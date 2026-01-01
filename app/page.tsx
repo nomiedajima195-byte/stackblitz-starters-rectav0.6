@@ -60,49 +60,50 @@ export default function Page() {
   return (
     <div className="min-h-screen bg-white text-black p-4 font-sans overflow-x-hidden">
       <div className="max-w-md mx-auto">
-        <header className="mb-8 flex justify-between items-center text-xs opacity-40 tracking-[0.3em]">
-          <h1>RECTA CLOUD v0.9</h1>
+        <header className="mb-12 flex justify-between items-center text-[10px] opacity-40 tracking-[0.4em]">
+          <h1>RECTA CLOUD v1.0</h1>
           <button onClick={() => fetchData()} className="border px-2 py-1">SYNC</button>
         </header>
 
         {!viewingSideParentId ? (
-          <div className="space-y-12 pb-32">
+          <div className="space-y-20 pb-32">
             {mainline.map((slot) => (
               <div key={slot.cell.id} className="relative group">
-                <button onClick={() => handleDelete(slot.cell.id, false)} className="absolute -top-2 -left-2 z-10 bg-white border border-black/10 text-[10px] w-5 h-5 rounded-full shadow-sm">×</button>
-                <div className="aspect-[3/4] bg-gray-50 rounded-xl overflow-hidden border">
-                  <img src={slot.cell.imageUrl} alt="" className="w-full h-full object-cover" />
+                <button onClick={() => handleDelete(slot.cell.id, false)} className="absolute -top-4 -left-2 z-10 text-[12px] opacity-20 hover:opacity-100">delete</button>
+                <div className="w-full bg-gray-50 rounded-sm overflow-hidden shadow-sm border border-gray-100">
+                  {/* 比率を固定せず、そのまま表示 */}
+                  <img src={slot.cell.imageUrl} alt="" className="w-full h-auto block" />
                 </div>
-                <button onClick={() => setViewingSideParentId(slot.cell.id)} className="absolute -right-2 bottom-4 bg-black text-white w-10 h-10 rounded-full flex items-center justify-center text-xl shadow-lg active:scale-95 transition-transform"> → </button>
+                <button onClick={() => setViewingSideParentId(slot.cell.id)} className="mt-4 flex items-center text-[10px] tracking-widest opacity-30 hover:opacity-100 transition-opacity">
+                  GO SIDEWAYS ➔
+                </button>
               </div>
             ))}
-            <label className="block aspect-[3/4] border-2 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer text-gray-300">
-              <span className="text-3xl font-light">＋</span>
-              <span className="text-[10px] mt-2 tracking-widest text-center">ADD MAIN</span>
+            <label className="block w-full aspect-video border border-dashed border-gray-200 rounded-sm flex flex-col items-center justify-center cursor-pointer text-gray-300 hover:bg-gray-50">
+              <span className="text-2xl font-light">＋</span>
               <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e)} />
             </label>
           </div>
         ) : (
           <div className="pb-32">
-            <button onClick={() => setViewingSideParentId(null)} className="text-[10px] opacity-40 mb-6 tracking-widest"> ← BACK TO MAIN </button>
+            <button onClick={() => setViewingSideParentId(null)} className="text-[10px] opacity-40 mb-12 tracking-widest"> ← BACK </button>
             
-            {/* 横並び・3:4 縦長カード仕様 */}
-            <div className="flex overflow-x-auto space-x-6 pb-8 scrollbar-hide snap-x p-2 -mx-4 px-4">
+            {/* 横並び・比率フリー仕様 */}
+            <div className="flex overflow-x-auto space-x-8 pb-8 scrollbar-hide snap-x items-center">
               { (sideCells[viewingSideParentId] || []).map((cell: any) => (
-                <div key={cell.id} className="relative group flex-shrink-0 w-48 aspect-[3/4] snap-center">
-                  <button onClick={() => handleDelete(cell.id, true)} className="absolute -top-2 -left-2 z-10 bg-white border border-black/10 text-[10px] w-5 h-5 rounded-full shadow-sm">×</button>
-                  <div className="w-full h-full bg-gray-50 rounded-xl overflow-hidden border shadow-sm">
-                    <img src={cell.imageUrl} alt="" className="w-full h-full object-cover" />
+                <div key={cell.id} className="relative group flex-shrink-0 snap-center">
+                  <button onClick={() => handleDelete(cell.id, true)} className="absolute -top-6 left-0 z-10 text-[10px] opacity-20">delete</button>
+                  <div className="h-[60vh] shadow-lg border border-gray-100 bg-gray-50">
+                    {/* 高さを固定して、横幅を画像に合わせる */}
+                    <img src={cell.imageUrl} alt="" className="h-full w-auto block object-contain" />
                   </div>
                 </div>
               ))}
-              <label className="flex-shrink-0 w-48 aspect-[3/4] border-2 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer text-gray-300 snap-center">
+              <label className="flex-shrink-0 w-40 h-[60vh] border border-dashed border-gray-200 rounded-sm flex flex-col items-center justify-center cursor-pointer text-gray-300 snap-center">
                 <span className="text-xl">＋</span>
-                <span className="text-[8px] mt-1 tracking-widest">ADD SIDE</span>
                 <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, viewingSideParentId)} />
               </label>
             </div>
-            <p className="text-[8px] opacity-20 mt-4 text-center tracking-widest">← SCROLL CARDS →</p>
           </div>
         )}
       </div>

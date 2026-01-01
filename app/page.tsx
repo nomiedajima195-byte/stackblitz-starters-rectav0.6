@@ -61,7 +61,7 @@ export default function Page() {
     <div className="min-h-screen bg-white text-black p-4 font-sans overflow-x-hidden">
       <div className="max-w-md mx-auto">
         <header className="mb-8 flex justify-between items-center text-xs opacity-40 tracking-[0.3em]">
-          <h1>RECTA CLOUD v0.8</h1>
+          <h1>RECTA CLOUD v0.9</h1>
           <button onClick={() => fetchData()} className="border px-2 py-1">SYNC</button>
         </header>
 
@@ -86,23 +86,23 @@ export default function Page() {
           <div className="pb-32">
             <button onClick={() => setViewingSideParentId(null)} className="text-[10px] opacity-40 mb-6 tracking-widest"> ← BACK TO MAIN </button>
             
-            {/* 横並び・横スクロール仕様 */}
-            <div className="flex overflow-x-auto space-x-4 pb-8 scrollbar-hide snap-x shadow-inner p-2 -mx-4 px-4">
+            {/* 横並び・3:4 縦長カード仕様 */}
+            <div className="flex overflow-x-auto space-x-6 pb-8 scrollbar-hide snap-x p-2 -mx-4 px-4">
               { (sideCells[viewingSideParentId] || []).map((cell: any) => (
-                <div key={cell.id} className="relative group flex-shrink-0 w-64 aspect-[4/3] snap-center">
+                <div key={cell.id} className="relative group flex-shrink-0 w-48 aspect-[3/4] snap-center">
                   <button onClick={() => handleDelete(cell.id, true)} className="absolute -top-2 -left-2 z-10 bg-white border border-black/10 text-[10px] w-5 h-5 rounded-full shadow-sm">×</button>
-                  <div className="w-full h-full bg-gray-50 rounded-lg overflow-hidden border">
+                  <div className="w-full h-full bg-gray-50 rounded-xl overflow-hidden border shadow-sm">
                     <img src={cell.imageUrl} alt="" className="w-full h-full object-cover" />
                   </div>
                 </div>
               ))}
-              <label className="flex-shrink-0 w-64 aspect-[4/3] border-2 border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer text-gray-300 snap-center">
+              <label className="flex-shrink-0 w-48 aspect-[3/4] border-2 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer text-gray-300 snap-center">
                 <span className="text-xl">＋</span>
                 <span className="text-[8px] mt-1 tracking-widest">ADD SIDE</span>
                 <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, viewingSideParentId)} />
               </label>
             </div>
-            <p className="text-[8px] opacity-20 mt-2 text-center tracking-widest">← SCROLL HORIZONTALLY →</p>
+            <p className="text-[8px] opacity-20 mt-4 text-center tracking-widest">← SCROLL CARDS →</p>
           </div>
         )}
       </div>

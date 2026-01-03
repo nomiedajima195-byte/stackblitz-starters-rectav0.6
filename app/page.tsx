@@ -127,4 +127,36 @@ export default function Page() {
               </button>
             </div>
             
-            <div className="flex overflow-x-auto space-x-6 pb-12 scrollbar-hide snap-x
+            <div className="flex overflow-x-auto space-x-6 pb-12 scrollbar-hide snap-x items-center px-4 -mx-10">
+              { (sideCells[viewingSideParentId] || []).map((cell: any) => (
+                <div key={cell.id} className="relative group flex-shrink-0 snap-center w-[85%]">
+                  <button onClick={() => handleDelete(cell.id, true)} className="absolute -top-8 left-0 z-10 w-4 h-4 opacity-40 hover:opacity-100">
+                    <div className="w-full h-[1px] bg-white rotate-45 absolute" /><div className="w-full h-[1px] bg-white -rotate-45 absolute" />
+                  </button>
+                  <div className="bg-white p-2 pb-10 rounded-[12px] shadow-2xl border border-white/[0.05]">
+                    <div className={filmEffectClass}>
+                      <div className="absolute inset-0 z-10 pointer-events-none bg-[radial-gradient(circle,transparent_40%,rgba(0,0,0,0.2)_140%)]" />
+                      <img src={cell.imageUrl} alt="" className="w-full h-full object-cover" style={{ imageOrientation: 'from-image' }} />
+                    </div>
+                  </div>
+                </div>
+              ))}
+              <label className="flex-shrink-0 w-24 aspect-square flex items-center justify-center cursor-pointer opacity-20 hover:opacity-100 transition-opacity">
+                <div className="w-2 h-2 border border-white rounded-full" />
+                <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, viewingSideParentId)} />
+              </label>
+            </div>
+          </div>
+        )}
+
+        {/* タスクバー：白い二重○（○の中にさらに小さい点） */}
+        <nav className="fixed bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-black via-black/90 to-transparent flex justify-center items-center pointer-events-none">
+          <label className={`w-14 h-14 bg-transparent border-2 border-white rounded-full flex items-center justify-center cursor-pointer shadow-[0_0_20px_rgba(255,255,255,0.1)] transition-all pointer-events-auto ${isUploading ? 'opacity-30 scale-75' : 'active:scale-90 hover:border-white/100'}`}>
+            <div className={`w-2 h-2 bg-white rounded-full ${isUploading ? 'animate-ping' : 'opacity-80'}`} />
+            <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, viewingSideParentId)} disabled={isUploading} />
+          </label>
+        </nav>
+      </div>
+    </div>
+  );
+}

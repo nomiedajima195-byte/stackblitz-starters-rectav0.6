@@ -7,11 +7,10 @@ const supabaseUrl = 'https://pfxwhcgdbavycddapqmz.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmeHdoY2dkYmF2eWNkZGFwcW16Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxNjQ0NzUsImV4cCI6MjA4Mjc0MDQ3NX0.YNQlbyocg2olS6-1WxTnbr5N2z52XcVIpI1XR-XrDtM';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// フィルム風エフェクト：ここでも「rounded-xl」と「aspect-square」を徹底
 const filmEffectClass = `
   relative w-full aspect-square overflow-hidden rounded-[12px] 
   brightness-[1.15] contrast-[1.4] saturate-[0.7] sepia-[0.2] 
-  hue-rotate-[-15deg] blur-[0.8px] bg-gray-200
+  hue-rotate-[-15deg] blur-[0.8px] bg-[#1A1A1A]
 `;
 
 export default function Page() {
@@ -51,17 +50,13 @@ export default function Page() {
         img.src = event.target?.result as string;
         img.onload = () => {
           const canvas = document.createElement('canvas');
-          const SIZE = 512; // 完全に正方形でリサイズ
-          canvas.width = SIZE;
-          canvas.height = SIZE;
+          const SIZE = 512;
+          canvas.width = SIZE; canvas.height = SIZE;
           const ctx = canvas.getContext('2d');
-          
-          // 中央でトリミングして描画
           const scale = Math.max(SIZE / img.width, SIZE / img.height);
           const x = (SIZE / 2) - (img.width / 2) * scale;
           const y = (SIZE / 2) - (img.height / 2) * scale;
           ctx?.drawImage(img, x, y, img.width * scale, img.height * scale);
-          
           resolve(canvas.toDataURL('image/jpeg', 0.85));
         };
       };
@@ -88,12 +83,13 @@ export default function Page() {
   };
 
   return (
-    <div className="min-h-screen bg-[#E2E2E2] text-black font-sans overflow-x-hidden">
-      <div className="fixed inset-0 pointer-events-none z-50 opacity-[0.05] mix-blend-overlay bg-[url('https://www.transparenttextures.com/patterns/stardust.png')]" />
+    <div className="min-h-screen bg-[#0A0A0A] text-white font-sans overflow-x-hidden">
+      {/* グレインエフェクト（背景が黒いのでより際立つ） */}
+      <div className="fixed inset-0 pointer-events-none z-50 opacity-[0.08] mix-blend-screen bg-[url('https://www.transparenttextures.com/patterns/stardust.png')]" />
 
       <div className="max-w-md mx-auto px-6">
         <header className="pt-12 pb-16 flex flex-col items-center">
-          <div onClick={() => fetchData()} className={`w-[18px] h-[36px] bg-black cursor-pointer shadow-sm transition-all ${isUploading ? 'animate-pulse opacity-50' : 'active:scale-90'}`} />
+          <div onClick={() => fetchData()} className={`w-[18px] h-[36px] bg-white cursor-pointer shadow-[0_0_15px_rgba(255,255,255,0.2)] transition-all ${isUploading ? 'animate-pulse opacity-50' : 'active:scale-90'}`} />
         </header>
 
         {!viewingSideParentId ? (
@@ -101,22 +97,22 @@ export default function Page() {
             {mainline.map((slot) => {
               const hasSide = (sideCells[slot.cell.id] || []).length > 0;
               return (
-                <div key={slot.cell.id} className="relative group">
-                  <button onClick={() => handleDelete(slot.cell.id, false)} className="absolute -top-3 -right-1 z-10 w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-20 hover:!opacity-100 transition-opacity">
-                    <div className="w-3 h-[1px] bg-black rotate-45 absolute" /><div className="w-3 h-[1px] bg-black -rotate-45 absolute" />
+                <div key={slot.cell.id} className="relative group animate-in fade-in zoom-in-95 duration-700">
+                  <button onClick={() => handleDelete(slot.cell.id, false)} className="absolute -top-3 -right-1 z-10 w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-40 hover:!opacity-100 transition-opacity">
+                    <div className="w-3 h-[1px] bg-white rotate-45 absolute" /><div className="w-3 h-[1px] bg-white -rotate-45 absolute" />
                   </button>
 
-                  <div className="bg-white p-3 pb-12 rounded-[12px] shadow-[0_20px_50px_-15px_rgba(0,0,0,0.3)] border border-black/[0.03]">
+                  <div className="bg-white p-3 pb-12 rounded-[12px] shadow-[0_20px_50px_rgba(0,0,0,0.8)] border border-white/[0.05]">
                     <div className={filmEffectClass}>
-                      <div className="absolute inset-0 z-10 pointer-events-none bg-[radial-gradient(circle,transparent_40%,rgba(0,0,0,0.25)_140%)]" />
+                      <div className="absolute inset-0 z-10 pointer-events-none bg-[radial-gradient(circle,transparent_40%,rgba(0,0,0,0.3)_140%)]" />
                       <img src={slot.cell.imageUrl} alt="" className="w-full h-full object-cover" style={{ imageOrientation: 'from-image' }} />
                     </div>
                   </div>
 
                   <div className="mt-10 flex items-center justify-center relative h-6">
-                    {hasSide && <div className="absolute w-full h-[1px] bg-black/[0.12]" />}
-                    <button onClick={() => setViewingSideParentId(slot.cell.id)} className="relative z-10 w-8 h-8 bg-white border border-black/[0.05] rounded-full flex items-center justify-center shadow-md active:scale-90">
-                      <div className="w-1.5 h-1.5 bg-black rounded-full opacity-30" />
+                    {hasSide && <div className="absolute w-full h-[1px] bg-white/[0.15]" />}
+                    <button onClick={() => setViewingSideParentId(slot.cell.id)} className="relative z-10 w-8 h-8 bg-[#1A1A1A] border border-white/[0.1] rounded-full flex items-center justify-center shadow-lg active:scale-90">
+                      <div className="w-1.5 h-1.5 bg-white rounded-full opacity-40" />
                     </button>
                   </div>
                 </div>
@@ -126,33 +122,9 @@ export default function Page() {
         ) : (
           <div className="pb-40 animate-in slide-in-from-right duration-500">
             <div className="flex justify-center mb-16">
-              <button onClick={() => setViewingSideParentId(null)} className="w-10 h-10 flex items-center justify-center opacity-20 hover:opacity-100"><div className="w-2 h-2 border-t border-l border-black -rotate-45" /></button>
+              <button onClick={() => setViewingSideParentId(null)} className="w-10 h-10 flex items-center justify-center opacity-40 hover:opacity-100 transition-opacity">
+                <div className="w-2 h-2 border-t border-l border-white -rotate-45" />
+              </button>
             </div>
             
-            <div className="flex overflow-x-auto space-x-6 pb-12 scrollbar-hide snap-x items-center px-4 -mx-10">
-              { (sideCells[viewingSideParentId] || []).map((cell: any) => (
-                <div key={cell.id} className="relative group flex-shrink-0 snap-center w-[85%]">
-                  <button onClick={() => handleDelete(cell.id, true)} className="absolute -top-8 left-0 z-10 w-4 h-4 opacity-10 hover:opacity-100"><div className="w-full h-[1px] bg-black rotate-45 absolute" /><div className="w-full h-[1px] bg-black -rotate-45 absolute" /></button>
-                  <div className="bg-white p-2 pb-10 rounded-[12px] shadow-2xl border border-black/[0.02]">
-                    <div className={filmEffectClass}>
-                      <div className="absolute inset-0 z-10 pointer-events-none bg-[radial-gradient(circle,transparent_40%,rgba(0,0,0,0.2)_140%)]" />
-                      <img src={cell.imageUrl} alt="" className="w-full h-full object-cover" style={{ imageOrientation: 'from-image' }} />
-                    </div>
-                  </div>
-                </div>
-              ))}
-              <label className="flex-shrink-0 w-24 aspect-square flex items-center justify-center cursor-pointer opacity-10"><div className="w-1.5 h-1.5 bg-black rounded-full" /><input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, viewingSideParentId)} /></label>
-            </div>
-          </div>
-        )}
-
-        <nav className="fixed bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-[#E2E2E2] via-[#E2E2E2]/90 to-transparent flex justify-center items-center pointer-events-none">
-          <label className={`w-14 h-14 bg-black rounded-full flex items-center justify-center cursor-pointer shadow-xl transition-all pointer-events-auto border-4 border-white ${isUploading ? 'opacity-30 scale-75' : 'active:scale-90'}`}>
-            <div className={`w-3 h-3 bg-white rounded-full ${isUploading ? 'animate-ping' : ''}`} />
-            <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, viewingSideParentId)} disabled={isUploading} />
-          </label>
-        </nav>
-      </div>
-    </div>
-  );
-}
+            <div className="flex overflow-x-auto space-x-6 pb-12 scrollbar-hide snap-x

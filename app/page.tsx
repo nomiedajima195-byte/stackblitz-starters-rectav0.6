@@ -73,7 +73,7 @@ export default function Page() {
       if (!parentId) { await supabase.from('mainline').insert([{ id: uniqueId, image_url: resizedDataUrl }]); }
       else { await supabase.from('side_cells').insert([{ id: uniqueId, parent_id: parentId, image_url: resizedDataUrl }]); }
       setTimeout(() => fetchData(), 500);
-    } catch (err) { console.error(err); } finally { setIsUploading(false); e.target.value = ''; }
+    } catch (err) { console.error(err); } finally { setIsUploading(false); if(e.target) e.target.value = ''; }
   };
 
   const handleDelete = async (id: string, isSide: boolean) => {
@@ -83,17 +83,21 @@ export default function Page() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] text-white font-sans overflow-x-hidden">
-      {/* グレインエフェクト（背景が黒いのでより際立つ） */}
+    <div className="min-h-screen bg-[#0A0A0A] text-white font-sans overflow-x-hidden selection:bg-none">
+      <style jsx global>{`
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+      `}</style>
+
       <div className="fixed inset-0 pointer-events-none z-50 opacity-[0.08] mix-blend-screen bg-[url('https://www.transparenttextures.com/patterns/stardust.png')]" />
 
-      <div className="max-w-md mx-auto px-6">
-        <header className="pt-12 pb-16 flex flex-col items-center">
+      <div className="max-w-md mx-auto">
+        <header className="pt-12 pb-16 flex flex-col items-center px-6">
           <div onClick={() => fetchData()} className={`w-[18px] h-[36px] bg-white cursor-pointer shadow-[0_0_15px_rgba(255,255,255,0.2)] transition-all ${isUploading ? 'animate-pulse opacity-50' : 'active:scale-90'}`} />
         </header>
 
         {!viewingSideParentId ? (
-          <div className="space-y-20 pb-40">
+          <div className="space-y-20 pb-40 px-6">
             {mainline.map((slot) => {
               const hasSide = (sideCells[slot.cell.id] || []).length > 0;
               return (
@@ -105,7 +109,7 @@ export default function Page() {
                   <div className="bg-white p-3 pb-12 rounded-[12px] shadow-[0_20px_50px_rgba(0,0,0,0.8)] border border-white/[0.05]">
                     <div className={filmEffectClass}>
                       <div className="absolute inset-0 z-10 pointer-events-none bg-[radial-gradient(circle,transparent_40%,rgba(0,0,0,0.3)_140%)]" />
-                      <img src={slot.cell.imageUrl} alt="" className="w-full h-full object-cover" style={{ imageOrientation: 'from-image' }} />
+                      <img src={slot.cell.imageUrl} alt="" className="w-full h-full object-cover" />
                     </div>
                   </div>
 
@@ -121,36 +125,44 @@ export default function Page() {
           </div>
         ) : (
           <div className="pb-40 animate-in slide-in-from-right duration-500">
-            <div className="flex justify-center mb-16">
+            <div className="flex justify-center mb-12 px-6">
               <button onClick={() => setViewingSideParentId(null)} className="w-10 h-10 flex items-center justify-center opacity-40 hover:opacity-100 transition-opacity">
                 <div className="w-2 h-2 border-t border-l border-white -rotate-45" />
               </button>
             </div>
             
-            <div className="flex overflow-x-auto space-x-6 pb-12 scrollbar-hide snap-x items-center px-4 -mx-10">
+            {/* 淵まで届く横スクロールエリア */}
+            <div className="flex overflow-x-auto scrollbar-hide snap-x snap-mandatory items-center w-screen overflow-y-hidden">
+              {/* 先頭の余白（最初の写真を中央に寄せるため） */}
+              <div className="flex-shrink-0 w-[7.5%]" />
+              
               { (sideCells[viewingSideParentId] || []).map((cell: any) => (
-                <div key={cell.id} className="relative group flex-shrink-0 snap-center w-[85%]">
-                  <button onClick={() => handleDelete(cell.id, true)} className="absolute -top-8 left-0 z-10 w-4 h-4 opacity-40 hover:opacity-100">
+                <div key={cell.id} className="relative group flex-shrink-0 snap-center w-[85%] px-2">
+                  <button onClick={() => handleDelete(cell.id, true)} className="absolute top-2 left-6 z-10 w-4 h-4 opacity-40 hover:opacity-100">
                     <div className="w-full h-[1px] bg-white rotate-45 absolute" /><div className="w-full h-[1px] bg-white -rotate-45 absolute" />
                   </button>
                   <div className="bg-white p-2 pb-10 rounded-[12px] shadow-2xl border border-white/[0.05]">
                     <div className={filmEffectClass}>
                       <div className="absolute inset-0 z-10 pointer-events-none bg-[radial-gradient(circle,transparent_40%,rgba(0,0,0,0.2)_140%)]" />
-                      <img src={cell.imageUrl} alt="" className="w-full h-full object-cover" style={{ imageOrientation: 'from-image' }} />
+                      <img src={cell.imageUrl} alt="" className="w-full h-full object-cover" />
                     </div>
                   </div>
                 </div>
               ))}
-              <label className="flex-shrink-0 w-24 aspect-square flex items-center justify-center cursor-pointer opacity-20 hover:opacity-100 transition-opacity">
+              
+              {/* 追加ボタンもスナップ対象に */}
+              <label className="flex-shrink-0 w-[50%] aspect-square flex items-center justify-center cursor-pointer opacity-20 hover:opacity-100 transition-opacity snap-center">
                 <div className="w-2 h-2 border border-white rounded-full" />
                 <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, viewingSideParentId)} />
               </label>
+
+              {/* 末尾の余白 */}
+              <div className="flex-shrink-0 w-[7.5%]" />
             </div>
           </div>
         )}
 
-        {/* タスクバー：白い二重○（○の中にさらに小さい点） */}
-        <nav className="fixed bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-black via-black/90 to-transparent flex justify-center items-center pointer-events-none">
+        <nav className="fixed bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-black via-black/90 to-transparent flex justify-center items-center pointer-events-none z-40">
           <label className={`w-14 h-14 bg-transparent border-2 border-white rounded-full flex items-center justify-center cursor-pointer shadow-[0_0_20px_rgba(255,255,255,0.1)] transition-all pointer-events-auto ${isUploading ? 'opacity-30 scale-75' : 'active:scale-90 hover:border-white/100'}`}>
             <div className={`w-2 h-2 bg-white rounded-full ${isUploading ? 'animate-ping' : 'opacity-80'}`} />
             <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, viewingSideParentId)} disabled={isUploading} />

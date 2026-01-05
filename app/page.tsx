@@ -46,11 +46,21 @@ export default function Page() {
     return () => { supabase.removeChannel(channel); };
   }, [fetchData]);
 
-  // 地雷URLコピー用関数
+  // 地雷URLコピー用
   const copyMineUrl = (id: string) => {
     const url = `${window.location.origin}?mine=${id}`;
-    navigator.clipboard.writeText(url);
-    alert("地雷URLを生成・コピーしました。これをターゲットに送ってください。");
+    // 古いスマホでも動くように互換性のあるコピー方法
+    const textArea = document.createElement("textarea");
+    textArea.value = url;
+    document.body.appendChild(textArea);
+    textArea.select();
+    try {
+      document.execCommand('copy');
+      alert("💣 地雷生成完了\nURLをコピーしました。ターゲットへ送ってください。");
+    } catch (err) {
+      console.error('Copy failed', err);
+    }
+    document.body.removeChild(textArea);
   };
 
   const resizeImage = (file: File): Promise<string> => {
@@ -130,13 +140,13 @@ export default function Page() {
                         <div className="w-3 h-[1px] bg-white rotate-45 absolute" /><div className="w-3 h-[1px] bg-white -rotate-45 absolute" />
                       </button>
                       
-                      {/* 画像を長押しで地雷URLを生成 */}
+                      {/* 画像の土台（白枠）を3連タップで地雷コピー */}
                       <div 
-                        onContextMenu={(e) => { e.preventDefault(); copyMineUrl(slot.cell.id); }}
-                        className="bg-white p-3 pb-12 rounded-[12px] shadow-[0_20px_50px_rgba(0,0,0,0.8)] border border-white/[0.05] active:scale-[0.98] transition-transform cursor-pointer"
+                        onClick={(e) => { if (e.detail === 3) copyMineUrl(slot.cell.id); }}
+                        className="bg-white p-3 pb-12 rounded-[12px] shadow-[0_20px_50px_rgba(0,0,0,0.8)] border border-white/[0.05] active:scale-[0.99] transition-transform cursor-pointer"
                       >
                         <div className={filmEffectClass}>
-                          <img src={slot.cell.imageUrl} alt="" className="w-full h-full object-cover" />
+                          <img src={slot.cell.imageUrl} alt="" className="w-full h-full object-cover pointer-events-none" />
                         </div>
                       </div>
                       
@@ -151,6 +161,7 @@ export default function Page() {
                 })}
               </div>
             ) : (
+              /* 横丁表示 */
               <div className="pb-40 animate-in slide-in-from-right duration-500">
                 <div className="flex justify-center mb-12 px-6">
                   <button onClick={() => { setViewingSideParentId(null); }} className="w-10 h-10 flex items-center justify-center opacity-40 hover:opacity-100 transition-opacity">
@@ -163,11 +174,11 @@ export default function Page() {
                     <div key={cell.id} className="relative group flex-shrink-0 snap-center w-[85%] px-2">
                       <button onClick={() => handleDelete(cell.id, true)} className="absolute top-2 left-6 z-10 w-4 h-4 opacity-40 hover:opacity-100"><div className="w-full h-[1px] bg-white rotate-45 absolute" /><div className="w-full h-[1px] bg-white -rotate-45 absolute" /></button>
                       <div 
-                        onContextMenu={(e) => { e.preventDefault(); copyMineUrl(viewingSideParentId); }} // 横丁内でも親の地雷URLをコピー
+                        onClick={(e) => { if (e.detail === 3) copyMineUrl(viewingSideParentId); }}
                         className="bg-white p-2 pb-10 rounded-[12px] shadow-2xl border border-white/[0.05]"
                       >
                         <div className={filmEffectClass}>
-                          <img src={cell.imageUrl} alt="" className="w-full h-full object-cover" />
+                          <img src={cell.imageUrl} alt="" className="w-full h-full object-cover pointer-events-none" />
                         </div>
                       </div>
                     </div>

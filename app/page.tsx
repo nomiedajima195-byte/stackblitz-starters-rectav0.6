@@ -18,7 +18,7 @@ export default function Page() {
   const [sideCells, setSideCells] = useState<any>({});
   const [viewingSideParentId, setViewingSideParentId] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [isMineMode, setIsMineMode] = useState<string | null>(null); // 地雷モード
+  const [isMineMode, setIsMineMode] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -42,10 +42,16 @@ export default function Page() {
     const params = new URLSearchParams(window.location.search);
     const mineId = params.get('mine');
     if (mineId) setIsMineMode(mineId);
-
     const channel = supabase.channel('realtime').on('postgres_changes', { event: '*', schema: 'public' }, () => fetchData()).subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [fetchData]);
+
+  // 地雷URLコピー用関数
+  const copyMineUrl = (id: string) => {
+    const url = `${window.location.origin}?mine=${id}`;
+    navigator.clipboard.writeText(url);
+    alert("地雷URLを生成・コピーしました。これをターゲットに送ってください。");
+  };
 
   const resizeImage = (file: File): Promise<string> => {
     return new Promise((resolve) => {
@@ -88,7 +94,6 @@ export default function Page() {
     fetchData();
   };
 
-  // 地雷モードで表示するターゲット画像
   const targetImage = mainline.find(m => m.cell.id === isMineMode)?.cell.imageUrl;
 
   return (
@@ -97,17 +102,12 @@ export default function Page() {
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
-
       <div className="fixed inset-0 pointer-events-none z-50 opacity-[0.08] mix-blend-screen bg-[url('https://www.transparenttextures.com/patterns/stardust.png')]" />
 
       <div className="max-w-md mx-auto">
         {isMineMode && targetImage ? (
-          /* 地雷ページ：ターゲットのクソ画像を1枚だけ見せる */
           <div className="flex flex-col items-center justify-center min-h-screen px-6 animate-in fade-in duration-1000">
-            <div 
-              onClick={() => setIsMineMode(null)} 
-              className="w-full bg-white p-3 pb-12 rounded-[12px] shadow-2xl cursor-pointer active:scale-95 transition-transform"
-            >
+            <div onClick={() => setIsMineMode(null)} className="w-full bg-white p-3 pb-12 rounded-[12px] shadow-2xl cursor-pointer active:scale-95 transition-transform">
               <div className={filmEffectClass}>
                 <img src={targetImage} alt="" className="w-full h-full object-cover" />
               </div>
@@ -115,7 +115,6 @@ export default function Page() {
             <p className="mt-8 text-white/10 text-[10px] tracking-[0.2em] uppercase">Private Record</p>
           </div>
         ) : (
-          /* メインコンテンツ（路地裏全体） */
           <>
             <header className="pt-12 pb-16 flex flex-col items-center px-6">
               <div onClick={() => fetchData()} className={`w-[18px] h-[36px] bg-white cursor-pointer shadow-[0_0_15px_rgba(255,255,255,0.2)] transition-all ${isUploading ? 'animate-pulse opacity-50' : 'active:scale-90'}`} />
@@ -127,18 +126,20 @@ export default function Page() {
                   const hasSide = (sideCells[slot.cell.id] || []).length > 0;
                   return (
                     <div key={slot.cell.id} className="relative group animate-in fade-in zoom-in-95 duration-700">
-                      <button 
-                        onLongPress={() => { navigator.clipboard.writeText(`${window.location.origin}?mine=${slot.cell.id}`); alert('地雷URLをコピーしました'); }}
-                        onClick={() => handleDelete(slot.cell.id, false)} 
-                        className="absolute -top-3 -right-1 z-10 w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-40 hover:!opacity-100 transition-opacity"
-                      >
+                      <button onClick={() => handleDelete(slot.cell.id, false)} className="absolute -top-3 -right-1 z-10 w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-40 hover:!opacity-100 transition-opacity">
                         <div className="w-3 h-[1px] bg-white rotate-45 absolute" /><div className="w-3 h-[1px] bg-white -rotate-45 absolute" />
                       </button>
-                      <div className="bg-white p-3 pb-12 rounded-[12px] shadow-[0_20px_50px_rgba(0,0,0,0.8)] border border-white/[0.05]">
+                      
+                      {/* 画像を長押しで地雷URLを生成 */}
+                      <div 
+                        onContextMenu={(e) => { e.preventDefault(); copyMineUrl(slot.cell.id); }}
+                        className="bg-white p-3 pb-12 rounded-[12px] shadow-[0_20px_50px_rgba(0,0,0,0.8)] border border-white/[0.05] active:scale-[0.98] transition-transform cursor-pointer"
+                      >
                         <div className={filmEffectClass}>
                           <img src={slot.cell.imageUrl} alt="" className="w-full h-full object-cover" />
                         </div>
                       </div>
+                      
                       <div className="mt-10 flex items-center justify-center relative h-6">
                         {hasSide && <div className="absolute w-full h-[1px] bg-white/[0.15]" />}
                         <button onClick={() => setViewingSideParentId(slot.cell.id)} className="relative z-10 w-8 h-8 bg-[#1A1A1A] border border-white/[0.1] rounded-full flex items-center justify-center shadow-lg active:scale-90">
@@ -152,7 +153,7 @@ export default function Page() {
             ) : (
               <div className="pb-40 animate-in slide-in-from-right duration-500">
                 <div className="flex justify-center mb-12 px-6">
-                  <button onClick={() => setViewingSideParentId(null)} className="w-10 h-10 flex items-center justify-center opacity-40 hover:opacity-100 transition-opacity">
+                  <button onClick={() => { setViewingSideParentId(null); }} className="w-10 h-10 flex items-center justify-center opacity-40 hover:opacity-100 transition-opacity">
                     <div className="w-2 h-2 border-t border-l border-white -rotate-45" />
                   </button>
                 </div>
@@ -161,7 +162,10 @@ export default function Page() {
                   { (sideCells[viewingSideParentId] || []).map((cell: any) => (
                     <div key={cell.id} className="relative group flex-shrink-0 snap-center w-[85%] px-2">
                       <button onClick={() => handleDelete(cell.id, true)} className="absolute top-2 left-6 z-10 w-4 h-4 opacity-40 hover:opacity-100"><div className="w-full h-[1px] bg-white rotate-45 absolute" /><div className="w-full h-[1px] bg-white -rotate-45 absolute" /></button>
-                      <div className="bg-white p-2 pb-10 rounded-[12px] shadow-2xl border border-white/[0.05]">
+                      <div 
+                        onContextMenu={(e) => { e.preventDefault(); copyMineUrl(viewingSideParentId); }} // 横丁内でも親の地雷URLをコピー
+                        className="bg-white p-2 pb-10 rounded-[12px] shadow-2xl border border-white/[0.05]"
+                      >
                         <div className={filmEffectClass}>
                           <img src={cell.imageUrl} alt="" className="w-full h-full object-cover" />
                         </div>

@@ -46,20 +46,16 @@ export default function Page() {
     return () => { supabase.removeChannel(channel); };
   }, [fetchData]);
 
-  // 地雷URLコピー用
   const copyMineUrl = (id: string) => {
     const url = `${window.location.origin}?mine=${id}`;
-    // 古いスマホでも動くように互換性のあるコピー方法
     const textArea = document.createElement("textarea");
     textArea.value = url;
     document.body.appendChild(textArea);
     textArea.select();
     try {
       document.execCommand('copy');
-      alert("💣 地雷生成完了\nURLをコピーしました。ターゲットへ送ってください。");
-    } catch (err) {
-      console.error('Copy failed', err);
-    }
+      alert("💣 地雷URLをコピーしました。\nターゲットに送ってください。");
+    } catch (err) { console.error('Copy failed', err); }
     document.body.removeChild(textArea);
   };
 
@@ -136,17 +132,19 @@ export default function Page() {
                   const hasSide = (sideCells[slot.cell.id] || []).length > 0;
                   return (
                     <div key={slot.cell.id} className="relative group animate-in fade-in zoom-in-95 duration-700">
-                      <button onClick={() => handleDelete(slot.cell.id, false)} className="absolute -top-3 -right-1 z-10 w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-40 hover:!opacity-100 transition-opacity">
+                      {/* 右上の削除ボタン */}
+                      <button onClick={() => handleDelete(slot.cell.id, false)} className="absolute -top-3 -right-1 z-20 w-8 h-8 flex items-center justify-center opacity-0 group-hover:opacity-40 hover:!opacity-100">
                         <div className="w-3 h-[1px] bg-white rotate-45 absolute" /><div className="w-3 h-[1px] bg-white -rotate-45 absolute" />
                       </button>
+
+                      {/* 左上の透明な地雷URLコピーボタン */}
+                      <button onClick={() => copyMineUrl(slot.cell.id)} className="absolute -top-3 -left-1 z-20 w-8 h-8 opacity-0 pointer-events-auto cursor-default">
+                        MINE
+                      </button>
                       
-                      {/* 画像の土台（白枠）を3連タップで地雷コピー */}
-                      <div 
-                        onClick={(e) => { if (e.detail === 3) copyMineUrl(slot.cell.id); }}
-                        className="bg-white p-3 pb-12 rounded-[12px] shadow-[0_20px_50px_rgba(0,0,0,0.8)] border border-white/[0.05] active:scale-[0.99] transition-transform cursor-pointer"
-                      >
+                      <div className="bg-white p-3 pb-12 rounded-[12px] shadow-[0_20px_50px_rgba(0,0,0,0.8)] border border-white/[0.05]">
                         <div className={filmEffectClass}>
-                          <img src={slot.cell.imageUrl} alt="" className="w-full h-full object-cover pointer-events-none" />
+                          <img src={slot.cell.imageUrl} alt="" className="w-full h-full object-cover" />
                         </div>
                       </div>
                       
@@ -173,12 +171,13 @@ export default function Page() {
                   { (sideCells[viewingSideParentId] || []).map((cell: any) => (
                     <div key={cell.id} className="relative group flex-shrink-0 snap-center w-[85%] px-2">
                       <button onClick={() => handleDelete(cell.id, true)} className="absolute top-2 left-6 z-10 w-4 h-4 opacity-40 hover:opacity-100"><div className="w-full h-[1px] bg-white rotate-45 absolute" /><div className="w-full h-[1px] bg-white -rotate-45 absolute" /></button>
-                      <div 
-                        onClick={(e) => { if (e.detail === 3) copyMineUrl(viewingSideParentId); }}
-                        className="bg-white p-2 pb-10 rounded-[12px] shadow-2xl border border-white/[0.05]"
-                      >
+                      
+                      {/* 横丁内でも写真の左上あたりをタップで親の地雷URLをコピー */}
+                      <div onClick={() => copyMineUrl(viewingSideParentId)} className="absolute top-0 left-0 w-20 h-20 z-20 opacity-0" />
+
+                      <div className="bg-white p-2 pb-10 rounded-[12px] shadow-2xl border border-white/[0.05]">
                         <div className={filmEffectClass}>
-                          <img src={cell.imageUrl} alt="" className="w-full h-full object-cover pointer-events-none" />
+                          <img src={cell.imageUrl} alt="" className="w-full h-full object-cover" />
                         </div>
                       </div>
                     </div>

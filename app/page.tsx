@@ -9,8 +9,7 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const filmEffectClass = `
   relative w-full aspect-square overflow-hidden rounded-[12px] 
-  brightness-[1.15] contrast-[1.4] saturate-[0.7] sepia-[0.2] 
-  hue-rotate-[-15deg] blur-[0.8px] bg-[#1A1A1A]
+  brightness-[1.1] contrast-[1.2] bg-[#1A1A1A]
 `;
 
 export default function Page() {
@@ -58,37 +57,77 @@ export default function Page() {
     document.body.removeChild(textArea);
   };
 
-  // 画像アップロードと倉庫への保存
+  // 🛠️ 闇の現像フィルター（保存時に加工）
+  const processImage = (file: File): Promise<Blob> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const SIZE = 600; 
+          canvas.width = SIZE; canvas.height = SIZE;
+          const ctx = canvas.getContext('2d')!;
+
+          // 中央切り抜き配置
+          const scale = Math.max(SIZE / img.width, SIZE / img.height);
+          const x = (SIZE / 2) - (img.width / 2) * scale;
+          const y = (SIZE / 2) - (img.height / 2) * scale;
+          ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
+
+          // 1. 彩度を落として銀残し風に
+          ctx.globalCompositeOperation = 'overlay';
+          ctx.fillStyle = 'rgba(0,0,0,0.2)';
+          ctx.fillRect(0, 0, SIZE, SIZE);
+
+          // 2. ヴィネット効果（四隅を暗く）
+          const grad = ctx.createRadialGradient(SIZE/2, SIZE/2, SIZE/4, SIZE/2, SIZE/2, SIZE/1.4);
+          grad.addColorStop(0, 'rgba(0,0,0,0)');
+          grad.addColorStop(1, 'rgba(0,0,0,0.5)');
+          ctx.fillStyle = grad;
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.fillRect(0, 0, SIZE, SIZE);
+
+          // 3. 粒状感（ノイズ）
+          for (let i = 0; i < 5000; i++) {
+            const rx = Math.random() * SIZE;
+            const ry = Math.random() * SIZE;
+            ctx.fillStyle = `rgba(255,255,255,${Math.random() * 0.05})`;
+            ctx.fillRect(rx, ry, 1, 1);
+          }
+
+          canvas.toBlob((blob) => resolve(blob!), 'image/jpeg', 0.8);
+        };
+      };
+    });
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, parentId: string | null = null) => {
     const file = e.target.files?.[0];
     if (!file || isUploading) return;
     setIsUploading(true);
     try {
+      // 現像処理を実行
+      const processedBlob = await processImage(file);
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
       
-      // 1. 倉庫(Storage)にアップロード
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('images')
-        .upload(fileName, file);
+      const { error: uploadError } = await supabase.storage.from('images').upload(fileName, processedBlob);
       if (uploadError) throw uploadError;
 
-      // 2. 公開URLを取得
       const { data: { publicUrl } } = supabase.storage.from('images').getPublicUrl(fileName);
 
-      // 3. データベースにはURLだけを保存
-      const uniqueId = fileName;
-      if (!parentId) { await supabase.from('mainline').insert([{ id: uniqueId, image_url: publicUrl }]); }
-      else { await supabase.from('side_cells').insert([{ id: uniqueId, parent_id: parentId, image_url: publicUrl }]); }
+      if (!parentId) { await supabase.from('mainline').insert([{ id: fileName, image_url: publicUrl }]); }
+      else { await supabase.from('side_cells').insert([{ id: fileName, parent_id: parentId, image_url: publicUrl }]); }
       
       setTimeout(() => fetchData(), 500);
-    } catch (err) { alert("アップロードに失敗しました。バケット設定を確認してください。"); } finally { setIsUploading(false); if(e.target) e.target.value = ''; }
+    } catch (err) { alert("現像に失敗しました。"); } finally { setIsUploading(false); if(e.target) e.target.value = ''; }
   };
 
   const handleDelete = async (id: string, isSide: boolean) => {
-    // 倉庫からも削除（任意ですがマナーとして）
     await supabase.storage.from('images').remove([id]);
-    const table = isSide ? 'side_cells' : 'mainline';
-    await supabase.from(table).delete().eq('id', id);
+    await supabase.from(isSide ? 'side_cells' : 'mainline').delete().eq('id', id);
     fetchData();
   };
 
@@ -103,17 +142,15 @@ export default function Page() {
     return null;
   };
 
-  const targetImage = getTargetImage();
-
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-white font-sans overflow-x-hidden selection:bg-none">
       <style jsx global>{` .scrollbar-hide::-webkit-scrollbar { display: none; } .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; } `}</style>
       <div className="fixed inset-0 pointer-events-none z-50 opacity-[0.08] mix-blend-screen bg-[url('https://www.transparenttextures.com/patterns/stardust.png')]" />
       <div className="max-w-md mx-auto">
-        {isMineMode && targetImage ? (
+        {isMineMode && getTargetImage() ? (
           <div className="flex flex-col items-center justify-center min-h-screen px-6 animate-in fade-in duration-1000">
             <div onClick={() => setIsMineMode(null)} className="w-full bg-white p-3 pb-12 rounded-[12px] shadow-2xl cursor-pointer active:scale-95 transition-transform">
-              <div className={filmEffectClass}><img src={targetImage} alt="" className="w-full h-full object-cover" /></div>
+              <div className={filmEffectClass}><img src={getTargetImage()!} alt="" className="w-full h-full object-cover" /></div>
             </div>
           </div>
         ) : (

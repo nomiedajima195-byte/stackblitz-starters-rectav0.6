@@ -7,10 +7,7 @@ const supabaseUrl = 'https://pfxwhcgdbavycddapqmz.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmeHdoY2dkYmF2eWNkZGFwcW16Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxNjQ0NzUsImV4cCI6MjA4Mjc0MDQ3NX0.YNQlbyocg2olS6-1WxTnbr5N2z52XcVIpI1XR-XrDtM';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-const filmEffectClass = `
-  relative w-full aspect-square overflow-hidden rounded-[12px] 
-  brightness-[1.1] contrast-[1.2] bg-[#1A1A1A]
-`;
+const filmEffectClass = `relative w-full aspect-square overflow-hidden rounded-[12px] brightness-[1.1] contrast-[1.2] bg-[#1A1A1A]`;
 
 export default function Page() {
   const [mainline, setMainline] = useState<any[]>([]);
@@ -57,7 +54,6 @@ export default function Page() {
     document.body.removeChild(textArea);
   };
 
-  // 🛠️ 闇の現像フィルター（保存時に加工）
   const processImage = (file: File): Promise<Blob> => {
     return new Promise((resolve) => {
       const reader = new FileReader();
@@ -70,19 +66,18 @@ export default function Page() {
           const SIZE = 600; 
           canvas.width = SIZE; canvas.height = SIZE;
           const ctx = canvas.getContext('2d')!;
+          ctx.fillStyle = "#000"; // 下地を黒で塗りつぶし
+          ctx.fillRect(0, 0, SIZE, SIZE);
 
-          // 中央切り抜き配置
           const scale = Math.max(SIZE / img.width, SIZE / img.height);
           const x = (SIZE / 2) - (img.width / 2) * scale;
           const y = (SIZE / 2) - (img.height / 2) * scale;
           ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
 
-          // 1. 彩度を落として銀残し風に
           ctx.globalCompositeOperation = 'overlay';
           ctx.fillStyle = 'rgba(0,0,0,0.2)';
           ctx.fillRect(0, 0, SIZE, SIZE);
 
-          // 2. ヴィネット効果（四隅を暗く）
           const grad = ctx.createRadialGradient(SIZE/2, SIZE/2, SIZE/4, SIZE/2, SIZE/2, SIZE/1.4);
           grad.addColorStop(0, 'rgba(0,0,0,0)');
           grad.addColorStop(1, 'rgba(0,0,0,0.5)');
@@ -90,7 +85,6 @@ export default function Page() {
           ctx.globalCompositeOperation = 'source-over';
           ctx.fillRect(0, 0, SIZE, SIZE);
 
-          // 3. 粒状感（ノイズ）
           for (let i = 0; i < 5000; i++) {
             const rx = Math.random() * SIZE;
             const ry = Math.random() * SIZE;
@@ -109,17 +103,18 @@ export default function Page() {
     if (!file || isUploading) return;
     setIsUploading(true);
     try {
-      // 現像処理を実行
       const processedBlob = await processImage(file);
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
-      
       const { error: uploadError } = await supabase.storage.from('images').upload(fileName, processedBlob);
       if (uploadError) throw uploadError;
 
       const { data: { publicUrl } } = supabase.storage.from('images').getPublicUrl(fileName);
 
-      if (!parentId) { await supabase.from('mainline').insert([{ id: fileName, image_url: publicUrl }]); }
-      else { await supabase.from('side_cells').insert([{ id: fileName, parent_id: parentId, image_url: publicUrl }]); }
+      if (!parentId) {
+        await supabase.from('mainline').insert([{ id: fileName, image_url: publicUrl }]);
+      } else {
+        await supabase.from('side_cells').insert([{ id: fileName, parent_id: parentId, image_url: publicUrl }]);
+      }
       
       setTimeout(() => fetchData(), 500);
     } catch (err) { alert("現像に失敗しました。"); } finally { setIsUploading(false); if(e.target) e.target.value = ''; }

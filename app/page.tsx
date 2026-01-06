@@ -16,22 +16,63 @@ export default function Page() {
   const [isUploading, setIsUploading] = useState(false);
   const [isMineMode, setIsMineMode] = useState<string | null>(null);
 
-  const fetchData = useCallback(async () => {
-    try {
-      const boundaryTime = new Date(Date.now() - 168 * 60 * 60 * 1000).toISOString();
-      const { data: mainData } = await supabase.from('mainline').select('*').gt('created_at', boundaryTime).order('created_at', { ascending: false });
-      const { data: sideData } = await supabase.from('side_cells').select('*').gt('created_at', boundaryTime).order('created_at', { ascending: true });
-      if (mainData) setMainline(mainData.map(d => ({ cell: { id: d.id, imageUrl: d.image_url } })));
-      if (sideData) {
-        const grouped: any = {};
-        sideData.forEach(s => {
-          if (!grouped[s.parent_id]) grouped[s.parent_id] = [];
-          grouped[s.parent_id].push({ id: s.id, imageUrl: s.image_url });
-        });
-        setSideCells(grouped);
+  const cleanup = useCallback(async () => {
+    const boundary = new Date(Date.now() - 168 * 60 * 60 * 1000).toISOString();
+    
+    // 1. 寿命が尽きたメイン画像を取得
+    const { data: expiredMain } = await supabase.from('mainline').select('*').lt('created_at', boundary);
+    
+    if (expiredMain && expiredMain.length > 0) {
+      for (const main of expiredMain) {
+        // 横丁があるか確認
+        const { data: sides } = await supabase.from('side_cells').select('*').eq('parent_id', main.id).order('created_at', { ascending: true });
+        
+        if (sides && sides.length > 0) {
+          // 横丁の1枚目をメインに昇格させる
+          const firstSide = sides[0];
+          await supabase.from('mainline').insert([{ id: firstSide.id, image_url: firstSide.image_url, created_at: firstSide.created_at }]);
+          // 残りの横丁の親IDを新しいメインのIDに付け替える
+          if (sides.length > 1) {
+            const otherSides = sides.slice(1);
+            for (const s of otherSides) {
+              await supabase.from('side_cells').update({ parent_id: firstSide.id }).eq('id', s.id);
+            }
+          }
+          // 旧横丁の1枚目を削除（メインになったので）
+          await supabase.from('side_cells').delete().eq('id', firstSide.id);
+        }
+        
+        // 寿命が尽きたメインを削除（倉庫からも）
+        await supabase.storage.from('images').remove([main.id]);
+        await supabase.from('mainline').delete().eq('id', main.id);
       }
-    } catch (e) { console.error(e); }
+    }
+
+    // 2. 親のいない（または寿命の）横丁も掃除
+    const { data: expiredSides } = await supabase.from('side_cells').select('*').lt('created_at', boundary);
+    if (expiredSides) {
+      for (const s of expiredSides) {
+        await supabase.storage.from('images').remove([s.id]);
+        await supabase.from('side_cells').delete().eq('id', s.id);
+      }
+    }
   }, []);
+
+  const fetchData = useCallback(async () => {
+    await cleanup(); // 取得前に掃除を実行
+    const { data: mainData } = await supabase.from('mainline').select('*').order('created_at', { ascending: false });
+    const { data: sideData } = await supabase.from('side_cells').select('*').order('created_at', { ascending: true });
+    
+    if (mainData) setMainline(mainData.map(d => ({ cell: { id: d.id, imageUrl: d.image_url } })));
+    if (sideData) {
+      const grouped: any = {};
+      sideData.forEach(s => {
+        if (!grouped[s.parent_id]) grouped[s.parent_id] = [];
+        grouped[s.parent_id].push({ id: s.id, imageUrl: s.image_url });
+      });
+      setSideCells(grouped);
+    }
+  }, [cleanup]);
 
   useEffect(() => {
     fetchData();
@@ -46,14 +87,7 @@ export default function Page() {
     return () => { supabase.removeChannel(channel); };
   }, [fetchData]);
 
-  const copyMineUrl = (id: string, isAlley: boolean = false) => {
-    const url = `${window.location.origin}?mine=${id}${isAlley ? '&type=alley' : ''}`;
-    const textArea = document.createElement("textarea");
-    textArea.value = url; document.body.appendChild(textArea); textArea.select();
-    try { document.execCommand('copy'); alert("💣 地雷URLをコピーしました。"); } catch (e) {}
-    document.body.removeChild(textArea);
-  };
-
+  // --- 処理ロジック (processImage, handleFileUpload, copyMineUrl) は v4.2 と同じ ---
   const processImage = (file: File): Promise<Blob> => {
     return new Promise((resolve) => {
       const reader = new FileReader();
@@ -66,32 +100,25 @@ export default function Page() {
           const SIZE = 600; 
           canvas.width = SIZE; canvas.height = SIZE;
           const ctx = canvas.getContext('2d')!;
-          ctx.fillStyle = "#000"; // 下地を黒で塗りつぶし
+          ctx.fillStyle = "#000";
           ctx.fillRect(0, 0, SIZE, SIZE);
-
           const scale = Math.max(SIZE / img.width, SIZE / img.height);
           const x = (SIZE / 2) - (img.width / 2) * scale;
           const y = (SIZE / 2) - (img.height / 2) * scale;
           ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
-
           ctx.globalCompositeOperation = 'overlay';
           ctx.fillStyle = 'rgba(0,0,0,0.2)';
           ctx.fillRect(0, 0, SIZE, SIZE);
-
           const grad = ctx.createRadialGradient(SIZE/2, SIZE/2, SIZE/4, SIZE/2, SIZE/2, SIZE/1.4);
-          grad.addColorStop(0, 'rgba(0,0,0,0)');
-          grad.addColorStop(1, 'rgba(0,0,0,0.5)');
+          grad.addColorStop(0, 'rgba(0,0,0,0)'); grad.addColorStop(1, 'rgba(0,0,0,0.5)');
           ctx.fillStyle = grad;
           ctx.globalCompositeOperation = 'source-over';
           ctx.fillRect(0, 0, SIZE, SIZE);
-
           for (let i = 0; i < 5000; i++) {
-            const rx = Math.random() * SIZE;
-            const ry = Math.random() * SIZE;
+            const rx = Math.random() * SIZE; const ry = Math.random() * SIZE;
             ctx.fillStyle = `rgba(255,255,255,${Math.random() * 0.05})`;
             ctx.fillRect(rx, ry, 1, 1);
           }
-
           canvas.toBlob((blob) => resolve(blob!), 'image/jpeg', 0.8);
         };
       };
@@ -107,15 +134,9 @@ export default function Page() {
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
       const { error: uploadError } = await supabase.storage.from('images').upload(fileName, processedBlob);
       if (uploadError) throw uploadError;
-
       const { data: { publicUrl } } = supabase.storage.from('images').getPublicUrl(fileName);
-
-      if (!parentId) {
-        await supabase.from('mainline').insert([{ id: fileName, image_url: publicUrl }]);
-      } else {
-        await supabase.from('side_cells').insert([{ id: fileName, parent_id: parentId, image_url: publicUrl }]);
-      }
-      
+      if (!parentId) { await supabase.from('mainline').insert([{ id: fileName, image_url: publicUrl }]); }
+      else { await supabase.from('side_cells').insert([{ id: fileName, parent_id: parentId, image_url: publicUrl }]); }
       setTimeout(() => fetchData(), 500);
     } catch (err) { alert("現像に失敗しました。"); } finally { setIsUploading(false); if(e.target) e.target.value = ''; }
   };
@@ -124,6 +145,14 @@ export default function Page() {
     await supabase.storage.from('images').remove([id]);
     await supabase.from(isSide ? 'side_cells' : 'mainline').delete().eq('id', id);
     fetchData();
+  };
+
+  const copyMineUrl = (id: string, isAlley: boolean = false) => {
+    const url = `${window.location.origin}?mine=${id}${isAlley ? '&type=alley' : ''}`;
+    const textArea = document.createElement("textarea");
+    textArea.value = url; document.body.appendChild(textArea); textArea.select();
+    try { document.execCommand('copy'); alert("💣 地雷URLをコピーしました。"); } catch (e) {}
+    document.body.removeChild(textArea);
   };
 
   const getTargetImage = () => {
@@ -138,7 +167,8 @@ export default function Page() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] text-white font-sans overflow-x-hidden selection:bg-none">
+    <div className="min-h-screen bg-[#0A0A0A] text-white font-sans overflow-x-hidden">
+      {/* --- UI部分は v4.2 と同じため省略 --- */}
       <style jsx global>{` .scrollbar-hide::-webkit-scrollbar { display: none; } .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; } `}</style>
       <div className="fixed inset-0 pointer-events-none z-50 opacity-[0.08] mix-blend-screen bg-[url('https://www.transparenttextures.com/patterns/stardust.png')]" />
       <div className="max-w-md mx-auto">

@@ -7,8 +7,8 @@ const supabaseUrl = 'https://pfxwhcgdbavycddapqmz.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmeHdoY2dkYmF2eWNkZGFwcW16Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxNjQ0NzUsImV4cCI6MjA4Mjc0MDQ3NX0.YNQlbyocg2olS6-1WxTnbr5N2z52XcVIpI1XR-XrDtM';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// 余白を排除し、画像そのものを引き立てるクラス
-const imageContainerClass = `relative w-full aspect-square overflow-hidden rounded-[4px] brightness-[1.1] contrast-[1.2] bg-[#1A1A1A] shadow-[0_10px_30px_rgba(0,0,0,0.5)]`;
+// 画像そのものを引き立てるクラス（枠なし・角丸少しだけ）
+const imageContainerClass = `relative w-full aspect-square overflow-hidden rounded-[8px] brightness-[1.1] contrast-[1.2] bg-[#1A1A1A] shadow-2xl`;
 
 export default function Page() {
   const [mainline, setMainline] = useState<any[]>([]);
@@ -16,6 +16,7 @@ export default function Page() {
   const [isUploading, setIsUploading] = useState(false);
   const [isMineMode, setIsMineMode] = useState<string | null>(null);
 
+  // --- 寿命とクリーニング (168時間) ---
   const cleanup = useCallback(async () => {
     const boundary = new Date(Date.now() - 168 * 60 * 60 * 1000).toISOString();
     const { data: expiredMain } = await supabase.from('mainline').select('*').lt('created_at', boundary);
@@ -59,6 +60,7 @@ export default function Page() {
     return () => { supabase.removeChannel(channel); };
   }, [fetchData]);
 
+  // --- 現像ロジック ---
   const processImage = (file: File): Promise<Blob> => {
     return new Promise((resolve) => {
       const reader = new FileReader();
@@ -120,33 +122,34 @@ export default function Page() {
         </div>
       ) : (
         <div className="max-w-md mx-auto">
+          {/* 1. リロードボタンを元の大きさに復元 */}
           <header className="pt-12 pb-16 flex justify-center">
-            <div onClick={() => fetchData()} className={`w-[1px] h-8 bg-white/20 cursor-pointer transition-all active:scale-y-50 ${isUploading ? 'animate-pulse bg-white' : ''}`} />
+            <div onClick={() => fetchData()} className={`w-[18px] h-[36px] bg-white cursor-pointer shadow-[0_0_15px_rgba(255,255,255,0.2)] transition-all active:scale-90 ${isUploading ? 'animate-pulse' : ''}`} />
           </header>
 
-          <div className="space-y-40 pb-64">
+          <div className="space-y-32 pb-64">
             {mainline.map((main) => (
               <div key={main.id} className="w-screen relative left-1/2 right-1/2 -ml-[50vw] -mr-[50vw]">
                 <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide">
                   <div className="flex-shrink-0 w-[10%]" />
                   
-                  {/* メイン画像（余白なし） */}
+                  {/* メイン画像（画像のみ） */}
                   <div className="flex-shrink-0 w-[80%] snap-center px-1 relative group">
-                    <button onClick={() => handleDelete(main.id, 'mainline')} className="absolute -top-6 right-2 z-10 opacity-0 group-hover:opacity-40 hover:!opacity-100 text-[10px] tracking-widest transition-opacity">DELETE</button>
+                    <button onClick={() => handleDelete(main.id, 'mainline')} className="absolute top-2 right-4 z-10 opacity-0 group-hover:opacity-40 hover:!opacity-100 text-xs">DEL</button>
                     <div className={imageContainerClass}><img src={main.image_url} className="w-full h-full object-cover" loading="lazy" /></div>
                   </div>
 
-                  {/* 横丁画像（余白なし・シームレス） */}
+                  {/* 横丁画像（シームレス） */}
                   {(sideCells[main.id] || []).map((side: any) => (
                     <div key={side.id} className="flex-shrink-0 w-[80%] snap-center px-1 relative group">
-                      <button onClick={() => handleDelete(side.id, 'side_cells')} className="absolute -top-6 right-2 z-10 opacity-0 group-hover:opacity-40 hover:!opacity-100 text-[10px] tracking-widest transition-opacity">DELETE</button>
+                      <button onClick={() => handleDelete(side.id, 'side_cells')} className="absolute top-2 right-4 z-10 opacity-0 group-hover:opacity-40 hover:!opacity-100 text-xs">DEL</button>
                       <div className={imageContainerClass}><img src={side.image_url} className="w-full h-full object-cover" loading="lazy" /></div>
                     </div>
                   ))}
 
-                  {/* 横丁追加（極小のドットのみ） */}
+                  {/* 横丁追加（点のまま維持） */}
                   <label className="flex-shrink-0 w-[40%] flex items-center justify-center cursor-pointer opacity-10 hover:opacity-50 snap-center transition-opacity">
-                    <div className="w-[1px] h-[1px] bg-white" />
+                    <div className="w-[2px] h-[2px] bg-white rounded-full" />
                     <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, main.id)} />
                   </label>
                   <div className="flex-shrink-0 w-[10%]" />
@@ -155,10 +158,10 @@ export default function Page() {
             ))}
           </div>
 
-          {/* フッターのアップロードボタン（極限までシンプルに） */}
+          {/* 2. アップロードボタン（○）を元の大きさに復元 */}
           <nav className="fixed bottom-12 left-0 right-0 flex justify-center items-center pointer-events-none z-40">
-            <label className="w-10 h-10 flex items-center justify-center cursor-pointer pointer-events-auto group">
-              <div className={`w-[1px] h-[1px] bg-white transition-all group-active:scale-[20] ${isUploading ? 'animate-ping h-2 w-2' : ''}`} />
+            <label className={`w-14 h-14 border-2 border-white rounded-full flex items-center justify-center cursor-pointer pointer-events-auto active:scale-90 transition-all ${isUploading ? 'opacity-30' : ''}`}>
+              <div className={`w-2 h-2 bg-white rounded-full ${isUploading ? 'animate-ping' : ''}`} />
               <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e)} disabled={isUploading} />
             </label>
           </nav>

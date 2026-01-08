@@ -19,7 +19,7 @@ export default function Page() {
     const boundary = new Date(Date.now() - 168 * 60 * 60 * 1000).toISOString();
     try {
       const { data: expiredMain } = await supabase.from('mainline').select('*').lt('created_at', boundary);
-      if (expiredMain && expiredMain.length > 0) {
+      if (expiredMain) {
         for (const main of expiredMain) {
           const { data: sides } = await supabase.from('side_cells').select('*').eq('parent_id', main.id).order('created_at', { ascending: true });
           if (sides && sides.length > 0) {
@@ -115,7 +115,7 @@ export default function Page() {
     const url = `${window.location.origin}?mine=${id}`;
     const textArea = document.createElement("textarea");
     textArea.value = url; document.body.appendChild(textArea); textArea.select();
-    try { document.execCommand('copy'); alert("💣 地雷URLをコピーしました。"); } catch (e) {}
+    try { document.execCommand('copy'); alert("○"); } catch (e) {}
     document.body.removeChild(textArea);
   };
 
@@ -143,37 +143,51 @@ export default function Page() {
 
           <div className="space-y-32 pb-64">
             {mainline.map((main) => (
-              <div key={main.id} className="w-screen relative left-1/2 right-1/2 -ml-[50vw] -mr-[50vw]">
-                <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide">
-                  <div className="flex-shrink-0 w-[10%]" />
+              <div key={main.id} className="relative group">
+                <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide w-full">
                   
-                  <div className="flex-shrink-0 w-[80%] snap-center px-1 relative group">
-                    <button onClick={() => handleDelete(main.id, 'mainline')} className="absolute top-2 right-4 z-10 opacity-0 group-hover:opacity-40 hover:!opacity-100 text-xs">DEL</button>
-                    <button onClick={() => copyMineUrl(main.id)} className="absolute top-2 left-4 z-10 opacity-0 group-hover:opacity-40 hover:!opacity-100 text-[10px]">MINE</button>
-                    
-                    {/* 暗示の線（横丁がある場合のみ） */}
+                  {/* メイン画像エリア (画面幅固定) */}
+                  <div className="flex-shrink-0 w-full snap-center px-6 relative">
+                    {/* UI記号 (中央上部) */}
+                    <div className="absolute -top-8 left-0 right-0 flex justify-center space-x-8 opacity-0 group-hover:opacity-40 transition-opacity">
+                       <button onClick={() => copyMineUrl(main.id)} className="text-sm">○</button>
+                       <button onClick={() => handleDelete(main.id, 'mainline')} className="text-sm">×</button>
+                    </div>
+
+                    {/* 暗示の線 (画面右端までスッと伸びる) */}
                     {(sideCells[main.id] || []).length > 0 && (
-                      <div className="absolute top-1/2 -right-[11%] w-[10%] h-[1px] bg-white/30 z-0 pointer-events-none" />
+                      <div className="absolute top-1/2 right-0 w-[6%] h-[1px] bg-white/30 z-10" />
                     )}
                     
                     <div className={imageContainerClass}><img src={main.image_url} className="w-full h-full object-cover" loading="lazy" /></div>
                   </div>
 
-                  {(sideCells[main.id] || []).map((side: any) => (
-                    <div key={side.id} className="flex-shrink-0 w-[80%] snap-center px-1 relative group">
-                      <button onClick={() => handleDelete(side.id, 'side_cells')} className="absolute top-2 right-4 z-10 opacity-0 group-hover:opacity-40 hover:!opacity-100 text-xs">DEL</button>
-                      <button onClick={() => copyMineUrl(side.id)} className="absolute top-2 left-4 z-10 opacity-0 group-hover:opacity-40 hover:!opacity-100 text-[10px]">MINE</button>
+                  {/* 横丁画像エリア (画面幅固定) */}
+                  {(sideCells[main.id] || []).map((side: any, idx: number) => (
+                    <div key={side.id} className="flex-shrink-0 w-full snap-center px-6 relative">
+                      <div className="absolute -top-8 left-0 right-0 flex justify-center space-x-8 opacity-0 group-hover:opacity-40 transition-opacity">
+                         <button onClick={() => copyMineUrl(side.id)} className="text-sm">○</button>
+                         <button onClick={() => handleDelete(side.id, 'side_cells')} className="text-sm">×</button>
+                      </div>
+
+                      {/* 戻る方向の線 (左) */}
+                      <div className="absolute top-1/2 left-0 w-[6%] h-[1px] bg-white/10 z-10" />
+                      {/* 次への線 (右) */}
+                      <div className="absolute top-1/2 right-0 w-[6%] h-[1px] bg-white/30 z-10" />
                       
-                      <div className="absolute top-1/2 -right-[11%] w-[10%] h-[1px] bg-white/20 z-0 pointer-events-none" />
                       <div className={imageContainerClass}><img src={side.image_url} className="w-full h-full object-cover" loading="lazy" /></div>
                     </div>
                   ))}
 
-                  <label className="flex-shrink-0 w-[60%] flex items-center justify-center cursor-pointer opacity-10 hover:opacity-50 snap-center transition-opacity">
-                    <div className="w-[2px] h-[2px] bg-white rounded-full" />
-                    <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, main.id)} />
-                  </label>
-                  <div className="flex-shrink-0 w-[10%]" />
+                  {/* 横丁追加ボタン (画面幅固定) */}
+                  <div className="flex-shrink-0 w-full snap-center flex items-center justify-center relative">
+                     <div className="absolute top-1/2 left-0 w-[6%] h-[1px] bg-white/10 z-10" />
+                     <label className="cursor-pointer opacity-10 hover:opacity-50 transition-opacity">
+                        <div className="w-[2px] h-[2px] bg-white rounded-full" />
+                        <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, main.id)} />
+                     </label>
+                  </div>
+
                 </div>
               </div>
             ))}

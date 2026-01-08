@@ -4,7 +4,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = 'https://pfxwhcgdbavycddapqmz.supabase.co';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmeHdoY2dkYmF2eWNkZGFwcW16Iiwicm9sZSI6ImFub24iLCU2Y2F0IjoyMDgyNzQwNDc1fQ.YNQlbyocg2olS6-1WxTnbr5N2z52XcVIpI1XR-XrDtM';
+// 正しい鍵に差し替えました
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmeHdoY2dkYmF2eWNkZGFwcW16Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxNjQ0NzUsImV4cCI6MjA4Mjc0MDQ3NX0.YNQlbyocg2olS6-1WxTnbr5N2z52XcVIpI1XR-XrDtM';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const imageContainerClass = `relative w-full aspect-square overflow-hidden rounded-[8px] brightness-[1.1] contrast-[1.2] bg-[#1A1A1A] shadow-2xl`;
@@ -17,22 +18,24 @@ export default function Page() {
 
   const cleanup = useCallback(async () => {
     const boundary = new Date(Date.now() - 168 * 60 * 60 * 1000).toISOString();
-    const { data: expiredMain } = await supabase.from('mainline').select('*').lt('created_at', boundary);
-    if (expiredMain) {
-      for (const main of expiredMain) {
-        const { data: sides } = await supabase.from('side_cells').select('*').eq('parent_id', main.id).order('created_at', { ascending: true });
-        if (sides && sides.length > 0) {
-          const firstSide = sides[0];
-          await supabase.from('mainline').insert([{ id: firstSide.id, image_url: firstSide.image_url, created_at: firstSide.created_at }]);
-          if (sides.length > 1) {
-            for (const s of sides.slice(1)) await supabase.from('side_cells').update({ parent_id: firstSide.id }).eq('id', s.id);
+    try {
+      const { data: expiredMain } = await supabase.from('mainline').select('*').lt('created_at', boundary);
+      if (expiredMain && expiredMain.length > 0) {
+        for (const main of expiredMain) {
+          const { data: sides } = await supabase.from('side_cells').select('*').eq('parent_id', main.id).order('created_at', { ascending: true });
+          if (sides && sides.length > 0) {
+            const firstSide = sides[0];
+            await supabase.from('mainline').insert([{ id: firstSide.id, image_url: firstSide.image_url, created_at: firstSide.created_at }]);
+            if (sides.length > 1) {
+              for (const s of sides.slice(1)) await supabase.from('side_cells').update({ parent_id: firstSide.id }).eq('id', s.id);
+            }
+            await supabase.from('side_cells').delete().eq('id', firstSide.id);
           }
-          await supabase.from('side_cells').delete().eq('id', firstSide.id);
+          await supabase.storage.from('images').remove([main.id]);
+          await supabase.from('mainline').delete().eq('id', main.id);
         }
-        await supabase.storage.from('images').remove([main.id]);
-        await supabase.from('mainline').delete().eq('id', main.id);
       }
-    }
+    } catch (e) { console.error("Cleanup Error:", e); }
   }, []);
 
   const fetchData = useCallback(async () => {
@@ -53,7 +56,8 @@ export default function Page() {
   useEffect(() => {
     fetchData();
     const params = new URLSearchParams(window.location.search);
-    if (params.get('mine')) setIsMineMode(params.get('mine'));
+    const mineId = params.get('mine');
+    if (mineId) setIsMineMode(mineId);
     const channel = supabase.channel('realtime').on('postgres_changes', { event: '*', schema: 'public' }, () => fetchData()).subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [fetchData]);
@@ -117,7 +121,6 @@ export default function Page() {
     document.body.removeChild(textArea);
   };
 
-  // 表示用URL取得ロジックを分離してエラーを回避
   const getMineImageUrl = () => {
     if (!isMineMode) return null;
     const mainFound = mainline.find(m => m.id === isMineMode);
@@ -132,7 +135,7 @@ export default function Page() {
       
       {isMineMode && getMineImageUrl() ? (
         <div className="flex items-center justify-center min-h-screen px-6 animate-in fade-in duration-1000" onClick={() => setIsMineMode(null)}>
-          <div className="w-full max-w-sm"><div className={imageContainerClass}><img src={getMineImageUrl()} className="w-full h-full object-cover" /></div></div>
+          <div className="w-full max-w-sm"><div className={imageContainerClass}><img src={getMineImageUrl()!} className="w-full h-full object-cover" /></div></div>
         </div>
       ) : (
         <div className="max-w-md mx-auto">

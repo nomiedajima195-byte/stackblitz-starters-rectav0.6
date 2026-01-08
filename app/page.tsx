@@ -4,10 +4,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = 'https://pfxwhcgdbavycddapqmz.supabase.co';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmeHdoY2dkYmF2eWNkZGFwcW16Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxNjQ0NzUsImV4cCI6MjA4Mjc0MDQ3NX0.YNQlbyocg2olS6-1WxTnbr5N2z52XcVIpI1XR-XrDtM';
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmeHdoY2dkYmF2eWNkZGFwcW16Iiwicm9sZSI6ImFub24iLCU2Y2F0IjoyMDgyNzQwNDc1fQ.YNQlbyocg2olS6-1WxTnbr5N2z52XcVIpI1XR-XrDtM';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// 画像そのものを引き立てるクラス（枠なし・角丸少しだけ）
 const imageContainerClass = `relative w-full aspect-square overflow-hidden rounded-[8px] brightness-[1.1] contrast-[1.2] bg-[#1A1A1A] shadow-2xl`;
 
 export default function Page() {
@@ -16,7 +15,6 @@ export default function Page() {
   const [isUploading, setIsUploading] = useState(false);
   const [isMineMode, setIsMineMode] = useState<string | null>(null);
 
-  // --- 寿命とクリーニング (168時間) ---
   const cleanup = useCallback(async () => {
     const boundary = new Date(Date.now() - 168 * 60 * 60 * 1000).toISOString();
     const { data: expiredMain } = await supabase.from('mainline').select('*').lt('created_at', boundary);
@@ -44,7 +42,7 @@ export default function Page() {
     if (mainData) setMainline(mainData);
     if (sideData) {
       const grouped: any = {};
-      sideData.forEach(s => {
+      sideData.forEach((s: any) => {
         if (!grouped[s.parent_id]) grouped[s.parent_id] = [];
         grouped[s.parent_id].push(s);
       });
@@ -60,7 +58,6 @@ export default function Page() {
     return () => { supabase.removeChannel(channel); };
   }, [fetchData]);
 
-  // --- 現像ロジック ---
   const processImage = (file: File): Promise<Blob> => {
     return new Promise((resolve) => {
       const reader = new FileReader();
@@ -112,17 +109,33 @@ export default function Page() {
     fetchData();
   };
 
+  const copyMineUrl = (id: string) => {
+    const url = `${window.location.origin}?mine=${id}`;
+    const textArea = document.createElement("textarea");
+    textArea.value = url; document.body.appendChild(textArea); textArea.select();
+    try { document.execCommand('copy'); alert("💣 地雷URLをコピーしました。"); } catch (e) {}
+    document.body.removeChild(textArea);
+  };
+
+  // 表示用URL取得ロジックを分離してエラーを回避
+  const getMineImageUrl = () => {
+    if (!isMineMode) return null;
+    const mainFound = mainline.find(m => m.id === isMineMode);
+    if (mainFound) return mainFound.image_url;
+    const sideFound = Object.values(sideCells).flat().find((s: any) => s.id === isMineMode) as any;
+    return sideFound?.image_url || null;
+  };
+
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-white font-sans overflow-x-hidden selection:bg-none">
       <style jsx global>{` .scrollbar-hide::-webkit-scrollbar { display: none; } .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; } `}</style>
       
-      {isMineMode ? (
+      {isMineMode && getMineImageUrl() ? (
         <div className="flex items-center justify-center min-h-screen px-6 animate-in fade-in duration-1000" onClick={() => setIsMineMode(null)}>
-          <div className="w-full max-w-sm"><div className={imageContainerClass}><img src={mainline.find(m => m.id === isMineMode)?.image_url || Object.values(sideCells).flat().find((s:any) => s.id === isMineMode)?.image_url} className="w-full h-full object-cover" /></div></div>
+          <div className="w-full max-w-sm"><div className={imageContainerClass}><img src={getMineImageUrl()} className="w-full h-full object-cover" /></div></div>
         </div>
       ) : (
         <div className="max-w-md mx-auto">
-          {/* 1. リロードボタンを元の大きさに復元 */}
           <header className="pt-12 pb-16 flex justify-center">
             <div onClick={() => fetchData()} className={`w-[18px] h-[36px] bg-white cursor-pointer shadow-[0_0_15px_rgba(255,255,255,0.2)] transition-all active:scale-90 ${isUploading ? 'animate-pulse' : ''}`} />
           </header>
@@ -133,21 +146,20 @@ export default function Page() {
                 <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide">
                   <div className="flex-shrink-0 w-[10%]" />
                   
-                  {/* メイン画像（画像のみ） */}
                   <div className="flex-shrink-0 w-[80%] snap-center px-1 relative group">
                     <button onClick={() => handleDelete(main.id, 'mainline')} className="absolute top-2 right-4 z-10 opacity-0 group-hover:opacity-40 hover:!opacity-100 text-xs">DEL</button>
+                    <button onClick={() => copyMineUrl(main.id)} className="absolute top-2 left-4 z-10 opacity-0 group-hover:opacity-40 hover:!opacity-100 text-[10px]">MINE</button>
                     <div className={imageContainerClass}><img src={main.image_url} className="w-full h-full object-cover" loading="lazy" /></div>
                   </div>
 
-                  {/* 横丁画像（シームレス） */}
                   {(sideCells[main.id] || []).map((side: any) => (
                     <div key={side.id} className="flex-shrink-0 w-[80%] snap-center px-1 relative group">
                       <button onClick={() => handleDelete(side.id, 'side_cells')} className="absolute top-2 right-4 z-10 opacity-0 group-hover:opacity-40 hover:!opacity-100 text-xs">DEL</button>
+                      <button onClick={() => copyMineUrl(side.id)} className="absolute top-2 left-4 z-10 opacity-0 group-hover:opacity-40 hover:!opacity-100 text-[10px]">MINE</button>
                       <div className={imageContainerClass}><img src={side.image_url} className="w-full h-full object-cover" loading="lazy" /></div>
                     </div>
                   ))}
 
-                  {/* 横丁追加（点のまま維持） */}
                   <label className="flex-shrink-0 w-[40%] flex items-center justify-center cursor-pointer opacity-10 hover:opacity-50 snap-center transition-opacity">
                     <div className="w-[2px] h-[2px] bg-white rounded-full" />
                     <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, main.id)} />
@@ -158,7 +170,6 @@ export default function Page() {
             ))}
           </div>
 
-          {/* 2. アップロードボタン（○）を元の大きさに復元 */}
           <nav className="fixed bottom-12 left-0 right-0 flex justify-center items-center pointer-events-none z-40">
             <label className={`w-14 h-14 border-2 border-white rounded-full flex items-center justify-center cursor-pointer pointer-events-auto active:scale-90 transition-all ${isUploading ? 'opacity-30' : ''}`}>
               <div className={`w-2 h-2 bg-white rounded-full ${isUploading ? 'animate-ping' : ''}`} />

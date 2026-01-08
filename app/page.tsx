@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = 'https://pfxwhcgdbavycddapqmz.supabase.co';
@@ -14,9 +14,10 @@ export default function Page() {
   const [sideCells, setSideCells] = useState<any>({});
   const [isUploading, setIsUploading] = useState(false);
   const [isMineMode, setIsMineMode] = useState<string | null>(null);
-  
-  // スクロール位置を監視するための状態
   const [activeSideIndex, setActiveSideIndex] = useState<{[key: string]: number}>({});
+
+  // いま横丁の奥にいるかどうか
+  const isDeepInAlley = Object.values(activeSideIndex).some(idx => idx > 0);
 
   const cleanup = useCallback(async () => {
     const boundary = new Date(Date.now() - 168 * 60 * 60 * 1000).toISOString();
@@ -67,7 +68,9 @@ export default function Page() {
     const scrollLeft = e.currentTarget.scrollLeft;
     const width = e.currentTarget.offsetWidth;
     const index = Math.round(scrollLeft / width);
-    setActiveSideIndex(prev => ({ ...prev, [id]: index }));
+    if (activeSideIndex[id] !== index) {
+      setActiveSideIndex(prev => ({ ...prev, [id]: index }));
+    }
   };
 
   const processImage = (file: File): Promise<Blob> => {
@@ -138,7 +141,8 @@ export default function Page() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] text-white font-sans overflow-x-hidden selection:bg-none">
+    // 横丁にいる時は全体の縦スクロールを禁止 (overflow-hidden)
+    <div className={`min-h-screen bg-[#0A0A0A] text-white font-sans selection:bg-none ${isDeepInAlley ? 'overflow-hidden' : 'overflow-x-hidden'}`}>
       <style jsx global>{` .scrollbar-hide::-webkit-scrollbar { display: none; } .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; } `}</style>
       
       {isMineMode && getMineImageUrl() ? (
@@ -147,27 +151,28 @@ export default function Page() {
         </div>
       ) : (
         <div className="max-w-md mx-auto">
-          <header className={`pt-12 pb-16 flex justify-center transition-opacity duration-700 ${Object.values(activeSideIndex).some(idx => idx > 0) ? 'opacity-0' : 'opacity-100'}`}>
+          <header className={`pt-12 pb-16 flex justify-center transition-opacity duration-700 ${isDeepInAlley ? 'opacity-0' : 'opacity-100'}`}>
             <div onClick={() => fetchData()} className={`w-[18px] h-[36px] bg-white cursor-pointer shadow-[0_0_15px_rgba(255,255,255,0.2)] transition-all active:scale-90 ${isUploading ? 'animate-pulse' : ''}`} />
           </header>
 
           <div className="space-y-32 pb-64">
             {mainline.map((main) => {
-              const isSearchingSide = (activeSideIndex[main.id] || 0) > 0;
-              const anyRowSearching = Object.entries(activeSideIndex).some(([id, idx]) => id !== main.id && idx > 0);
+              const isThisRowDeep = (activeSideIndex[main.id] || 0) > 0;
+              const anyOtherRowDeep = Object.entries(activeSideIndex).some(([id, idx]) => id !== main.id && idx > 0);
 
               return (
-                <div key={main.id} className={`relative group transition-opacity duration-700 ${anyRowSearching ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+                <div key={main.id} className={`relative group transition-opacity duration-700 ${anyOtherRowDeep ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+                  {/* 横スクロールコンテナ: w-screenで画面幅いっぱい */}
                   <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide w-screen relative left-1/2 right-1/2 -ml-[50vw] -mr-[50vw]" onScroll={(e) => handleScroll(main.id, e)}>
                     
                     {/* メイン画像エリア */}
-                    <div className="flex-shrink-0 w-screen snap-center px-8 relative">
-                      <div className="absolute -top-8 left-0 right-0 flex justify-center space-x-8 opacity-0 group-hover:opacity-40 transition-opacity">
+                    <div className="flex-shrink-0 w-screen snap-center px-8 relative flex flex-col items-center">
+                      <div className="absolute -top-8 flex justify-center space-x-8 opacity-0 group-hover:opacity-40 transition-opacity">
                          <button onClick={() => copyMineUrl(main.id)} className="text-sm">○</button>
                          <button onClick={() => handleDelete(main.id, 'mainline')} className="text-sm">×</button>
                       </div>
                       
-                      {/* 暗示の線 (z-indexを上げて確実に表示) */}
+                      {/* 暗示の線 */}
                       {(sideCells[main.id] || []).length > 0 && (
                         <div className="absolute top-1/2 right-0 w-[8%] h-[1px] bg-white/40 z-50 pointer-events-none" />
                       )}
@@ -177,8 +182,8 @@ export default function Page() {
 
                     {/* 横丁画像エリア */}
                     {(sideCells[main.id] || []).map((side: any) => (
-                      <div key={side.id} className="flex-shrink-0 w-screen snap-center px-8 relative">
-                        <div className="absolute -top-8 left-0 right-0 flex justify-center space-x-8 opacity-0 group-hover:opacity-40 transition-opacity">
+                      <div key={side.id} className="flex-shrink-0 w-screen snap-center px-8 relative flex flex-col items-center">
+                        <div className="absolute -top-8 flex justify-center space-x-8 opacity-0 group-hover:opacity-40 transition-opacity">
                            <button onClick={() => copyMineUrl(side.id)} className="text-sm">○</button>
                            <button onClick={() => handleDelete(side.id, 'side_cells')} className="text-sm">×</button>
                         </div>
@@ -191,7 +196,7 @@ export default function Page() {
                     {/* 横丁追加ボタン */}
                     <div className="flex-shrink-0 w-screen snap-center flex items-center justify-center relative">
                        <div className="absolute top-1/2 left-0 w-[8%] h-[1px] bg-white/20 z-50" />
-                       <label className="cursor-pointer opacity-10 hover:opacity-50 transition-opacity">
+                       <label className="cursor-pointer opacity-10 hover:opacity-50 transition-opacity p-20">
                           <div className="w-[2px] h-[2px] bg-white rounded-full" />
                           <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, main.id)} />
                        </label>
@@ -203,7 +208,7 @@ export default function Page() {
             })}
           </div>
 
-          <nav className={`fixed bottom-12 left-0 right-0 flex justify-center items-center pointer-events-none z-40 transition-opacity duration-700 ${Object.values(activeSideIndex).some(idx => idx > 0) ? 'opacity-0' : 'opacity-100'}`}>
+          <nav className={`fixed bottom-12 left-0 right-0 flex justify-center items-center pointer-events-none z-40 transition-opacity duration-700 ${isDeepInAlley ? 'opacity-0' : 'opacity-100'}`}>
             <label className={`w-14 h-14 border-2 border-white rounded-full flex items-center justify-center cursor-pointer pointer-events-auto active:scale-90 transition-all ${isUploading ? 'opacity-30' : ''}`}>
               <div className={`w-2 h-2 bg-white rounded-full ${isUploading ? 'animate-ping' : ''}`} />
               <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e)} disabled={isUploading} />

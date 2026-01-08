@@ -1,19 +1,22 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = 'https://pfxwhcgdbavycddapqmz.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmeHdoY2dkYmF2eWNkZGFwcW16Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxNjQ0NzUsImV4cCI6MjA4Mjc0MDQ3NX0.YNQlbyocg2olS6-1WxTnbr5N2z52XcVIpI1XR-XrDtM';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-const imageContainerClass = `relative w-full aspect-square overflow-hidden rounded-[8px] brightness-[1.1] contrast-[1.2] bg-[#1A1A1A] shadow-2xl`;
+const imageContainerClass = `relative w-full aspect-square overflow-hidden rounded-[8px] brightness-[1.1] contrast-[1.2] bg-[#1A1A1A] shadow-2xl transition-all duration-500`;
 
 export default function Page() {
   const [mainline, setMainline] = useState<any[]>([]);
   const [sideCells, setSideCells] = useState<any>({});
   const [isUploading, setIsUploading] = useState(false);
   const [isMineMode, setIsMineMode] = useState<string | null>(null);
+  
+  // スクロール位置を監視するための状態
+  const [activeSideIndex, setActiveSideIndex] = useState<{[key: string]: number}>({});
 
   const cleanup = useCallback(async () => {
     const boundary = new Date(Date.now() - 168 * 60 * 60 * 1000).toISOString();
@@ -59,6 +62,13 @@ export default function Page() {
     const channel = supabase.channel('realtime').on('postgres_changes', { event: '*', schema: 'public' }, () => fetchData()).subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [fetchData]);
+
+  const handleScroll = (id: string, e: React.UIEvent<HTMLDivElement>) => {
+    const scrollLeft = e.currentTarget.scrollLeft;
+    const width = e.currentTarget.offsetWidth;
+    const index = Math.round(scrollLeft / width);
+    setActiveSideIndex(prev => ({ ...prev, [id]: index }));
+  };
 
   const processImage = (file: File): Promise<Blob> => {
     return new Promise((resolve) => {
@@ -137,63 +147,63 @@ export default function Page() {
         </div>
       ) : (
         <div className="max-w-md mx-auto">
-          <header className="pt-12 pb-16 flex justify-center">
+          <header className={`pt-12 pb-16 flex justify-center transition-opacity duration-700 ${Object.values(activeSideIndex).some(idx => idx > 0) ? 'opacity-0' : 'opacity-100'}`}>
             <div onClick={() => fetchData()} className={`w-[18px] h-[36px] bg-white cursor-pointer shadow-[0_0_15px_rgba(255,255,255,0.2)] transition-all active:scale-90 ${isUploading ? 'animate-pulse' : ''}`} />
           </header>
 
           <div className="space-y-32 pb-64">
-            {mainline.map((main) => (
-              <div key={main.id} className="relative group">
-                <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide w-full">
-                  
-                  {/* メイン画像エリア (画面幅固定) */}
-                  <div className="flex-shrink-0 w-full snap-center px-6 relative">
-                    {/* UI記号 (中央上部) */}
-                    <div className="absolute -top-8 left-0 right-0 flex justify-center space-x-8 opacity-0 group-hover:opacity-40 transition-opacity">
-                       <button onClick={() => copyMineUrl(main.id)} className="text-sm">○</button>
-                       <button onClick={() => handleDelete(main.id, 'mainline')} className="text-sm">×</button>
-                    </div>
+            {mainline.map((main) => {
+              const isSearchingSide = (activeSideIndex[main.id] || 0) > 0;
+              const anyRowSearching = Object.entries(activeSideIndex).some(([id, idx]) => id !== main.id && idx > 0);
 
-                    {/* 暗示の線 (画面右端までスッと伸びる) */}
-                    {(sideCells[main.id] || []).length > 0 && (
-                      <div className="absolute top-1/2 right-0 w-[6%] h-[1px] bg-white/30 z-10" />
-                    )}
+              return (
+                <div key={main.id} className={`relative group transition-opacity duration-700 ${anyRowSearching ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+                  <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide w-screen relative left-1/2 right-1/2 -ml-[50vw] -mr-[50vw]" onScroll={(e) => handleScroll(main.id, e)}>
                     
-                    <div className={imageContainerClass}><img src={main.image_url} className="w-full h-full object-cover" loading="lazy" /></div>
-                  </div>
-
-                  {/* 横丁画像エリア (画面幅固定) */}
-                  {(sideCells[main.id] || []).map((side: any, idx: number) => (
-                    <div key={side.id} className="flex-shrink-0 w-full snap-center px-6 relative">
+                    {/* メイン画像エリア */}
+                    <div className="flex-shrink-0 w-screen snap-center px-8 relative">
                       <div className="absolute -top-8 left-0 right-0 flex justify-center space-x-8 opacity-0 group-hover:opacity-40 transition-opacity">
-                         <button onClick={() => copyMineUrl(side.id)} className="text-sm">○</button>
-                         <button onClick={() => handleDelete(side.id, 'side_cells')} className="text-sm">×</button>
+                         <button onClick={() => copyMineUrl(main.id)} className="text-sm">○</button>
+                         <button onClick={() => handleDelete(main.id, 'mainline')} className="text-sm">×</button>
                       </div>
-
-                      {/* 戻る方向の線 (左) */}
-                      <div className="absolute top-1/2 left-0 w-[6%] h-[1px] bg-white/10 z-10" />
-                      {/* 次への線 (右) */}
-                      <div className="absolute top-1/2 right-0 w-[6%] h-[1px] bg-white/30 z-10" />
                       
-                      <div className={imageContainerClass}><img src={side.image_url} className="w-full h-full object-cover" loading="lazy" /></div>
+                      {/* 暗示の線 (z-indexを上げて確実に表示) */}
+                      {(sideCells[main.id] || []).length > 0 && (
+                        <div className="absolute top-1/2 right-0 w-[8%] h-[1px] bg-white/40 z-50 pointer-events-none" />
+                      )}
+                      
+                      <div className={imageContainerClass}><img src={main.image_url} className="w-full h-full object-cover" loading="lazy" /></div>
                     </div>
-                  ))}
 
-                  {/* 横丁追加ボタン (画面幅固定) */}
-                  <div className="flex-shrink-0 w-full snap-center flex items-center justify-center relative">
-                     <div className="absolute top-1/2 left-0 w-[6%] h-[1px] bg-white/10 z-10" />
-                     <label className="cursor-pointer opacity-10 hover:opacity-50 transition-opacity">
-                        <div className="w-[2px] h-[2px] bg-white rounded-full" />
-                        <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, main.id)} />
-                     </label>
+                    {/* 横丁画像エリア */}
+                    {(sideCells[main.id] || []).map((side: any) => (
+                      <div key={side.id} className="flex-shrink-0 w-screen snap-center px-8 relative">
+                        <div className="absolute -top-8 left-0 right-0 flex justify-center space-x-8 opacity-0 group-hover:opacity-40 transition-opacity">
+                           <button onClick={() => copyMineUrl(side.id)} className="text-sm">○</button>
+                           <button onClick={() => handleDelete(side.id, 'side_cells')} className="text-sm">×</button>
+                        </div>
+                        <div className="absolute top-1/2 left-0 w-[8%] h-[1px] bg-white/20 z-50 pointer-events-none" />
+                        <div className="absolute top-1/2 right-0 w-[8%] h-[1px] bg-white/40 z-50 pointer-events-none" />
+                        <div className={imageContainerClass}><img src={side.image_url} className="w-full h-full object-cover" loading="lazy" /></div>
+                      </div>
+                    ))}
+
+                    {/* 横丁追加ボタン */}
+                    <div className="flex-shrink-0 w-screen snap-center flex items-center justify-center relative">
+                       <div className="absolute top-1/2 left-0 w-[8%] h-[1px] bg-white/20 z-50" />
+                       <label className="cursor-pointer opacity-10 hover:opacity-50 transition-opacity">
+                          <div className="w-[2px] h-[2px] bg-white rounded-full" />
+                          <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, main.id)} />
+                       </label>
+                    </div>
+
                   </div>
-
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
-          <nav className="fixed bottom-12 left-0 right-0 flex justify-center items-center pointer-events-none z-40">
+          <nav className={`fixed bottom-12 left-0 right-0 flex justify-center items-center pointer-events-none z-40 transition-opacity duration-700 ${Object.values(activeSideIndex).some(idx => idx > 0) ? 'opacity-0' : 'opacity-100'}`}>
             <label className={`w-14 h-14 border-2 border-white rounded-full flex items-center justify-center cursor-pointer pointer-events-auto active:scale-90 transition-all ${isUploading ? 'opacity-30' : ''}`}>
               <div className={`w-2 h-2 bg-white rounded-full ${isUploading ? 'animate-ping' : ''}`} />
               <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e)} disabled={isUploading} />

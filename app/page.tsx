@@ -4,7 +4,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = 'https://pfxwhcgdbavycddapqmz.supabase.co';
-// 正しい鍵に差し替えました
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmeHdoY2dkYmF2eWNkZGFwcW16Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxNjQ0NzUsImV4cCI6MjA4Mjc0MDQ3NX0.YNQlbyocg2olS6-1WxTnbr5N2z52XcVIpI1XR-XrDtM';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
@@ -20,7 +19,7 @@ export default function Page() {
     const boundary = new Date(Date.now() - 168 * 60 * 60 * 1000).toISOString();
     try {
       const { data: expiredMain } = await supabase.from('mainline').select('*').lt('created_at', boundary);
-      if (expiredMain && expiredMain.length > 0) {
+      if (expiredMain) {
         for (const main of expiredMain) {
           const { data: sides } = await supabase.from('side_cells').select('*').eq('parent_id', main.id).order('created_at', { ascending: true });
           if (sides && sides.length > 0) {
@@ -35,7 +34,7 @@ export default function Page() {
           await supabase.from('mainline').delete().eq('id', main.id);
         }
       }
-    } catch (e) { console.error("Cleanup Error:", e); }
+    } catch (e) {}
   }, []);
 
   const fetchData = useCallback(async () => {
@@ -56,8 +55,7 @@ export default function Page() {
   useEffect(() => {
     fetchData();
     const params = new URLSearchParams(window.location.search);
-    const mineId = params.get('mine');
-    if (mineId) setIsMineMode(mineId);
+    if (params.get('mine')) setIsMineMode(params.get('mine'));
     const channel = supabase.channel('realtime').on('postgres_changes', { event: '*', schema: 'public' }, () => fetchData()).subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [fetchData]);
@@ -149,21 +147,34 @@ export default function Page() {
                 <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide">
                   <div className="flex-shrink-0 w-[10%]" />
                   
+                  {/* メイン画像 */}
                   <div className="flex-shrink-0 w-[80%] snap-center px-1 relative group">
                     <button onClick={() => handleDelete(main.id, 'mainline')} className="absolute top-2 right-4 z-10 opacity-0 group-hover:opacity-40 hover:!opacity-100 text-xs">DEL</button>
                     <button onClick={() => copyMineUrl(main.id)} className="absolute top-2 left-4 z-10 opacity-0 group-hover:opacity-40 hover:!opacity-100 text-[10px]">MINE</button>
+                    
+                    {/* 暗示の線（横丁がある場合のみ表示） */}
+                    {(sideCells[main.id] || []).length > 0 && (
+                      <div className="absolute top-1/2 -right-[15%] w-[10%] h-[1px] bg-white/20 z-0 pointer-events-none" />
+                    )}
+                    
                     <div className={imageContainerClass}><img src={main.image_url} className="w-full h-full object-cover" loading="lazy" /></div>
                   </div>
 
-                  {(sideCells[main.id] || []).map((side: any) => (
+                  {/* 横丁画像（完全な闇に配置） */}
+                  {(sideCells[main.id] || []).map((side: any, idx: number) => (
                     <div key={side.id} className="flex-shrink-0 w-[80%] snap-center px-1 relative group">
                       <button onClick={() => handleDelete(side.id, 'side_cells')} className="absolute top-2 right-4 z-10 opacity-0 group-hover:opacity-40 hover:!opacity-100 text-xs">DEL</button>
                       <button onClick={() => copyMineUrl(side.id)} className="absolute top-2 left-4 z-10 opacity-0 group-hover:opacity-40 hover:!opacity-100 text-[10px]">MINE</button>
+                      
+                      {/* 横丁間の線 */}
+                      <div className="absolute top-1/2 -right-[15%] w-[10%] h-[1px] bg-white/10 z-0 pointer-events-none" />
+                      
                       <div className={imageContainerClass}><img src={side.image_url} className="w-full h-full object-cover" loading="lazy" /></div>
                     </div>
                   ))}
 
-                  <label className="flex-shrink-0 w-[40%] flex items-center justify-center cursor-pointer opacity-10 hover:opacity-50 snap-center transition-opacity">
+                  {/* 横丁追加ボタン（少し距離を置く） */}
+                  <label className="flex-shrink-0 w-[60%] flex items-center justify-center cursor-pointer opacity-10 hover:opacity-50 snap-center transition-opacity">
                     <div className="w-[2px] h-[2px] bg-white rounded-full" />
                     <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, main.id)} />
                   </label>

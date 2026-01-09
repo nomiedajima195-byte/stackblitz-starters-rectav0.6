@@ -7,8 +7,8 @@ const supabaseUrl = 'https://pfxwhcgdbavycddapqmz.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmeHdoY2dkYmF2eWNkZGFwcW16Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxNjQ0NzUsImV4cCI6MjA4Mjc0MDQ3NX0.YNQlbyocg2olS6-1WxTnbr5N2z52XcVIpI1XR-XrDtM';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// 粗さを強調するフィルタ：コントラストを上げ、彩度を少し落とし、シャープに見せる
-const imageContainerClass = `relative w-full aspect-square overflow-hidden rounded-[4px] bg-[#E0E0E0] contrast-[1.25] saturate-[0.8] brightness-[1.05] shadow-sm`;
+// 質感：ドットを際立たせ、コントラストを限界まで攻める
+const imageContainerClass = `relative w-full aspect-square overflow-hidden rounded-[2px] bg-[#E5E5E5] contrast-[1.3] brightness-[1.1] saturate-[0.7] shadow-inner`;
 
 export default function Page() {
   const [mainline, setMainline] = useState<any[]>([]);
@@ -20,7 +20,7 @@ export default function Page() {
   const scrollRefs = useRef<{[key: string]: HTMLDivElement | null}>({});
   const isDeepInAlley = useMemo(() => Object.values(activeSideIndex).some(idx => idx > 0), [activeSideIndex]);
 
-  // 画像を「あえて粗く」リサイズ＆圧縮
+  // 【極限】画像リサイズ：240px & 圧縮率10%
   const processImage = (file: File): Promise<Blob> => {
     return new Promise((resolve) => {
       const reader = new FileReader();
@@ -30,26 +30,30 @@ export default function Page() {
         img.src = e.target?.result as string;
         img.onload = () => {
           const canvas = document.createElement('canvas');
-          const MAX_SIZE = 320; // あえて低い解像度
+          const MAX_SIZE = 240; // ドットが目に見えるサイズ
           let w = img.width;
           let h = img.height;
           if (w > h) { if (w > MAX_SIZE) { h *= MAX_SIZE / w; w = MAX_SIZE; } }
           else { if (h > MAX_SIZE) { w *= MAX_SIZE / h; h = MAX_SIZE; } }
           canvas.width = w; canvas.height = h;
           const ctx = canvas.getContext('2d');
-          ctx?.drawImage(img, 0, 0, w, h);
-          // 圧縮率0.2 (20%) でザラつきを出す
-          canvas.toBlob((blob) => { if (blob) resolve(blob); }, 'image/jpeg', 0.2);
+          
+          // あえてアンチエイリアスを無効にして描画
+          if (ctx) {
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(img, 0, 0, w, h);
+          }
+          
+          // 圧縮率 0.1 (10%) でノイズを最大化
+          canvas.toBlob((blob) => { if (blob) resolve(blob); }, 'image/jpeg', 0.1);
         };
       };
     });
   };
 
   const fetchData = useCallback(async () => {
-    // 期限切れデータの除外はSupabase側で168時間設定されている前提で取得
     const { data: m } = await supabase.from('mainline').select('*').order('created_at', { ascending: false });
     if (m) setMainline(m);
-
     const { data: s } = await supabase.from('side_cells').select('*').order('created_at', { ascending: true });
     if (s) {
       const g: {[key: string]: any[]} = {};
@@ -78,10 +82,8 @@ export default function Page() {
       const fileName = `${Date.now()}.jpg`;
       await supabase.storage.from('images').upload(fileName, blob);
       const { data: { publicUrl } } = supabase.storage.from('images').getPublicUrl(fileName);
-      
       if (!parentId) await supabase.from('mainline').insert([{ id: fileName, image_url: publicUrl }]);
       else await supabase.from('side_cells').insert([{ id: fileName, parent_id: parentId, image_url: publicUrl }]);
-      
       fetchData();
     } catch (err) {} finally { setIsUploading(false); if(e.target) e.target.value = ''; }
   };
@@ -109,12 +111,21 @@ export default function Page() {
       <style jsx global>{` 
         .scrollbar-hide::-webkit-scrollbar { display: none; } 
         body { overscroll-behavior-y: none; margin: 0; background-color: #fff; }
-        img { image-rendering: -webkit-optimize-contrast; } /* 画像を少しパキッとさせる */
+        /* ピクセルをボカさず、カチッと表示させる */
+        img { 
+          image-rendering: pixelated; 
+          image-rendering: -moz-crisp-edges; 
+          image-rendering: crisp-edges; 
+        } 
       `}</style>
       
       {isMineMode ? (
         <div className="flex items-center justify-center min-h-screen px-4 bg-white" onClick={() => setIsMineMode(null)}>
-          <div className="w-full max-w-md"><div className={imageContainerClass}><img src={displayImageUrl} className="w-full h-full object-cover" /></div></div>
+          <div className="w-full max-w-md">
+            <div className={imageContainerClass}>
+              <img src={displayImageUrl} className="w-full h-full object-cover" />
+            </div>
+          </div>
         </div>
       ) : (
         <div className="max-w-md mx-auto relative">

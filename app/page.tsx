@@ -7,8 +7,8 @@ const supabaseUrl = 'https://pfxwhcgdbavycddapqmz.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmeHdoY2dkYmF2eWNkZGFwcW16Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxNjQ0NzUsImV4cCI6MjA4Mjc0MDQ3NX0.YNQlbyocg2olS6-1WxTnbr5N2z52XcVIpI1XR-XrDtM';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// 画像の質感を少し硬めに（コントラスト上げ）
-const imageContainerClass = `relative w-full aspect-square overflow-hidden rounded-[8px] bg-[#EEEEEE] contrast-[1.15] brightness-[1.05] shadow-sm`;
+// 粗さを強調するフィルタ：コントラストを上げ、彩度を少し落とし、シャープに見せる
+const imageContainerClass = `relative w-full aspect-square overflow-hidden rounded-[4px] bg-[#E0E0E0] contrast-[1.25] saturate-[0.8] brightness-[1.05] shadow-sm`;
 
 export default function Page() {
   const [mainline, setMainline] = useState<any[]>([]);
@@ -20,7 +20,7 @@ export default function Page() {
   const scrollRefs = useRef<{[key: string]: HTMLDivElement | null}>({});
   const isDeepInAlley = useMemo(() => Object.values(activeSideIndex).some(idx => idx > 0), [activeSideIndex]);
 
-  // 画像リサイズ＆あえて画質を落とす
+  // 画像を「あえて粗く」リサイズ＆圧縮
   const processImage = (file: File): Promise<Blob> => {
     return new Promise((resolve) => {
       const reader = new FileReader();
@@ -30,7 +30,7 @@ export default function Page() {
         img.src = e.target?.result as string;
         img.onload = () => {
           const canvas = document.createElement('canvas');
-          const MAX_SIZE = 640; // 粗さを出すためのサイズダウン
+          const MAX_SIZE = 320; // あえて低い解像度
           let w = img.width;
           let h = img.height;
           if (w > h) { if (w > MAX_SIZE) { h *= MAX_SIZE / w; w = MAX_SIZE; } }
@@ -38,15 +38,18 @@ export default function Page() {
           canvas.width = w; canvas.height = h;
           const ctx = canvas.getContext('2d');
           ctx?.drawImage(img, 0, 0, w, h);
-          canvas.toBlob((blob) => { if (blob) resolve(blob); }, 'image/jpeg', 0.5); // 画質50%でザラつきを許容
+          // 圧縮率0.2 (20%) でザラつきを出す
+          canvas.toBlob((blob) => { if (blob) resolve(blob); }, 'image/jpeg', 0.2);
         };
       };
     });
   };
 
   const fetchData = useCallback(async () => {
+    // 期限切れデータの除外はSupabase側で168時間設定されている前提で取得
     const { data: m } = await supabase.from('mainline').select('*').order('created_at', { ascending: false });
     if (m) setMainline(m);
+
     const { data: s } = await supabase.from('side_cells').select('*').order('created_at', { ascending: true });
     if (s) {
       const g: {[key: string]: any[]} = {};
@@ -75,8 +78,10 @@ export default function Page() {
       const fileName = `${Date.now()}.jpg`;
       await supabase.storage.from('images').upload(fileName, blob);
       const { data: { publicUrl } } = supabase.storage.from('images').getPublicUrl(fileName);
+      
       if (!parentId) await supabase.from('mainline').insert([{ id: fileName, image_url: publicUrl }]);
       else await supabase.from('side_cells').insert([{ id: fileName, parent_id: parentId, image_url: publicUrl }]);
+      
       fetchData();
     } catch (err) {} finally { setIsUploading(false); if(e.target) e.target.value = ''; }
   };
@@ -101,7 +106,11 @@ export default function Page() {
   return (
     <div className={`min-h-screen bg-white text-black font-sans ${isDeepInAlley ? 'overflow-hidden' : 'overflow-x-hidden'}`}
          style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
-      <style jsx global>{` .scrollbar-hide::-webkit-scrollbar { display: none; } body { overscroll-behavior-y: none; margin: 0; background-color: #fff; } `}</style>
+      <style jsx global>{` 
+        .scrollbar-hide::-webkit-scrollbar { display: none; } 
+        body { overscroll-behavior-y: none; margin: 0; background-color: #fff; }
+        img { image-rendering: -webkit-optimize-contrast; } /* 画像を少しパキッとさせる */
+      `}</style>
       
       {isMineMode ? (
         <div className="flex items-center justify-center min-h-screen px-4 bg-white" onClick={() => setIsMineMode(null)}>
@@ -127,7 +136,7 @@ export default function Page() {
                     setActiveSideIndex(prev => prev[main.id] === idx ? prev : { ...prev, [main.id]: idx });
                   }}>
                     <div className="flex-shrink-0 w-screen snap-center px-4 relative flex flex-col items-center">
-                      <div className={imageContainerClass}><img src={main.image_url} className="w-full h-full object-cover" loading="eager" decoding="async" /></div>
+                      <div className={imageContainerClass}><img src={main.image_url} className="w-full h-full object-cover" loading="eager" /></div>
                       <div className="w-full flex justify-between px-3 pt-2 opacity-30">
                          <button onClick={() => copyMineUrl(main.id)} className="text-[10px]">●</button>
                          <button onClick={() => handleDelete(main.id, 'mainline')} className="text-[10px]">✖︎</button>
@@ -135,7 +144,7 @@ export default function Page() {
                     </div>
                     {(sideCells[main.id] || []).map((side) => (
                       <div key={side.id} className="flex-shrink-0 w-screen snap-center px-4 relative flex flex-col items-center">
-                        <div className={imageContainerClass}><img src={side.image_url} className="w-full h-full object-cover" loading="lazy" decoding="async" /></div>
+                        <div className={imageContainerClass}><img src={side.image_url} className="w-full h-full object-cover" loading="lazy" /></div>
                         <div className="w-full flex justify-between px-3 pt-2 opacity-30">
                            <button onClick={() => copyMineUrl(side.id)} className="text-[10px]">●</button>
                            <button onClick={() => handleDelete(side.id, 'side_cells')} className="text-[10px]">✖︎</button>

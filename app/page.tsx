@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = 'https://pfxwhcgdbavycddapqmz.supabase.co';
@@ -15,6 +15,9 @@ export default function Page() {
   const [isUploading, setIsUploading] = useState(false);
   const [isMineMode, setIsMineMode] = useState<string | null>(null);
   const [activeSideIndex, setActiveSideIndex] = useState<{[key: string]: number}>({});
+  
+  // スクロール操作用のRef
+  const scrollRefs = useRef<{[key: string]: HTMLDivElement | null}>({});
 
   const isDeepInAlley = Object.values(activeSideIndex).some(idx => idx > 0);
 
@@ -68,6 +71,13 @@ export default function Page() {
     if (activeSideIndex[id] !== index) setActiveSideIndex(prev => ({ ...prev, [id]: index }));
   };
 
+  // メインに戻る関数
+  const backToMain = (id: string) => {
+    if (scrollRefs.current[id]) {
+      scrollRefs.current[id]?.scrollTo({ left: 0, behavior: 'smooth' });
+    }
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, parentId: string | null = null) => {
     const file = e.target.files?.[0];
     if (!file || isUploading) return;
@@ -96,21 +106,13 @@ export default function Page() {
     document.body.removeChild(textArea);
   };
 
-  const getMineUrl = () => {
-    if (!isMineMode) return '';
-    const main = mainline.find(m => m.id === isMineMode);
-    if (main) return main.image_url;
-    const side = Object.values(sideCells).flat().find((s: any) => s.id === isMineMode) as any;
-    return side?.image_url || '';
-  };
-
   return (
     <div className={`min-h-screen bg-white text-black font-sans selection:bg-none ${isDeepInAlley ? 'overflow-hidden' : 'overflow-x-hidden'}`}>
       <style jsx global>{` .scrollbar-hide::-webkit-scrollbar { display: none; } `}</style>
       
       {isMineMode ? (
         <div className="flex items-center justify-center min-h-screen px-4 bg-white" onClick={() => setIsMineMode(null)}>
-          <div className="w-full max-w-md"><div className={imageContainerClass}><img src={getMineUrl()} className="w-full h-full object-cover" /></div></div>
+          <div className="w-full max-w-md"><div className={imageContainerClass}><img src={mainline.find(m=>m.id===isMineMode)?.image_url || Object.values(sideCells).flat().find((s:any)=>s.id===isMineMode)?.image_url} className="w-full h-full object-cover" /></div></div>
         </div>
       ) : (
         <div className="max-w-md mx-auto">
@@ -118,16 +120,35 @@ export default function Page() {
             <div onClick={() => fetchData()} className={`w-[16px] h-[32px] bg-black cursor-pointer active:scale-95 ${isUploading ? 'animate-pulse' : ''}`} />
           </header>
 
-          <div className="pt-32 space-y-48 pb-64">
+          {/* space-y-12 に短縮して、上下の画像を見切れさせる */}
+          <div className="pt-24 space-y-12 pb-64">
             {mainline.map((main) => {
+              const isThisRowDeep = (activeSideIndex[main.id] || 0) > 0;
               const anyOtherRowDeep = Object.entries(activeSideIndex).some(([id, idx]) => id !== main.id && idx > 0);
+
               return (
                 <div key={main.id} className={`relative group transition-opacity duration-700 ${anyOtherRowDeep ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
-                  <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide w-screen relative left-1/2 right-1/2 -ml-[50vw] -mr-[50vw]" onScroll={(e) => handleScroll(main.id, e)}>
+                  
+                  {/* 横丁の脱出ボタン ＜ */}
+                  {isThisRowDeep && (
+                    <button 
+                      onClick={() => backToMain(main.id)} 
+                      className="absolute -top-6 left-1/2 -translate-x-1/2 z-50 text-[14px] opacity-40 hover:opacity-100 transition-opacity p-2"
+                    >
+                      ＜
+                    </button>
+                  )}
+
+                  <div 
+                    ref={el => { scrollRefs.current[main.id] = el; }}
+                    className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide w-screen relative left-1/2 right-1/2 -ml-[50vw] -mr-[50vw]" 
+                    onScroll={(e) => handleScroll(main.id, e)}
+                  >
                     
+                    {/* メイン画像 */}
                     <div className="flex-shrink-0 w-screen snap-center px-4 relative flex flex-col items-center">
                       <div className={imageContainerClass}><img src={main.image_url} className="w-full h-full object-cover" /></div>
-                      <div className="w-full flex justify-between px-3 pt-3 opacity-0 group-hover:opacity-40 transition-opacity">
+                      <div className="w-full flex justify-between px-3 pt-2 opacity-0 group-hover:opacity-40 transition-opacity">
                          <button onClick={() => copyMineUrl(main.id)} className="text-[10px]">●</button>
                          <button onClick={() => handleDelete(main.id, 'mainline')} className="text-[10px]">✖︎</button>
                       </div>
@@ -136,20 +157,18 @@ export default function Page() {
                       )}
                     </div>
 
+                    {/* 横丁画像 */}
                     {(sideCells[main.id] || []).map((side: any) => (
                       <div key={side.id} className="flex-shrink-0 w-screen snap-center px-4 relative flex flex-col items-center">
                         <div className={imageContainerClass}><img src={side.image_url} className="w-full h-full object-cover" /></div>
-                        <div className="w-full flex justify-between px-3 pt-3 opacity-0 group-hover:opacity-40 transition-opacity">
+                        <div className="w-full flex justify-between px-3 pt-2 opacity-0 group-hover:opacity-40 transition-opacity">
                            <button onClick={() => copyMineUrl(side.id)} className="text-[10px]">●</button>
                            <button onClick={() => handleDelete(side.id, 'side_cells')} className="text-[10px]">✖︎</button>
                         </div>
-                        <div className="absolute top-1/2 left-0 w-[6%] h-[1px] bg-black/10 z-10 pointer-events-none" />
-                        <div className="absolute top-1/2 right-0 w-[6%] h-[1px] bg-black/20 z-10 pointer-events-none" />
                       </div>
                     ))}
 
-                    <div className="flex-shrink-0 w-screen snap-center flex items-center justify-center relative">
-                       <div className="absolute top-1/2 left-0 w-[6%] h-[1px] bg-black/10 z-10" />
+                    <div className="flex-shrink-0 w-screen snap-center flex items-center justify-center">
                        <label className="cursor-pointer opacity-10 hover:opacity-50 transition-opacity p-20 text-[10px]">●
                           <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, main.id)} />
                        </label>

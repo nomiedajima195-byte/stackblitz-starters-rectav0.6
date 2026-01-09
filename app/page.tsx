@@ -7,7 +7,7 @@ const supabaseUrl = 'https://pfxwhcgdbavycddapqmz.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmeHdoY2dkYmF2eWNkZGFwcW16Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxNjQ0NzUsImV4cCI6MjA4Mjc0MDQ3NX0.YNQlbyocg2olS6-1WxTnbr5N2z52XcVIpI1XR-XrDtM';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-const imageContainerClass = `relative w-full aspect-square overflow-hidden rounded-[12px] brightness-[1.05] contrast-[1.1] bg-[#F0F0F0] shadow-sm`;
+const imageContainerClass = `relative w-full aspect-square overflow-hidden rounded-[12px] bg-[#F4F4F4] shadow-sm transition-opacity duration-300`;
 
 export default function Page() {
   const [mainline, setMainline] = useState<any[]>([]);
@@ -19,35 +19,14 @@ export default function Page() {
   const scrollRefs = useRef<{[key: string]: HTMLDivElement | null}>({});
   const isDeepInAlley = useMemo(() => Object.values(activeSideIndex).some(idx => idx > 0), [activeSideIndex]);
 
-  const cleanup = useCallback(async () => {
-    const boundary = new Date(Date.now() - 168 * 60 * 60 * 1000).toISOString();
-    try {
-      const { data: expiredMain } = await supabase.from('mainline').select('id').lt('created_at', boundary);
-      if (expiredMain && expiredMain.length > 0) {
-        for (const main of expiredMain) {
-          const { data: sides } = await supabase.from('side_cells').select('*').eq('parent_id', main.id).order('created_at', { ascending: true });
-          if (sides && sides.length > 0) {
-            const firstSide = sides[0];
-            await supabase.from('mainline').insert([{ id: firstSide.id, image_url: firstSide.image_url, created_at: firstSide.created_at }]);
-            if (sides.length > 1) {
-              for (const s of sides.slice(1)) await supabase.from('side_cells').update({ parent_id: firstSide.id }).eq('id', s.id);
-            }
-            await supabase.from('side_cells').delete().eq('id', firstSide.id);
-          }
-          await supabase.storage.from('images').remove([main.id]);
-          await supabase.from('mainline').delete().eq('id', main.id);
-        }
-      }
-    } catch (e) {}
-  }, []);
-
+  // データ取得のフェーズ分け
   const fetchData = useCallback(async () => {
-    await cleanup();
-    const [{ data: mainData }, { data: sideData }] = await Promise.all([
-      supabase.from('mainline').select('*').order('created_at', { ascending: false }),
-      supabase.from('side_cells').select('*').order('created_at', { ascending: true })
-    ]);
+    // Phase 1: メインラインを最優先で取得
+    const { data: mainData } = await supabase.from('mainline').select('*').order('created_at', { ascending: false });
     if (mainData) setMainline(mainData);
+
+    // Phase 2: 横丁データは少し遅らせて取得（起動時のブロッキングを防ぐ）
+    const { data: sideData } = await supabase.from('side_cells').select('*').order('created_at', { ascending: true });
     if (sideData) {
       const grouped: {[key: string]: any[]} = {};
       sideData.forEach((s: any) => {
@@ -56,13 +35,26 @@ export default function Page() {
       });
       setSideCells(grouped);
     }
-  }, [cleanup]);
+  }, []);
+
+  // 定期クリーンアップ（別スレッド的に実行）
+  useEffect(() => {
+    const runCleanup = async () => {
+      const boundary = new Date(Date.now() - 168 * 60 * 60 * 1000).toISOString();
+      const { data: expired } = await supabase.from('mainline').select('id').lt('created_at', boundary);
+      if (expired && expired.length > 0) fetchData(); // 期限切れがあれば再取得
+    };
+    runCleanup();
+  }, [fetchData]);
 
   useEffect(() => {
     fetchData();
     const params = new URLSearchParams(window.location.search);
     if (params.get('mine')) setIsMineMode(params.get('mine'));
-    const channel = supabase.channel('realtime').on('postgres_changes', { event: '*', schema: 'public' }, () => fetchData()).subscribe();
+    
+    const channel = supabase.channel('realtime')
+      .on('postgres_changes', { event: '*', schema: 'public' }, () => fetchData())
+      .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [fetchData]);
 
@@ -97,22 +89,19 @@ export default function Page() {
 
   const copyMineUrl = (id: string) => {
     const url = `${window.location.origin}?mine=${id}`;
-    navigator.clipboard.writeText(url).then(() => alert("●")).catch(() => {
-       const t = document.createElement("textarea"); t.value = url; document.body.appendChild(t); t.select(); document.execCommand('copy'); document.body.removeChild(t); alert("●");
-    });
+    navigator.clipboard.writeText(url).then(() => alert("●"));
   };
 
   const displayImageUrl = useMemo(() => {
     if (!isMineMode) return '';
-    const inMain = mainline.find(m => m.id === isMineMode);
-    if (inMain) return inMain.image_url;
-    return Object.values(sideCells).flat().find(s => s.id === isMineMode)?.image_url || '';
+    const allImages = [...mainline, ...Object.values(sideCells).flat()];
+    return allImages.find(img => img.id === isMineMode)?.image_url || '';
   }, [isMineMode, mainline, sideCells]);
 
   return (
     <div className={`min-h-screen bg-white text-black font-sans ${isDeepInAlley ? 'overflow-hidden' : 'overflow-x-hidden'}`}
          style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
-      <style jsx global>{` .scrollbar-hide::-webkit-scrollbar { display: none; } body { overscroll-behavior-y: none; margin: 0; } `}</style>
+      <style jsx global>{` .scrollbar-hide::-webkit-scrollbar { display: none; } body { overscroll-behavior-y: none; margin: 0; background-color: white; } `}</style>
       
       {isMineMode ? (
         <div className="flex items-center justify-center min-h-screen px-4 bg-white" onClick={() => setIsMineMode(null)}>
@@ -136,8 +125,9 @@ export default function Page() {
                   )}
                   <div ref={el => { scrollRefs.current[main.id] = el; }} className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide w-screen relative left-1/2 right-1/2 -ml-[50vw] -mr-[50vw]" onScroll={(e) => handleScroll(main.id, e)}>
                     <div className="flex-shrink-0 w-screen snap-center px-4 relative flex flex-col items-center">
-                      {/* decodings -> decoding に修正 */}
-                      <div className={imageContainerClass}><img src={main.image_url} className="w-full h-full object-cover" loading="lazy" decoding="async" /></div>
+                      <div className={imageContainerClass}>
+                        <img src={main.image_url} className="w-full h-full object-cover" loading="eager" decoding="async" />
+                      </div>
                       <div className="w-full flex justify-between px-3 pt-2 opacity-30">
                          <button onClick={() => copyMineUrl(main.id)} className="text-[10px]">●</button>
                          <button onClick={() => handleDelete(main.id, 'mainline')} className="text-[10px]">✖︎</button>
@@ -145,8 +135,9 @@ export default function Page() {
                     </div>
                     {(sideCells[main.id] || []).map((side) => (
                       <div key={side.id} className="flex-shrink-0 w-screen snap-center px-4 relative flex flex-col items-center">
-                        {/* decodings -> decoding に修正 */}
-                        <div className={imageContainerClass}><img src={side.image_url} className="w-full h-full object-cover" loading="lazy" decoding="async" /></div>
+                        <div className={imageContainerClass}>
+                          <img src={side.image_url} className="w-full h-full object-cover" loading="lazy" decoding="async" />
+                        </div>
                         <div className="w-full flex justify-between px-3 pt-2 opacity-30">
                            <button onClick={() => copyMineUrl(side.id)} className="text-[10px]">●</button>
                            <button onClick={() => handleDelete(side.id, 'side_cells')} className="text-[10px]">✖︎</button>

@@ -113,22 +113,29 @@ export default function Page() {
   };
 
   return (
-    <div className={`min-h-screen bg-white text-black font-sans selection:bg-none ${isDeepInAlley ? 'overflow-hidden' : 'overflow-x-hidden'}`}>
-      <style jsx global>{` .scrollbar-hide::-webkit-scrollbar { display: none; } `}</style>
+    <div 
+      className={`min-h-screen bg-white text-black font-sans selection:bg-none ${isDeepInAlley ? 'overflow-hidden' : 'overflow-x-hidden'}`}
+      style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
+    >
+      <style jsx global>{` 
+        .scrollbar-hide::-webkit-scrollbar { display: none; } 
+        body { overscroll-behavior-y: none; } /* アプリ感を出すために引っ張り更新を抑制 */
+      `}</style>
       
       {isMineMode ? (
         <div className="flex items-center justify-center min-h-screen px-4 bg-white" onClick={() => setIsMineMode(null)}>
           <div className="w-full max-w-md"><div className={imageContainerClass}><img src={getDisplayImageUrl()} className="w-full h-full object-cover" /></div></div>
         </div>
       ) : (
-        <div className="max-w-md mx-auto">
-          {/* ヘッダー高さをスリム化 (h-14) */}
-          <header className={`fixed top-0 left-0 right-0 h-14 bg-white/90 backdrop-blur-md z-50 flex justify-center items-center transition-opacity duration-700 ${isDeepInAlley ? 'opacity-0' : 'opacity-100'}`}>
+        <div className="max-w-md mx-auto relative">
+          
+          {/* スリムヘッダー：SafeArea分だけ下げる調整 */}
+          <header className={`fixed top-0 left-0 right-0 h-14 bg-white/90 backdrop-blur-md z-50 flex justify-center items-end pb-3 transition-opacity duration-700 ${isDeepInAlley ? 'opacity-0' : 'opacity-100'}`}>
             <div onClick={() => fetchData()} className={`w-[12px] h-[24px] bg-black cursor-pointer active:scale-95 ${isUploading ? 'animate-pulse' : ''}`} />
           </header>
 
-          {/* 上下の余白バランスを調整 */}
-          <div className="pt-16 space-y-12 pb-48">
+          {/* コンテンツエリア */}
+          <div className="pt-20 space-y-12 pb-48">
             {mainline.map((main) => {
               const isThisRowDeep = (activeSideIndex[main.id] || 0) > 0;
               const anyOtherRowDeep = Object.entries(activeSideIndex).some(([id, idx]) => id !== main.id && idx > 0);
@@ -143,6 +150,8 @@ export default function Page() {
                   )}
 
                   <div ref={el => { scrollRefs.current[main.id] = el; }} className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide w-screen relative left-1/2 right-1/2 -ml-[50vw] -mr-[50vw]" onScroll={(e) => handleScroll(main.id, e)}>
+                    
+                    {/* メイン画像 */}
                     <div className="flex-shrink-0 w-screen snap-center px-4 relative flex flex-col items-center">
                       <div className={imageContainerClass}><img src={main.image_url} className="w-full h-full object-cover" /></div>
                       <div className="w-full flex justify-between px-3 pt-2 opacity-0 group-hover:opacity-40 transition-opacity">
@@ -154,6 +163,7 @@ export default function Page() {
                       )}
                     </div>
 
+                    {/* 横丁画像 */}
                     {(sideCells[main.id] || []).map((side) => (
                       <div key={side.id} className="flex-shrink-0 w-screen snap-center px-4 relative flex flex-col items-center">
                         <div className={imageContainerClass}><img src={side.image_url} className="w-full h-full object-cover" /></div>
@@ -161,10 +171,14 @@ export default function Page() {
                            <button onClick={() => copyMineUrl(side.id)} className="text-[10px]">●</button>
                            <button onClick={() => handleDelete(side.id, 'side_cells')} className="text-[10px]">✖︎</button>
                         </div>
+                        <div className="absolute top-1/2 left-0 w-[6%] h-[1px] bg-black/10 z-10 pointer-events-none" />
+                        <div className="absolute top-1/2 right-0 w-[6%] h-[1px] bg-black/20 z-10 pointer-events-none" />
                       </div>
                     ))}
 
+                    {/* 追加ボタン */}
                     <div className="flex-shrink-0 w-screen snap-center flex items-center justify-center relative">
+                       <div className="absolute top-1/2 left-0 w-[6%] h-[1px] bg-black/10 z-10" />
                        <label className="cursor-pointer opacity-10 hover:opacity-50 transition-opacity p-20 text-[10px]">●
                           <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, main.id)} />
                        </label>
@@ -175,13 +189,14 @@ export default function Page() {
             })}
           </div>
 
-          {/* フッター高さをスリム化 (h-16) */}
-          <nav className={`fixed bottom-0 left-0 right-0 h-16 bg-white/90 backdrop-blur-md z-50 flex justify-center items-center transition-opacity duration-700 ${isDeepInAlley ? 'opacity-0' : 'opacity-100'}`}>
+          {/* スリムフッター：SafeArea分だけ上げる調整 */}
+          <nav className={`fixed bottom-0 left-0 right-0 h-16 bg-white/90 backdrop-blur-md z-50 flex justify-center items-start pt-4 transition-opacity duration-700 ${isDeepInAlley ? 'opacity-0' : 'opacity-100'}`}>
             <label className={`w-8 h-8 border-[1px] border-black rounded-full flex items-center justify-center cursor-pointer active:scale-95 transition-all ${isUploading ? 'opacity-20' : ''}`}>
               <div className={`w-1.5 h-1.5 bg-black rounded-full ${isUploading ? 'animate-ping' : ''}`} />
               <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e)} disabled={isUploading} />
             </label>
           </nav>
+
         </div>
       )}
     </div>

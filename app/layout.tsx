@@ -1,10 +1,9 @@
-// app/layout.tsx
+import "./globals.css"; // ← これがデザインを復活させる魔法の1行です！
 import type { Metadata, Viewport } from "next";
 
 export const metadata: Metadata = {
   title: "Recta",
   description: "Seamless Gallery",
-  // これが重要：ホーム画面に追加した時にアドレスバーを消す
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
@@ -16,8 +15,8 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
-  userScalable: false, // 勝手にズームするのを防ぐ
-  viewportFit: "cover", // iPhoneのノッチ部分まで背景を広げる
+  userScalable: false,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -27,7 +26,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ja">
-      <body>{children}</body>
+      <body className="antialiased">{children}</body>
     </html>
   );
 }

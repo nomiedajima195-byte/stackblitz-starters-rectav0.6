@@ -7,7 +7,8 @@ const supabaseUrl = 'https://pfxwhcgdbavycddapqmz.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmeHdoY2dkYmF2eWNkZGFwcW16Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxNjQ0NzUsImV4cCI6MjA4Mjc0MDQ3NX0.YNQlbyocg2olS6-1WxTnbr5N2z52XcVIpI1XR-XrDtM';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-const imageContainerClass = `relative w-full aspect-square overflow-hidden rounded-[12px] bg-[#F4F4F4] shadow-sm transition-opacity duration-300`;
+// 画像の質感を少し硬めに（コントラスト上げ）
+const imageContainerClass = `relative w-full aspect-square overflow-hidden rounded-[8px] bg-[#EEEEEE] contrast-[1.15] brightness-[1.05] shadow-sm`;
 
 export default function Page() {
   const [mainline, setMainline] = useState<any[]>([]);
@@ -19,61 +20,60 @@ export default function Page() {
   const scrollRefs = useRef<{[key: string]: HTMLDivElement | null}>({});
   const isDeepInAlley = useMemo(() => Object.values(activeSideIndex).some(idx => idx > 0), [activeSideIndex]);
 
-  // データ取得のフェーズ分け
-  const fetchData = useCallback(async () => {
-    // Phase 1: メインラインを最優先で取得
-    const { data: mainData } = await supabase.from('mainline').select('*').order('created_at', { ascending: false });
-    if (mainData) setMainline(mainData);
+  // 画像リサイズ＆あえて画質を落とす
+  const processImage = (file: File): Promise<Blob> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (e) => {
+        const img = new Image();
+        img.src = e.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_SIZE = 640; // 粗さを出すためのサイズダウン
+          let w = img.width;
+          let h = img.height;
+          if (w > h) { if (w > MAX_SIZE) { h *= MAX_SIZE / w; w = MAX_SIZE; } }
+          else { if (h > MAX_SIZE) { w *= MAX_SIZE / h; h = MAX_SIZE; } }
+          canvas.width = w; canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, w, h);
+          canvas.toBlob((blob) => { if (blob) resolve(blob); }, 'image/jpeg', 0.5); // 画質50%でザラつきを許容
+        };
+      };
+    });
+  };
 
-    // Phase 2: 横丁データは少し遅らせて取得（起動時のブロッキングを防ぐ）
-    const { data: sideData } = await supabase.from('side_cells').select('*').order('created_at', { ascending: true });
-    if (sideData) {
-      const grouped: {[key: string]: any[]} = {};
-      sideData.forEach((s: any) => {
-        if (!grouped[s.parent_id]) grouped[s.parent_id] = [];
-        grouped[s.parent_id].push(s);
+  const fetchData = useCallback(async () => {
+    const { data: m } = await supabase.from('mainline').select('*').order('created_at', { ascending: false });
+    if (m) setMainline(m);
+    const { data: s } = await supabase.from('side_cells').select('*').order('created_at', { ascending: true });
+    if (s) {
+      const g: {[key: string]: any[]} = {};
+      s.forEach((item: any) => {
+        if (!g[item.parent_id]) g[item.parent_id] = [];
+        g[item.parent_id].push(item);
       });
-      setSideCells(grouped);
+      setSideCells(g);
     }
   }, []);
 
-  // 定期クリーンアップ（別スレッド的に実行）
-  useEffect(() => {
-    const runCleanup = async () => {
-      const boundary = new Date(Date.now() - 168 * 60 * 60 * 1000).toISOString();
-      const { data: expired } = await supabase.from('mainline').select('id').lt('created_at', boundary);
-      if (expired && expired.length > 0) fetchData(); // 期限切れがあれば再取得
-    };
-    runCleanup();
-  }, [fetchData]);
-
   useEffect(() => {
     fetchData();
+    const channel = supabase.channel('realtime').on('postgres_changes', { event: '*', schema: 'public' }, () => fetchData()).subscribe();
     const params = new URLSearchParams(window.location.search);
     if (params.get('mine')) setIsMineMode(params.get('mine'));
-    
-    const channel = supabase.channel('realtime')
-      .on('postgres_changes', { event: '*', schema: 'public' }, () => fetchData())
-      .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [fetchData]);
-
-  const handleScroll = useCallback((id: string, e: React.UIEvent<HTMLDivElement>) => {
-    const index = Math.round(e.currentTarget.scrollLeft / e.currentTarget.offsetWidth);
-    setActiveSideIndex(prev => prev[id] === index ? prev : { ...prev, [id]: index });
-  }, []);
-
-  const backToMain = (id: string) => {
-    scrollRefs.current[id]?.scrollTo({ left: 0, behavior: 'smooth' });
-  };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, parentId: string | null = null) => {
     const file = e.target.files?.[0];
     if (!file || isUploading) return;
     setIsUploading(true);
     try {
+      const blob = await processImage(file);
       const fileName = `${Date.now()}.jpg`;
-      await supabase.storage.from('images').upload(fileName, file);
+      await supabase.storage.from('images').upload(fileName, blob);
       const { data: { publicUrl } } = supabase.storage.from('images').getPublicUrl(fileName);
       if (!parentId) await supabase.from('mainline').insert([{ id: fileName, image_url: publicUrl }]);
       else await supabase.from('side_cells').insert([{ id: fileName, parent_id: parentId, image_url: publicUrl }]);
@@ -94,14 +94,14 @@ export default function Page() {
 
   const displayImageUrl = useMemo(() => {
     if (!isMineMode) return '';
-    const allImages = [...mainline, ...Object.values(sideCells).flat()];
-    return allImages.find(img => img.id === isMineMode)?.image_url || '';
+    const all = [...mainline, ...Object.values(sideCells).flat()];
+    return all.find(img => img.id === isMineMode)?.image_url || '';
   }, [isMineMode, mainline, sideCells]);
 
   return (
     <div className={`min-h-screen bg-white text-black font-sans ${isDeepInAlley ? 'overflow-hidden' : 'overflow-x-hidden'}`}
          style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
-      <style jsx global>{` .scrollbar-hide::-webkit-scrollbar { display: none; } body { overscroll-behavior-y: none; margin: 0; background-color: white; } `}</style>
+      <style jsx global>{` .scrollbar-hide::-webkit-scrollbar { display: none; } body { overscroll-behavior-y: none; margin: 0; background-color: #fff; } `}</style>
       
       {isMineMode ? (
         <div className="flex items-center justify-center min-h-screen px-4 bg-white" onClick={() => setIsMineMode(null)}>
@@ -117,17 +117,17 @@ export default function Page() {
             {mainline.map((main) => {
               const isThisRowDeep = (activeSideIndex[main.id] || 0) > 0;
               const anyOtherRowDeep = Object.entries(activeSideIndex).some(([id, idx]) => id !== main.id && idx > 0);
-
               return (
                 <div key={main.id} className={`relative transition-opacity duration-500 ${anyOtherRowDeep ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
                   {isThisRowDeep && (
-                    <button onClick={() => backToMain(main.id)} className="absolute -top-6 left-1/2 -translate-x-1/2 z-50 text-[14px] opacity-40 p-2">＜</button>
+                    <button onClick={() => scrollRefs.current[main.id]?.scrollTo({left:0, behavior:'smooth'})} className="absolute -top-6 left-1/2 -translate-x-1/2 z-50 text-[14px] opacity-40 p-2">＜</button>
                   )}
-                  <div ref={el => { scrollRefs.current[main.id] = el; }} className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide w-screen relative left-1/2 right-1/2 -ml-[50vw] -mr-[50vw]" onScroll={(e) => handleScroll(main.id, e)}>
+                  <div ref={el => { scrollRefs.current[main.id] = el; }} className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide w-screen relative left-1/2 right-1/2 -ml-[50vw] -mr-[50vw]" onScroll={(e) => {
+                    const idx = Math.round(e.currentTarget.scrollLeft / e.currentTarget.offsetWidth);
+                    setActiveSideIndex(prev => prev[main.id] === idx ? prev : { ...prev, [main.id]: idx });
+                  }}>
                     <div className="flex-shrink-0 w-screen snap-center px-4 relative flex flex-col items-center">
-                      <div className={imageContainerClass}>
-                        <img src={main.image_url} className="w-full h-full object-cover" loading="eager" decoding="async" />
-                      </div>
+                      <div className={imageContainerClass}><img src={main.image_url} className="w-full h-full object-cover" loading="eager" decoding="async" /></div>
                       <div className="w-full flex justify-between px-3 pt-2 opacity-30">
                          <button onClick={() => copyMineUrl(main.id)} className="text-[10px]">●</button>
                          <button onClick={() => handleDelete(main.id, 'mainline')} className="text-[10px]">✖︎</button>
@@ -135,9 +135,7 @@ export default function Page() {
                     </div>
                     {(sideCells[main.id] || []).map((side) => (
                       <div key={side.id} className="flex-shrink-0 w-screen snap-center px-4 relative flex flex-col items-center">
-                        <div className={imageContainerClass}>
-                          <img src={side.image_url} className="w-full h-full object-cover" loading="lazy" decoding="async" />
-                        </div>
+                        <div className={imageContainerClass}><img src={side.image_url} className="w-full h-full object-cover" loading="lazy" decoding="async" /></div>
                         <div className="w-full flex justify-between px-3 pt-2 opacity-30">
                            <button onClick={() => copyMineUrl(side.id)} className="text-[10px]">●</button>
                            <button onClick={() => handleDelete(side.id, 'side_cells')} className="text-[10px]">✖︎</button>

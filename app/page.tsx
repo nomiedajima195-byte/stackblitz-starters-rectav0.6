@@ -1,13 +1,13 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = 'https://pfxwhcgdbavycddapqmz.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmeHdoY2dkYmF2eWNkZGFwcW16Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxNjQ0NzUsImV4cCI6MjA4Mjc0MDQ3NX0.YNQlbyocg2olS6-1WxTnbr5N2z52XcVIpI1XR-XrDtM';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-const imageContainerClass = `relative w-full aspect-square overflow-hidden rounded-[12px] brightness-[1.05] contrast-[1.1] bg-[#F9F9F9] shadow-sm transition-all duration-500`;
+const imageContainerClass = `relative w-full aspect-square overflow-hidden rounded-[12px] brightness-[1.05] contrast-[1.1] bg-[#F0F0F0] shadow-sm`;
 
 export default function Page() {
   const [mainline, setMainline] = useState<any[]>([]);
@@ -17,13 +17,13 @@ export default function Page() {
   const [activeSideIndex, setActiveSideIndex] = useState<{[key: string]: number}>({});
   
   const scrollRefs = useRef<{[key: string]: HTMLDivElement | null}>({});
-  const isDeepInAlley = Object.values(activeSideIndex).some(idx => idx > 0);
+  const isDeepInAlley = useMemo(() => Object.values(activeSideIndex).some(idx => idx > 0), [activeSideIndex]);
 
   const cleanup = useCallback(async () => {
     const boundary = new Date(Date.now() - 168 * 60 * 60 * 1000).toISOString();
     try {
-      const { data: expiredMain } = await supabase.from('mainline').select('*').lt('created_at', boundary);
-      if (expiredMain) {
+      const { data: expiredMain } = await supabase.from('mainline').select('id').lt('created_at', boundary);
+      if (expiredMain && expiredMain.length > 0) {
         for (const main of expiredMain) {
           const { data: sides } = await supabase.from('side_cells').select('*').eq('parent_id', main.id).order('created_at', { ascending: true });
           if (sides && sides.length > 0) {
@@ -43,8 +43,10 @@ export default function Page() {
 
   const fetchData = useCallback(async () => {
     await cleanup();
-    const { data: mainData } = await supabase.from('mainline').select('*').order('created_at', { ascending: false });
-    const { data: sideData } = await supabase.from('side_cells').select('*').order('created_at', { ascending: true });
+    const [{ data: mainData }, { data: sideData }] = await Promise.all([
+      supabase.from('mainline').select('*').order('created_at', { ascending: false }),
+      supabase.from('side_cells').select('*').order('created_at', { ascending: true })
+    ]);
     if (mainData) setMainline(mainData);
     if (sideData) {
       const grouped: {[key: string]: any[]} = {};
@@ -64,15 +66,13 @@ export default function Page() {
     return () => { supabase.removeChannel(channel); };
   }, [fetchData]);
 
-  const handleScroll = (id: string, e: React.UIEvent<HTMLDivElement>) => {
+  const handleScroll = useCallback((id: string, e: React.UIEvent<HTMLDivElement>) => {
     const index = Math.round(e.currentTarget.scrollLeft / e.currentTarget.offsetWidth);
-    if (activeSideIndex[id] !== index) setActiveSideIndex(prev => ({ ...prev, [id]: index }));
-  };
+    setActiveSideIndex(prev => prev[id] === index ? prev : { ...prev, [id]: index });
+  }, []);
 
   const backToMain = (id: string) => {
-    if (scrollRefs.current[id]) {
-      scrollRefs.current[id]?.scrollTo({ left: 0, behavior: 'smooth' });
-    }
+    scrollRefs.current[id]?.scrollTo({ left: 0, behavior: 'smooth' });
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, parentId: string | null = null) => {
@@ -85,7 +85,7 @@ export default function Page() {
       const { data: { publicUrl } } = supabase.storage.from('images').getPublicUrl(fileName);
       if (!parentId) await supabase.from('mainline').insert([{ id: fileName, image_url: publicUrl }]);
       else await supabase.from('side_cells').insert([{ id: fileName, parent_id: parentId, image_url: publicUrl }]);
-      setTimeout(() => fetchData(), 500);
+      fetchData();
     } catch (err) {} finally { setIsUploading(false); if(e.target) e.target.value = ''; }
   };
 
@@ -97,91 +97,64 @@ export default function Page() {
 
   const copyMineUrl = (id: string) => {
     const url = `${window.location.origin}?mine=${id}`;
-    const textArea = document.createElement("textarea");
-    textArea.value = url; document.body.appendChild(textArea); textArea.select();
-    try { document.execCommand('copy'); alert("●"); } catch (e) {}
-    document.body.removeChild(textArea);
+    navigator.clipboard.writeText(url).then(() => alert("●")).catch(() => {
+       const t = document.createElement("textarea"); t.value = url; document.body.appendChild(t); t.select(); document.execCommand('copy'); document.body.removeChild(t); alert("●");
+    });
   };
 
-  const getDisplayImageUrl = () => {
+  const displayImageUrl = useMemo(() => {
     if (!isMineMode) return '';
     const inMain = mainline.find(m => m.id === isMineMode);
     if (inMain) return inMain.image_url;
-    const allSides = Object.values(sideCells).flat();
-    const inSide = allSides.find(s => s.id === isMineMode);
-    return inSide ? inSide.image_url : '';
-  };
+    return Object.values(sideCells).flat().find(s => s.id === isMineMode)?.image_url || '';
+  }, [isMineMode, mainline, sideCells]);
 
   return (
-    <div 
-      className={`min-h-screen bg-white text-black font-sans selection:bg-none ${isDeepInAlley ? 'overflow-hidden' : 'overflow-x-hidden'}`}
-      style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
-    >
-      <style jsx global>{` 
-        .scrollbar-hide::-webkit-scrollbar { display: none; } 
-        body { overscroll-behavior-y: none; } /* アプリ感を出すために引っ張り更新を抑制 */
-      `}</style>
+    <div className={`min-h-screen bg-white text-black font-sans ${isDeepInAlley ? 'overflow-hidden' : 'overflow-x-hidden'}`}
+         style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
+      <style jsx global>{` .scrollbar-hide::-webkit-scrollbar { display: none; } body { overscroll-behavior-y: none; margin: 0; } `}</style>
       
       {isMineMode ? (
         <div className="flex items-center justify-center min-h-screen px-4 bg-white" onClick={() => setIsMineMode(null)}>
-          <div className="w-full max-w-md"><div className={imageContainerClass}><img src={getDisplayImageUrl()} className="w-full h-full object-cover" /></div></div>
+          <div className="w-full max-w-md"><div className={imageContainerClass}><img src={displayImageUrl} className="w-full h-full object-cover" /></div></div>
         </div>
       ) : (
         <div className="max-w-md mx-auto relative">
-          
-          {/* スリムヘッダー：SafeArea分だけ下げる調整 */}
-          <header className={`fixed top-0 left-0 right-0 h-14 bg-white/90 backdrop-blur-md z-50 flex justify-center items-end pb-3 transition-opacity duration-700 ${isDeepInAlley ? 'opacity-0' : 'opacity-100'}`}>
-            <div onClick={() => fetchData()} className={`w-[12px] h-[24px] bg-black cursor-pointer active:scale-95 ${isUploading ? 'animate-pulse' : ''}`} />
+          <header className={`fixed top-0 left-0 right-0 h-14 bg-white/80 backdrop-blur-md z-50 flex justify-center items-end pb-3 transition-opacity duration-500 ${isDeepInAlley ? 'opacity-0' : 'opacity-100'}`}>
+            <div onClick={() => fetchData()} className={`w-[12px] h-[24px] bg-black cursor-pointer ${isUploading ? 'animate-pulse' : ''}`} />
           </header>
 
-          {/* コンテンツエリア */}
           <div className="pt-20 space-y-12 pb-48">
             {mainline.map((main) => {
               const isThisRowDeep = (activeSideIndex[main.id] || 0) > 0;
               const anyOtherRowDeep = Object.entries(activeSideIndex).some(([id, idx]) => id !== main.id && idx > 0);
 
               return (
-                <div key={main.id} className={`relative group transition-opacity duration-700 ${anyOtherRowDeep ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
-                  
+                <div key={main.id} className={`relative transition-opacity duration-500 ${anyOtherRowDeep ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
                   {isThisRowDeep && (
-                    <button onClick={() => backToMain(main.id)} className="absolute -top-6 left-1/2 -translate-x-1/2 z-50 text-[14px] opacity-40 hover:opacity-100 transition-opacity p-2">
-                      ＜
-                    </button>
+                    <button onClick={() => backToMain(main.id)} className="absolute -top-6 left-1/2 -translate-x-1/2 z-50 text-[14px] opacity-40 p-2">＜</button>
                   )}
-
                   <div ref={el => { scrollRefs.current[main.id] = el; }} className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide w-screen relative left-1/2 right-1/2 -ml-[50vw] -mr-[50vw]" onScroll={(e) => handleScroll(main.id, e)}>
-                    
-                    {/* メイン画像 */}
                     <div className="flex-shrink-0 w-screen snap-center px-4 relative flex flex-col items-center">
-                      <div className={imageContainerClass}><img src={main.image_url} className="w-full h-full object-cover" /></div>
-                      <div className="w-full flex justify-between px-3 pt-2 opacity-0 group-hover:opacity-40 transition-opacity">
+                      {/* decodings -> decoding に修正 */}
+                      <div className={imageContainerClass}><img src={main.image_url} className="w-full h-full object-cover" loading="lazy" decoding="async" /></div>
+                      <div className="w-full flex justify-between px-3 pt-2 opacity-30">
                          <button onClick={() => copyMineUrl(main.id)} className="text-[10px]">●</button>
                          <button onClick={() => handleDelete(main.id, 'mainline')} className="text-[10px]">✖︎</button>
                       </div>
-                      {(sideCells[main.id] || []).length > 0 && (
-                        <div className="absolute top-1/2 right-0 w-[6%] h-[1px] bg-black/20 z-10 pointer-events-none" />
-                      )}
                     </div>
-
-                    {/* 横丁画像 */}
                     {(sideCells[main.id] || []).map((side) => (
                       <div key={side.id} className="flex-shrink-0 w-screen snap-center px-4 relative flex flex-col items-center">
-                        <div className={imageContainerClass}><img src={side.image_url} className="w-full h-full object-cover" /></div>
-                        <div className="w-full flex justify-between px-3 pt-2 opacity-0 group-hover:opacity-40 transition-opacity">
+                        {/* decodings -> decoding に修正 */}
+                        <div className={imageContainerClass}><img src={side.image_url} className="w-full h-full object-cover" loading="lazy" decoding="async" /></div>
+                        <div className="w-full flex justify-between px-3 pt-2 opacity-30">
                            <button onClick={() => copyMineUrl(side.id)} className="text-[10px]">●</button>
                            <button onClick={() => handleDelete(side.id, 'side_cells')} className="text-[10px]">✖︎</button>
                         </div>
-                        <div className="absolute top-1/2 left-0 w-[6%] h-[1px] bg-black/10 z-10 pointer-events-none" />
-                        <div className="absolute top-1/2 right-0 w-[6%] h-[1px] bg-black/20 z-10 pointer-events-none" />
                       </div>
                     ))}
-
-                    {/* 追加ボタン */}
                     <div className="flex-shrink-0 w-screen snap-center flex items-center justify-center relative">
-                       <div className="absolute top-1/2 left-0 w-[6%] h-[1px] bg-black/10 z-10" />
-                       <label className="cursor-pointer opacity-10 hover:opacity-50 transition-opacity p-20 text-[10px]">●
-                          <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, main.id)} />
-                       </label>
+                       <label className="cursor-pointer opacity-10 p-20 text-[10px]">●<input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, main.id)} /></label>
                     </div>
                   </div>
                 </div>
@@ -189,14 +162,12 @@ export default function Page() {
             })}
           </div>
 
-          {/* スリムフッター：SafeArea分だけ上げる調整 */}
-          <nav className={`fixed bottom-0 left-0 right-0 h-16 bg-white/90 backdrop-blur-md z-50 flex justify-center items-start pt-4 transition-opacity duration-700 ${isDeepInAlley ? 'opacity-0' : 'opacity-100'}`}>
-            <label className={`w-8 h-8 border-[1px] border-black rounded-full flex items-center justify-center cursor-pointer active:scale-95 transition-all ${isUploading ? 'opacity-20' : ''}`}>
+          <nav className={`fixed bottom-0 left-0 right-0 h-16 bg-white/80 backdrop-blur-md z-50 flex justify-center items-start pt-4 transition-opacity duration-500 ${isDeepInAlley ? 'opacity-0' : 'opacity-100'}`}>
+            <label className={`w-8 h-8 border-[1px] border-black rounded-full flex items-center justify-center cursor-pointer ${isUploading ? 'opacity-20' : ''}`}>
               <div className={`w-1.5 h-1.5 bg-black rounded-full ${isUploading ? 'animate-ping' : ''}`} />
               <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e)} disabled={isUploading} />
             </label>
           </nav>
-
         </div>
       )}
     </div>

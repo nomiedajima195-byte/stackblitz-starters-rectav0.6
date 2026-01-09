@@ -7,7 +7,6 @@ const supabaseUrl = 'https://pfxwhcgdbavycddapqmz.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmeHdoY2dkYmF2eWNkZGFwcW16Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxNjQ0NzUsImV4cCI6MjA4Mjc0MDQ3NX0.YNQlbyocg2olS6-1WxTnbr5N2z52XcVIpI1XR-XrDtM';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// ビンテージ加工：白っぽく、彩度を落とし、少しだけセピアを混ぜる
 const imageContainerClass = `relative w-full aspect-square overflow-hidden rounded-[4px] bg-[#F8F8F8] brightness-[1.08] contrast-[0.85] saturate-[0.6] sepia-[0.15] shadow-sm transition-opacity duration-700`;
 
 export default function Page() {
@@ -20,7 +19,6 @@ export default function Page() {
   const scrollRefs = useRef<{[key: string]: HTMLDivElement | null}>({});
   const isDeepInAlley = useMemo(() => Object.values(activeSideIndex).some(idx => idx > 0), [activeSideIndex]);
 
-  // 【ビンテージ】画像リサイズ：400px & ほどよい圧縮
   const processImage = (file: File): Promise<Blob> => {
     return new Promise((resolve) => {
       const reader = new FileReader();
@@ -31,17 +29,12 @@ export default function Page() {
         img.onload = () => {
           const canvas = document.createElement('canvas');
           const MAX_SIZE = 400; 
-          let w = img.width;
-          let h = img.height;
+          let w = img.width, h = img.height;
           if (w > h) { if (w > MAX_SIZE) { h *= MAX_SIZE / w; w = MAX_SIZE; } }
           else { if (h > MAX_SIZE) { w *= MAX_SIZE / h; h = MAX_SIZE; } }
           canvas.width = w; canvas.height = h;
           const ctx = canvas.getContext('2d');
-          if (ctx) {
-            ctx.imageSmoothingEnabled = true; // 今回は滑らかに
-            ctx.drawImage(img, 0, 0, w, h);
-          }
-          // 画質0.4 (40%) で少しカサつかせる
+          if (ctx) { ctx.imageSmoothingEnabled = true; ctx.drawImage(img, 0, 0, w, h); }
           canvas.toBlob((blob) => { if (blob) resolve(blob); }, 'image/jpeg', 0.4);
         };
       };
@@ -108,17 +101,12 @@ export default function Page() {
       <style jsx global>{` 
         .scrollbar-hide::-webkit-scrollbar { display: none; } 
         body { overscroll-behavior-y: none; margin: 0; background-color: #fff; }
-        /* 今回はあえて少しソフトに見せる */
         img { filter: blur(0.2px); } 
       `}</style>
       
       {isMineMode ? (
         <div className="flex items-center justify-center min-h-screen px-4 bg-white" onClick={() => setIsMineMode(null)}>
-          <div className="w-full max-w-md">
-            <div className={imageContainerClass}>
-              <img src={displayImageUrl} className="w-full h-full object-cover" />
-            </div>
-          </div>
+          <div className="w-full max-w-md"><div className={imageContainerClass}><img src={displayImageUrl} className="w-full h-full object-cover" /></div></div>
         </div>
       ) : (
         <div className="max-w-md mx-auto relative">
@@ -128,8 +116,10 @@ export default function Page() {
 
           <div className="pt-20 space-y-12 pb-48">
             {mainline.map((main) => {
+              const hasSide = (sideCells[main.id] || []).length > 0;
               const isThisRowDeep = (activeSideIndex[main.id] || 0) > 0;
               const anyOtherRowDeep = Object.entries(activeSideIndex).some(([id, idx]) => id !== main.id && idx > 0);
+              
               return (
                 <div key={main.id} className={`relative transition-opacity duration-500 ${anyOtherRowDeep ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
                   {isThisRowDeep && (
@@ -139,13 +129,22 @@ export default function Page() {
                     const idx = Math.round(e.currentTarget.scrollLeft / e.currentTarget.offsetWidth);
                     setActiveSideIndex(prev => prev[main.id] === idx ? prev : { ...prev, [main.id]: idx });
                   }}>
+                    {/* メイン画像セル */}
                     <div className="flex-shrink-0 w-screen snap-center px-4 relative flex flex-col items-center">
-                      <div className={imageContainerClass}><img src={main.image_url} className="w-full h-full object-cover" loading="eager" /></div>
+                      <div className={imageContainerClass}>
+                        <img src={main.image_url} className="w-full h-full object-cover" loading="eager" />
+                        {/* 横丁がある場合のみ、右端に一本の細い線を表示 */}
+                        {hasSide && !isThisRowDeep && (
+                          <div className="absolute right-0 top-1/2 -translate-y-1/2 w-[1px] h-12 bg-black/10 z-10" />
+                        )}
+                      </div>
                       <div className="w-full flex justify-between px-3 pt-2 opacity-10">
                          <button onClick={() => copyMineUrl(main.id)} className="text-[10px]">●</button>
                          <button onClick={() => handleDelete(main.id, 'mainline')} className="text-[10px]">✖︎</button>
                       </div>
                     </div>
+
+                    {/* 横丁画像セル */}
                     {(sideCells[main.id] || []).map((side) => (
                       <div key={side.id} className="flex-shrink-0 w-screen snap-center px-4 relative flex flex-col items-center">
                         <div className={imageContainerClass}><img src={side.image_url} className="w-full h-full object-cover" loading="lazy" /></div>
@@ -155,6 +154,7 @@ export default function Page() {
                         </div>
                       </div>
                     ))}
+
                     <div className="flex-shrink-0 w-screen snap-center flex items-center justify-center relative">
                        <label className="cursor-pointer opacity-10 p-20 text-[10px]">●<input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, main.id)} /></label>
                     </div>

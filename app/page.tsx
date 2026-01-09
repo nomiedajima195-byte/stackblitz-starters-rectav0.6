@@ -11,14 +11,12 @@ const imageContainerClass = `relative w-full aspect-square overflow-hidden round
 
 export default function Page() {
   const [mainline, setMainline] = useState<any[]>([]);
-  const [sideCells, setSideCells] = useState<any>({});
+  const [sideCells, setSideCells] = useState<{[key: string]: any[]}>({});
   const [isUploading, setIsUploading] = useState(false);
   const [isMineMode, setIsMineMode] = useState<string | null>(null);
   const [activeSideIndex, setActiveSideIndex] = useState<{[key: string]: number}>({});
   
-  // スクロール操作用のRef
   const scrollRefs = useRef<{[key: string]: HTMLDivElement | null}>({});
-
   const isDeepInAlley = Object.values(activeSideIndex).some(idx => idx > 0);
 
   const cleanup = useCallback(async () => {
@@ -49,7 +47,7 @@ export default function Page() {
     const { data: sideData } = await supabase.from('side_cells').select('*').order('created_at', { ascending: true });
     if (mainData) setMainline(mainData);
     if (sideData) {
-      const grouped: any = {};
+      const grouped: {[key: string]: any[]} = {};
       sideData.forEach((s: any) => {
         if (!grouped[s.parent_id]) grouped[s.parent_id] = [];
         grouped[s.parent_id].push(s);
@@ -71,7 +69,6 @@ export default function Page() {
     if (activeSideIndex[id] !== index) setActiveSideIndex(prev => ({ ...prev, [id]: index }));
   };
 
-  // メインに戻る関数
   const backToMain = (id: string) => {
     if (scrollRefs.current[id]) {
       scrollRefs.current[id]?.scrollTo({ left: 0, behavior: 'smooth' });
@@ -106,13 +103,29 @@ export default function Page() {
     document.body.removeChild(textArea);
   };
 
+  // 安全な画像URL取得
+  const getDisplayImageUrl = () => {
+    if (!isMineMode) return '';
+    const inMain = mainline.find(m => m.id === isMineMode);
+    if (inMain) return inMain.image_url;
+    
+    // 全ての横丁を平坦化して検索
+    const allSides = Object.values(sideCells).flat();
+    const inSide = allSides.find(s => s.id === isMineMode);
+    return inSide ? inSide.image_url : '';
+  };
+
   return (
     <div className={`min-h-screen bg-white text-black font-sans selection:bg-none ${isDeepInAlley ? 'overflow-hidden' : 'overflow-x-hidden'}`}>
       <style jsx global>{` .scrollbar-hide::-webkit-scrollbar { display: none; } `}</style>
       
       {isMineMode ? (
         <div className="flex items-center justify-center min-h-screen px-4 bg-white" onClick={() => setIsMineMode(null)}>
-          <div className="w-full max-w-md"><div className={imageContainerClass}><img src={mainline.find(m=>m.id===isMineMode)?.image_url || Object.values(sideCells).flat().find((s:any)=>s.id===isMineMode)?.image_url} className="w-full h-full object-cover" /></div></div>
+          <div className="w-full max-w-md">
+            <div className={imageContainerClass}>
+              <img src={getDisplayImageUrl()} className="w-full h-full object-cover" />
+            </div>
+          </div>
         </div>
       ) : (
         <div className="max-w-md mx-auto">
@@ -120,7 +133,6 @@ export default function Page() {
             <div onClick={() => fetchData()} className={`w-[16px] h-[32px] bg-black cursor-pointer active:scale-95 ${isUploading ? 'animate-pulse' : ''}`} />
           </header>
 
-          {/* space-y-12 に短縮して、上下の画像を見切れさせる */}
           <div className="pt-24 space-y-12 pb-64">
             {mainline.map((main) => {
               const isThisRowDeep = (activeSideIndex[main.id] || 0) > 0;
@@ -129,23 +141,13 @@ export default function Page() {
               return (
                 <div key={main.id} className={`relative group transition-opacity duration-700 ${anyOtherRowDeep ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
                   
-                  {/* 横丁の脱出ボタン ＜ */}
                   {isThisRowDeep && (
-                    <button 
-                      onClick={() => backToMain(main.id)} 
-                      className="absolute -top-6 left-1/2 -translate-x-1/2 z-50 text-[14px] opacity-40 hover:opacity-100 transition-opacity p-2"
-                    >
+                    <button onClick={() => backToMain(main.id)} className="absolute -top-6 left-1/2 -translate-x-1/2 z-50 text-[14px] opacity-40 hover:opacity-100 transition-opacity p-2">
                       ＜
                     </button>
                   )}
 
-                  <div 
-                    ref={el => { scrollRefs.current[main.id] = el; }}
-                    className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide w-screen relative left-1/2 right-1/2 -ml-[50vw] -mr-[50vw]" 
-                    onScroll={(e) => handleScroll(main.id, e)}
-                  >
-                    
-                    {/* メイン画像 */}
+                  <div ref={el => { scrollRefs.current[main.id] = el; }} className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide w-screen relative left-1/2 right-1/2 -ml-[50vw] -mr-[50vw]" onScroll={(e) => handleScroll(main.id, e)}>
                     <div className="flex-shrink-0 w-screen snap-center px-4 relative flex flex-col items-center">
                       <div className={imageContainerClass}><img src={main.image_url} className="w-full h-full object-cover" /></div>
                       <div className="w-full flex justify-between px-3 pt-2 opacity-0 group-hover:opacity-40 transition-opacity">
@@ -157,8 +159,7 @@ export default function Page() {
                       )}
                     </div>
 
-                    {/* 横丁画像 */}
-                    {(sideCells[main.id] || []).map((side: any) => (
+                    {(sideCells[main.id] || []).map((side) => (
                       <div key={side.id} className="flex-shrink-0 w-screen snap-center px-4 relative flex flex-col items-center">
                         <div className={imageContainerClass}><img src={side.image_url} className="w-full h-full object-cover" /></div>
                         <div className="w-full flex justify-between px-3 pt-2 opacity-0 group-hover:opacity-40 transition-opacity">
@@ -168,7 +169,7 @@ export default function Page() {
                       </div>
                     ))}
 
-                    <div className="flex-shrink-0 w-screen snap-center flex items-center justify-center">
+                    <div className="flex-shrink-0 w-screen snap-center flex items-center justify-center relative">
                        <label className="cursor-pointer opacity-10 hover:opacity-50 transition-opacity p-20 text-[10px]">●
                           <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, main.id)} />
                        </label>

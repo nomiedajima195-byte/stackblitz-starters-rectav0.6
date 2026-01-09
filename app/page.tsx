@@ -103,13 +103,10 @@ export default function Page() {
     document.body.removeChild(textArea);
   };
 
-  // 安全な画像URL取得
   const getDisplayImageUrl = () => {
     if (!isMineMode) return '';
     const inMain = mainline.find(m => m.id === isMineMode);
     if (inMain) return inMain.image_url;
-    
-    // 全ての横丁を平坦化して検索
     const allSides = Object.values(sideCells).flat();
     const inSide = allSides.find(s => s.id === isMineMode);
     return inSide ? inSide.image_url : '';
@@ -121,19 +118,17 @@ export default function Page() {
       
       {isMineMode ? (
         <div className="flex items-center justify-center min-h-screen px-4 bg-white" onClick={() => setIsMineMode(null)}>
-          <div className="w-full max-w-md">
-            <div className={imageContainerClass}>
-              <img src={getDisplayImageUrl()} className="w-full h-full object-cover" />
-            </div>
-          </div>
+          <div className="w-full max-w-md"><div className={imageContainerClass}><img src={getDisplayImageUrl()} className="w-full h-full object-cover" /></div></div>
         </div>
       ) : (
         <div className="max-w-md mx-auto">
-          <header className={`fixed top-0 left-0 right-0 h-20 bg-white/90 backdrop-blur-md z-50 flex justify-center items-center transition-opacity duration-700 ${isDeepInAlley ? 'opacity-0' : 'opacity-100'}`}>
-            <div onClick={() => fetchData()} className={`w-[16px] h-[32px] bg-black cursor-pointer active:scale-95 ${isUploading ? 'animate-pulse' : ''}`} />
+          {/* ヘッダー高さをスリム化 (h-14) */}
+          <header className={`fixed top-0 left-0 right-0 h-14 bg-white/90 backdrop-blur-md z-50 flex justify-center items-center transition-opacity duration-700 ${isDeepInAlley ? 'opacity-0' : 'opacity-100'}`}>
+            <div onClick={() => fetchData()} className={`w-[12px] h-[24px] bg-black cursor-pointer active:scale-95 ${isUploading ? 'animate-pulse' : ''}`} />
           </header>
 
-          <div className="pt-24 space-y-12 pb-64">
+          {/* 上下の余白バランスを調整 */}
+          <div className="pt-16 space-y-12 pb-48">
             {mainline.map((main) => {
               const isThisRowDeep = (activeSideIndex[main.id] || 0) > 0;
               const anyOtherRowDeep = Object.entries(activeSideIndex).some(([id, idx]) => id !== main.id && idx > 0);
@@ -180,8 +175,9 @@ export default function Page() {
             })}
           </div>
 
-          <nav className={`fixed bottom-0 left-0 right-0 h-24 bg-white/90 backdrop-blur-md z-50 flex justify-center items-center transition-opacity duration-700 ${isDeepInAlley ? 'opacity-0' : 'opacity-100'}`}>
-            <label className={`w-10 h-10 border-[1px] border-black rounded-full flex items-center justify-center cursor-pointer active:scale-95 transition-all ${isUploading ? 'opacity-20' : ''}`}>
+          {/* フッター高さをスリム化 (h-16) */}
+          <nav className={`fixed bottom-0 left-0 right-0 h-16 bg-white/90 backdrop-blur-md z-50 flex justify-center items-center transition-opacity duration-700 ${isDeepInAlley ? 'opacity-0' : 'opacity-100'}`}>
+            <label className={`w-8 h-8 border-[1px] border-black rounded-full flex items-center justify-center cursor-pointer active:scale-95 transition-all ${isUploading ? 'opacity-20' : ''}`}>
               <div className={`w-1.5 h-1.5 bg-black rounded-full ${isUploading ? 'animate-ping' : ''}`} />
               <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e)} disabled={isUploading} />
             </label>

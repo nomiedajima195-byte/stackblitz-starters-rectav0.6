@@ -116,7 +116,7 @@ export default function Page() {
 
           <div className="pt-20 space-y-12 pb-48">
             {mainline.map((main) => {
-              const hasSide = (sideCells[main.id] || []).length > 0;
+              const hasSide = sideCells[main.id] && sideCells[main.id].length > 0;
               const isThisRowDeep = (activeSideIndex[main.id] || 0) > 0;
               const anyOtherRowDeep = Object.entries(activeSideIndex).some(([id, idx]) => id !== main.id && idx > 0);
               
@@ -129,13 +129,13 @@ export default function Page() {
                     const idx = Math.round(e.currentTarget.scrollLeft / e.currentTarget.offsetWidth);
                     setActiveSideIndex(prev => prev[main.id] === idx ? prev : { ...prev, [main.id]: idx });
                   }}>
-                    {/* メイン画像セル */}
+                    {/* メイン画像 */}
                     <div className="flex-shrink-0 w-screen snap-center px-4 relative flex flex-col items-center">
                       <div className={imageContainerClass}>
                         <img src={main.image_url} className="w-full h-full object-cover" loading="eager" />
-                        {/* 横丁がある場合のみ、右端に一本の細い線を表示 */}
+                        {/* 路地の入り口を示す線（240px版よりも濃く、少し内側に） */}
                         {hasSide && !isThisRowDeep && (
-                          <div className="absolute right-0 top-1/2 -translate-y-1/2 w-[1px] h-12 bg-black/10 z-10" />
+                          <div className="absolute right-1 top-1/2 -translate-y-1/2 w-[1.5px] h-14 bg-black/30 z-20" />
                         )}
                       </div>
                       <div className="w-full flex justify-between px-3 pt-2 opacity-10">
@@ -144,7 +144,7 @@ export default function Page() {
                       </div>
                     </div>
 
-                    {/* 横丁画像セル */}
+                    {/* 横丁画像 */}
                     {(sideCells[main.id] || []).map((side) => (
                       <div key={side.id} className="flex-shrink-0 w-screen snap-center px-4 relative flex flex-col items-center">
                         <div className={imageContainerClass}><img src={side.image_url} className="w-full h-full object-cover" loading="lazy" /></div>
@@ -155,6 +155,7 @@ export default function Page() {
                       </div>
                     ))}
 
+                    {/* 追加ボタン */}
                     <div className="flex-shrink-0 w-screen snap-center flex items-center justify-center relative">
                        <label className="cursor-pointer opacity-10 p-20 text-[10px]">●<input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, main.id)} /></label>
                     </div>

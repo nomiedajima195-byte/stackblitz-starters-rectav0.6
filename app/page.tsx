@@ -16,10 +16,9 @@ export default function Page() {
   const [isMineMode, setIsMineMode] = useState<string | null>(null);
   const [activeSideIndex, setActiveSideIndex] = useState<{[key: string]: number}>({});
   
-  // 現像室（ダークルーム）
   const [darkroomImage, setDarkroomImage] = useState<string | null>(null);
   const [darkroomParentId, setDarkroomParentId] = useState<string | null>(null);
-  const [settings, setSettings] = useState({ size: 400, br: 1.08, con: 0.85, sat: 0.6, q: 0.4 });
+  const [settings, setSettings] = useState({ size: 400, br: 1.08, con: 0.85, sat: 0.6, q: 0.2 });
   
   const scrollRefs = useRef<{[key: string]: HTMLDivElement | null}>({});
   const isDeepInAlley = useMemo(() => Object.values(activeSideIndex).some(idx => idx > 0), [activeSideIndex]);
@@ -41,10 +40,19 @@ export default function Page() {
   useEffect(() => {
     fetchData();
     const channel = supabase.channel('realtime').on('postgres_changes', { event: '*', schema: 'public' }, () => fetchData()).subscribe();
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('mine')) setIsMineMode(params.get('mine'));
     return () => { supabase.removeChannel(channel); };
   }, [fetchData]);
+
+  // 消去関数（復活させました）
+  const handleDelete = async (id: string, table: 'mainline' | 'side_cells') => {
+    try {
+      await supabase.storage.from('images').remove([id]);
+      await supabase.from(table).delete().eq('id', id);
+      fetchData();
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const onFileSelect = (e: React.ChangeEvent<HTMLInputElement>, parentId: string | null = null) => {
     const file = e.target.files?.[0];
@@ -58,13 +66,14 @@ export default function Page() {
     e.target.value = '';
   };
 
-  // 現像：Canvasにフィルターを焼き付ける
   const developImage = async () => {
     if (!darkroomImage || isUploading) return;
     setIsUploading(true);
     
     const img = new Image();
     img.src = darkroomImage;
+    img.crossOrigin = "anonymous"; 
+    
     img.onload = async () => {
       const canvas = document.createElement('canvas');
       const s = settings.size;
@@ -75,7 +84,8 @@ export default function Page() {
       canvas.width = w; canvas.height = h;
       const ctx = canvas.getContext('2d');
       if (ctx) {
-        // ここが重要：描画する前にCanvas自体にフィルターを適用する
+        ctx.fillStyle = "white";
+        ctx.fillRect(0, 0, w, h);
         ctx.filter = `brightness(${settings.br}) contrast(${settings.con}) saturate(${settings.sat}) sepia(0.15) blur(0.2px)`;
         ctx.drawImage(img, 0, 0, w, h);
       }
@@ -83,8 +93,9 @@ export default function Page() {
       canvas.toBlob(async (blob) => {
         if (blob) {
           const fileName = `${Date.now()}.jpg`;
-          await supabase.storage.from('images').upload(fileName, blob);
+          await supabase.storage.from('images').upload(fileName, blob, { contentType: 'image/jpeg' });
           const { data: { publicUrl } } = supabase.storage.from('images').getPublicUrl(fileName);
+          
           if (!darkroomParentId) await supabase.from('mainline').insert([{ id: fileName, image_url: publicUrl }]);
           else await supabase.from('side_cells').insert([{ id: fileName, parent_id: darkroomParentId, image_url: publicUrl }]);
           
@@ -92,22 +103,17 @@ export default function Page() {
           setIsUploading(false);
           fetchData();
         }
-      }, 'image/jpeg', settings.q); // 圧縮率(GRAIN)もここで適用
+      }, 'image/jpeg', settings.q); 
     };
-  };
-
-  const handleDelete = async (id: string, table: 'mainline' | 'side_cells') => {
-    await supabase.storage.from('images').remove([id]);
-    await supabase.from(table).delete().eq('id', id);
-    fetchData();
   };
 
   return (
     <div className={`min-h-screen bg-white text-black font-sans ${isDeepInAlley || darkroomImage ? 'overflow-hidden' : 'overflow-x-hidden'}`}>
       <style jsx global>{` .scrollbar-hide::-webkit-scrollbar { display: none; } body { overscroll-behavior-y: none; margin: 0; background-color: #fff; } `}</style>
       
+      {/* 現像室 */}
       {darkroomImage && (
-        <div className="fixed inset-0 bg-white z-[100] flex flex-col items-center justify-center px-8 space-y-8">
+        <div className="fixed inset-0 bg-white z-[100] flex flex-col items-center justify-center px-8 space-y-6">
           <div className="w-full max-w-xs aspect-square overflow-hidden rounded-[4px] bg-[#F8F8F8]">
             <img 
               src={darkroomImage} 
@@ -115,29 +121,28 @@ export default function Page() {
               className="w-full h-full object-cover"
             />
           </div>
-          <div className="w-full max-w-xs space-y-4">
+          <div className="w-full max-w-xs space-y-4 pt-4">
             <div className="space-y-1">
-              <div className="flex justify-between text-[10px] opacity-30"><span>SIZE / {settings.size}px</span></div>
-              <input type="range" min="120" max="400" step="10" value={settings.size} onChange={e => setSettings({...settings, size: +e.target.value})} className="w-full accent-black" />
+              <div className="flex justify-between text-[9px] tracking-widest opacity-40"><span>RESOLUTION</span><span>{settings.size}PX</span></div>
+              <input type="range" min="80" max="400" step="10" value={settings.size} onChange={e => setSettings({...settings, size: +e.target.value})} className="w-full accent-black h-1 bg-gray-100 appearance-none rounded-full" />
             </div>
-            
             <div className="space-y-1">
-              <div className="flex justify-between text-[10px] opacity-30"><span>BRIGHT / {settings.br}</span></div>
-              <input type="range" min="0.5" max="2" step="0.05" value={settings.br} onChange={e => setSettings({...settings, br: +e.target.value})} className="w-full accent-black" />
+              <div className="flex justify-between text-[9px] tracking-widest opacity-40"><span>BRIGHTNESS</span></div>
+              <input type="range" min="0.5" max="2" step="0.05" value={settings.br} onChange={e => setSettings({...settings, br: +e.target.value})} className="w-full accent-black h-1 bg-gray-100 appearance-none rounded-full" />
             </div>
-
             <div className="space-y-1">
-              <div className="flex justify-between text-[10px] opacity-30"><span>GRAIN (COMPRESS)</span></div>
-              <input type="range" min="0.1" max="1" step="0.05" value={settings.q} onChange={e => setSettings({...settings, q: +e.target.value})} className="w-full accent-black" />
+              <div className="flex justify-between text-[9px] tracking-widest opacity-40"><span>GRAIN / COMPRESS</span></div>
+              <input type="range" min="0.01" max="0.5" step="0.01" value={settings.q} onChange={e => setSettings({...settings, q: +e.target.value})} className="w-full accent-black h-1 bg-gray-100 appearance-none rounded-full" />
             </div>
           </div>
-          <div className="flex space-x-12 pt-4">
-            <button onClick={() => setDarkroomImage(null)} className="text-[12px] opacity-30">CANCEL</button>
-            <button onClick={developImage} className={`text-[12px] ${isUploading ? 'animate-pulse' : ''}`}>DEVELOP ●</button>
+          <div className="flex space-x-12 pt-6">
+            <button onClick={() => setDarkroomImage(null)} className="text-[11px] tracking-tighter opacity-30">CANCEL</button>
+            <button onClick={developImage} className={`text-[11px] tracking-tighter ${isUploading ? 'animate-pulse' : ''}`}>DEVELOP ●</button>
           </div>
         </div>
       )}
 
+      {/* メイン画面 */}
       {!isMineMode ? (
         <div className="max-w-md mx-auto relative">
           <header className={`fixed top-0 left-0 right-0 h-14 bg-white/80 backdrop-blur-md z-50 flex justify-center items-end pb-3 ${isDeepInAlley ? 'opacity-0' : 'opacity-100'}`}>
@@ -160,17 +165,17 @@ export default function Page() {
                         <img src={main.image_url} className="w-full h-full object-cover" />
                         {hasSide && !isThisRowDeep && <div className="absolute right-1 top-1/2 -translate-y-1/2 w-[1.5px] h-14 bg-black/30 z-20" />}
                       </div>
-                      <div className="w-full flex justify-between px-3 pt-2 opacity-10">
+                      <div className="w-full flex justify-between px-3 pt-2 opacity-5">
                          <button onClick={() => navigator.clipboard.writeText(`${window.location.origin}?mine=${main.id}`).then(() => alert("●"))} className="text-[10px]">●</button>
-                         <button onClick={() => handleDelete(main.id, 'mainline')} className="text-[10px]">✖︎</button>
+                         <button onClick={() => { if(confirm('消去？')) handleDelete(main.id, 'mainline') }} className="text-[10px]">✖︎</button>
                       </div>
                     </div>
                     {(sideCells[main.id] || []).map((side) => (
                       <div key={side.id} className="flex-shrink-0 w-screen snap-center px-4 relative flex flex-col items-center">
                         <div className={imageBaseClass}><img src={side.image_url} className="w-full h-full object-cover" /></div>
-                        <div className="w-full flex justify-between px-3 pt-2 opacity-10">
+                        <div className="w-full flex justify-between px-3 pt-2 opacity-5">
                            <button onClick={() => navigator.clipboard.writeText(`${window.location.origin}?mine=${side.id}`).then(() => alert("●"))} className="text-[10px]">●</button>
-                           <button onClick={() => handleDelete(side.id, 'side_cells')} className="text-[10px]">✖︎</button>
+                           <button onClick={() => { if(confirm('消去？')) handleDelete(side.id, 'side_cells') }} className="text-[10px]">✖︎</button>
                         </div>
                       </div>
                     ))}
@@ -192,11 +197,7 @@ export default function Page() {
         </div>
       ) : (
         <div className="flex items-center justify-center min-h-screen px-4 bg-white" onClick={() => setIsMineMode(null)}>
-          <div className="w-full max-w-md">
-            <div className={imageBaseClass}>
-              <img src={mainline.concat(Object.values(sideCells).flat()).find(i=>i.id===isMineMode)?.image_url} className="w-full h-full object-cover" />
-            </div>
-          </div>
+          <div className="w-full max-w-md"><div className={imageBaseClass}><img src={mainline.concat(Object.values(sideCells).flat()).find(i=>i.id===isMineMode)?.image_url} className="w-full h-full object-cover" /></div></div>
         </div>
       )}
     </div>

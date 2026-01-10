@@ -18,7 +18,9 @@ export default function Page() {
   
   const [darkroomImage, setDarkroomImage] = useState<string | null>(null);
   const [darkroomParentId, setDarkroomParentId] = useState<string | null>(null);
-  const [settings, setSettings] = useState({ size: 400, br: 1.08, con: 0.85, sat: 0.6, q: 0.2 });
+  
+  // 設定項目を拡張：サイズ、輝度、コントラスト、彩度、圧縮率
+  const [settings, setSettings] = useState({ size: 400, br: 1.1, con: 0.9, sat: 0.6, q: 0.2 });
   
   const scrollRefs = useRef<{[key: string]: HTMLDivElement | null}>({});
   const isDeepInAlley = useMemo(() => Object.values(activeSideIndex).some(idx => idx > 0), [activeSideIndex]);
@@ -43,15 +45,12 @@ export default function Page() {
     return () => { supabase.removeChannel(channel); };
   }, [fetchData]);
 
-  // 消去関数（復活させました）
   const handleDelete = async (id: string, table: 'mainline' | 'side_cells') => {
     try {
       await supabase.storage.from('images').remove([id]);
       await supabase.from(table).delete().eq('id', id);
       fetchData();
-    } catch (err) {
-      console.error(err);
-    }
+    } catch (err) {}
   };
 
   const onFileSelect = (e: React.ChangeEvent<HTMLInputElement>, parentId: string | null = null) => {
@@ -72,8 +71,6 @@ export default function Page() {
     
     const img = new Image();
     img.src = darkroomImage;
-    img.crossOrigin = "anonymous"; 
-    
     img.onload = async () => {
       const canvas = document.createElement('canvas');
       const s = settings.size;
@@ -86,6 +83,7 @@ export default function Page() {
       if (ctx) {
         ctx.fillStyle = "white";
         ctx.fillRect(0, 0, w, h);
+        // 設定された全てのフィルターをベイク
         ctx.filter = `brightness(${settings.br}) contrast(${settings.con}) saturate(${settings.sat}) sepia(0.15) blur(0.2px)`;
         ctx.drawImage(img, 0, 0, w, h);
       }
@@ -95,10 +93,8 @@ export default function Page() {
           const fileName = `${Date.now()}.jpg`;
           await supabase.storage.from('images').upload(fileName, blob, { contentType: 'image/jpeg' });
           const { data: { publicUrl } } = supabase.storage.from('images').getPublicUrl(fileName);
-          
           if (!darkroomParentId) await supabase.from('mainline').insert([{ id: fileName, image_url: publicUrl }]);
           else await supabase.from('side_cells').insert([{ id: fileName, parent_id: darkroomParentId, image_url: publicUrl }]);
-          
           setDarkroomImage(null);
           setIsUploading(false);
           fetchData();
@@ -111,9 +107,8 @@ export default function Page() {
     <div className={`min-h-screen bg-white text-black font-sans ${isDeepInAlley || darkroomImage ? 'overflow-hidden' : 'overflow-x-hidden'}`}>
       <style jsx global>{` .scrollbar-hide::-webkit-scrollbar { display: none; } body { overscroll-behavior-y: none; margin: 0; background-color: #fff; } `}</style>
       
-      {/* 現像室 */}
       {darkroomImage && (
-        <div className="fixed inset-0 bg-white z-[100] flex flex-col items-center justify-center px-8 space-y-6">
+        <div className="fixed inset-0 bg-white z-[100] flex flex-col items-center justify-center px-8 space-y-4 animate-in fade-in duration-300">
           <div className="w-full max-w-xs aspect-square overflow-hidden rounded-[4px] bg-[#F8F8F8]">
             <img 
               src={darkroomImage} 
@@ -121,28 +116,40 @@ export default function Page() {
               className="w-full h-full object-cover"
             />
           </div>
-          <div className="w-full max-w-xs space-y-4 pt-4">
+          <div className="w-full max-w-xs space-y-3 pt-2">
+            {/* RESOLUTION */}
             <div className="space-y-1">
-              <div className="flex justify-between text-[9px] tracking-widest opacity-40"><span>RESOLUTION</span><span>{settings.size}PX</span></div>
+              <div className="flex justify-between text-[8px] tracking-widest opacity-40"><span>RES / {settings.size}PX</span></div>
               <input type="range" min="80" max="400" step="10" value={settings.size} onChange={e => setSettings({...settings, size: +e.target.value})} className="w-full accent-black h-1 bg-gray-100 appearance-none rounded-full" />
             </div>
+            {/* COLOR (Saturation) */}
             <div className="space-y-1">
-              <div className="flex justify-between text-[9px] tracking-widest opacity-40"><span>BRIGHTNESS</span></div>
+              <div className="flex justify-between text-[8px] tracking-widest opacity-40"><span>COLOR / SAT</span></div>
+              <input type="range" min="0" max="2" step="0.1" value={settings.sat} onChange={e => setSettings({...settings, sat: +e.target.value})} className="w-full accent-black h-1 bg-gray-100 appearance-none rounded-full" />
+            </div>
+            {/* BRIGHTNESS */}
+            <div className="space-y-1">
+              <div className="flex justify-between text-[8px] tracking-widest opacity-40"><span>BRIGHT</span></div>
               <input type="range" min="0.5" max="2" step="0.05" value={settings.br} onChange={e => setSettings({...settings, br: +e.target.value})} className="w-full accent-black h-1 bg-gray-100 appearance-none rounded-full" />
             </div>
+            {/* CONTRAST */}
             <div className="space-y-1">
-              <div className="flex justify-between text-[9px] tracking-widest opacity-40"><span>GRAIN / COMPRESS</span></div>
+              <div className="flex justify-between text-[8px] tracking-widest opacity-40"><span>CONTRAST</span></div>
+              <input type="range" min="0.3" max="1.5" step="0.05" value={settings.con} onChange={e => setSettings({...settings, con: +e.target.value})} className="w-full accent-black h-1 bg-gray-100 appearance-none rounded-full" />
+            </div>
+            {/* GRAIN */}
+            <div className="space-y-1">
+              <div className="flex justify-between text-[8px] tracking-widest opacity-40"><span>GRAIN</span></div>
               <input type="range" min="0.01" max="0.5" step="0.01" value={settings.q} onChange={e => setSettings({...settings, q: +e.target.value})} className="w-full accent-black h-1 bg-gray-100 appearance-none rounded-full" />
             </div>
           </div>
-          <div className="flex space-x-12 pt-6">
-            <button onClick={() => setDarkroomImage(null)} className="text-[11px] tracking-tighter opacity-30">CANCEL</button>
-            <button onClick={developImage} className={`text-[11px] tracking-tighter ${isUploading ? 'animate-pulse' : ''}`}>DEVELOP ●</button>
+          <div className="flex space-x-12 pt-4">
+            <button onClick={() => setDarkroomImage(null)} className="text-[10px] tracking-widest opacity-30">CANCEL</button>
+            <button onClick={developImage} className={`text-[10px] tracking-widest ${isUploading ? 'animate-pulse' : ''}`}>DEVELOP ●</button>
           </div>
         </div>
       )}
 
-      {/* メイン画面 */}
       {!isMineMode ? (
         <div className="max-w-md mx-auto relative">
           <header className={`fixed top-0 left-0 right-0 h-14 bg-white/80 backdrop-blur-md z-50 flex justify-center items-end pb-3 ${isDeepInAlley ? 'opacity-0' : 'opacity-100'}`}>

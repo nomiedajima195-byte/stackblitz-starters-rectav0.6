@@ -18,8 +18,6 @@ export default function Page() {
   
   const [darkroomImage, setDarkroomImage] = useState<string | null>(null);
   const [darkroomParentId, setDarkroomParentId] = useState<string | null>(null);
-  
-  // 設定項目を拡張：サイズ、輝度、コントラスト、彩度、圧縮率
   const [settings, setSettings] = useState({ size: 400, br: 1.1, con: 0.9, sat: 0.6, q: 0.2 });
   
   const scrollRefs = useRef<{[key: string]: HTMLDivElement | null}>({});
@@ -71,35 +69,54 @@ export default function Page() {
     
     const img = new Image();
     img.src = darkroomImage;
-    img.onload = async () => {
+    
+    // 画像がメモリに完全にロードされてからCanvas処理を開始
+    img.onload = () => {
       const canvas = document.createElement('canvas');
       const s = settings.size;
       let w = img.width, h = img.height;
+      
       if (w > h) { if (w > s) { h *= s / w; w = s; } }
       else { if (h > s) { w *= s / h; h = s; } }
       
-      canvas.width = w; canvas.height = h;
+      canvas.width = w;
+      canvas.height = h;
       const ctx = canvas.getContext('2d');
+      
       if (ctx) {
+        // 1. フィルターをセット
+        ctx.filter = `brightness(${settings.br}) contrast(${settings.con}) saturate(${settings.sat}) sepia(0.15) blur(0.2px)`;
+        
+        // 2. 背景を塗りつぶして透過を防ぐ
         ctx.fillStyle = "white";
         ctx.fillRect(0, 0, w, h);
-        // 設定された全てのフィルターをベイク
-        ctx.filter = `brightness(${settings.br}) contrast(${settings.con}) saturate(${settings.sat}) sepia(0.15) blur(0.2px)`;
+        
+        // 3. 描画（ここでフィルターがベイクされる）
         ctx.drawImage(img, 0, 0, w, h);
-      }
-      
-      canvas.toBlob(async (blob) => {
-        if (blob) {
-          const fileName = `${Date.now()}.jpg`;
-          await supabase.storage.from('images').upload(fileName, blob, { contentType: 'image/jpeg' });
-          const { data: { publicUrl } } = supabase.storage.from('images').getPublicUrl(fileName);
-          if (!darkroomParentId) await supabase.from('mainline').insert([{ id: fileName, image_url: publicUrl }]);
-          else await supabase.from('side_cells').insert([{ id: fileName, parent_id: darkroomParentId, image_url: publicUrl }]);
-          setDarkroomImage(null);
+        
+        // 4. Blob化してアップロード
+        canvas.toBlob(async (blob) => {
+          if (blob) {
+            const fileName = `${Date.now()}.jpg`;
+            const { error: uploadError } = await supabase.storage.from('images').upload(fileName, blob, {
+              contentType: 'image/jpeg',
+              cacheControl: '3600'
+            });
+
+            if (!uploadError) {
+              const { data: { publicUrl } } = supabase.storage.from('images').getPublicUrl(fileName);
+              if (!darkroomParentId) {
+                await supabase.from('mainline').insert([{ id: fileName, image_url: publicUrl }]);
+              } else {
+                await supabase.from('side_cells').insert([{ id: fileName, parent_id: darkroomParentId, image_url: publicUrl }]);
+              }
+              setDarkroomImage(null);
+              fetchData();
+            }
+          }
           setIsUploading(false);
-          fetchData();
-        }
-      }, 'image/jpeg', settings.q); 
+        }, 'image/jpeg', settings.q);
+      }
     };
   };
 
@@ -108,7 +125,7 @@ export default function Page() {
       <style jsx global>{` .scrollbar-hide::-webkit-scrollbar { display: none; } body { overscroll-behavior-y: none; margin: 0; background-color: #fff; } `}</style>
       
       {darkroomImage && (
-        <div className="fixed inset-0 bg-white z-[100] flex flex-col items-center justify-center px-8 space-y-4 animate-in fade-in duration-300">
+        <div className="fixed inset-0 bg-white z-[100] flex flex-col items-center justify-center px-8 space-y-4">
           <div className="w-full max-w-xs aspect-square overflow-hidden rounded-[4px] bg-[#F8F8F8]">
             <img 
               src={darkroomImage} 
@@ -117,45 +134,25 @@ export default function Page() {
             />
           </div>
           <div className="w-full max-w-xs space-y-3 pt-2">
-            {/* RESOLUTION */}
-            <div className="space-y-1">
-              <div className="flex justify-between text-[8px] tracking-widest opacity-40"><span>RES / {settings.size}PX</span></div>
-              <input type="range" min="80" max="400" step="10" value={settings.size} onChange={e => setSettings({...settings, size: +e.target.value})} className="w-full accent-black h-1 bg-gray-100 appearance-none rounded-full" />
-            </div>
-            {/* COLOR (Saturation) */}
-            <div className="space-y-1">
-              <div className="flex justify-between text-[8px] tracking-widest opacity-40"><span>COLOR / SAT</span></div>
-              <input type="range" min="0" max="2" step="0.1" value={settings.sat} onChange={e => setSettings({...settings, sat: +e.target.value})} className="w-full accent-black h-1 bg-gray-100 appearance-none rounded-full" />
-            </div>
-            {/* BRIGHTNESS */}
-            <div className="space-y-1">
-              <div className="flex justify-between text-[8px] tracking-widest opacity-40"><span>BRIGHT</span></div>
-              <input type="range" min="0.5" max="2" step="0.05" value={settings.br} onChange={e => setSettings({...settings, br: +e.target.value})} className="w-full accent-black h-1 bg-gray-100 appearance-none rounded-full" />
-            </div>
-            {/* CONTRAST */}
-            <div className="space-y-1">
-              <div className="flex justify-between text-[8px] tracking-widest opacity-40"><span>CONTRAST</span></div>
-              <input type="range" min="0.3" max="1.5" step="0.05" value={settings.con} onChange={e => setSettings({...settings, con: +e.target.value})} className="w-full accent-black h-1 bg-gray-100 appearance-none rounded-full" />
-            </div>
-            {/* GRAIN */}
-            <div className="space-y-1">
-              <div className="flex justify-between text-[8px] tracking-widest opacity-40"><span>GRAIN</span></div>
-              <input type="range" min="0.01" max="0.5" step="0.01" value={settings.q} onChange={e => setSettings({...settings, q: +e.target.value})} className="w-full accent-black h-1 bg-gray-100 appearance-none rounded-full" />
-            </div>
+            <div className="space-y-1"><div className="flex justify-between text-[8px] tracking-widest opacity-40"><span>RES / {settings.size}PX</span></div><input type="range" min="80" max="400" step="10" value={settings.size} onChange={e => setSettings({...settings, size: +e.target.value})} className="w-full accent-black h-1 bg-gray-100 appearance-none rounded-full" /></div>
+            <div className="space-y-1"><div className="flex justify-between text-[8px] tracking-widest opacity-40"><span>COLOR</span></div><input type="range" min="0" max="2" step="0.1" value={settings.sat} onChange={e => setSettings({...settings, sat: +e.target.value})} className="w-full accent-black h-1 bg-gray-100 appearance-none rounded-full" /></div>
+            <div className="space-y-1"><div className="flex justify-between text-[8px] tracking-widest opacity-40"><span>BRIGHT</span></div><input type="range" min="0.5" max="2" step="0.05" value={settings.br} onChange={e => setSettings({...settings, br: +e.target.value})} className="w-full accent-black h-1 bg-gray-100 appearance-none rounded-full" /></div>
+            <div className="space-y-1"><div className="flex justify-between text-[8px] tracking-widest opacity-40"><span>CONTRAST</span></div><input type="range" min="0.3" max="1.5" step="0.05" value={settings.con} onChange={e => setSettings({...settings, con: +e.target.value})} className="w-full accent-black h-1 bg-gray-100 appearance-none rounded-full" /></div>
+            <div className="space-y-1"><div className="flex justify-between text-[8px] tracking-widest opacity-40"><span>GRAIN</span></div><input type="range" min="0.01" max="0.5" step="0.01" value={settings.q} onChange={e => setSettings({...settings, q: +e.target.value})} className="w-full accent-black h-1 bg-gray-100 appearance-none rounded-full" /></div>
           </div>
           <div className="flex space-x-12 pt-4">
             <button onClick={() => setDarkroomImage(null)} className="text-[10px] tracking-widest opacity-30">CANCEL</button>
-            <button onClick={developImage} className={`text-[10px] tracking-widest ${isUploading ? 'animate-pulse' : ''}`}>DEVELOP ●</button>
+            <button onClick={developImage} className={`text-[10px] tracking-widest ${isUploading ? 'animate-pulse' : 'text-blue-500 font-bold'}`}>DEVELOP ●</button>
           </div>
         </div>
       )}
 
+      {/* 以下、メインUI部分は変更なし */}
       {!isMineMode ? (
         <div className="max-w-md mx-auto relative">
           <header className={`fixed top-0 left-0 right-0 h-14 bg-white/80 backdrop-blur-md z-50 flex justify-center items-end pb-3 ${isDeepInAlley ? 'opacity-0' : 'opacity-100'}`}>
             <div onClick={() => fetchData()} className="w-[12px] h-[24px] bg-black cursor-pointer" />
           </header>
-
           <div className="pt-20 space-y-12 pb-48">
             {mainline.map((main) => {
               const hasSide = sideCells[main.id]?.length > 0;
@@ -194,7 +191,6 @@ export default function Page() {
               );
             })}
           </div>
-
           <nav className={`fixed bottom-0 left-0 right-0 h-16 bg-white/80 backdrop-blur-md z-50 flex justify-center items-start pt-4 ${isDeepInAlley ? 'opacity-0' : 'opacity-100'}`}>
             <label className="w-8 h-8 border-[1px] border-black rounded-full flex items-center justify-center cursor-pointer">
               <div className="w-1.5 h-1.5 bg-black rounded-full" />

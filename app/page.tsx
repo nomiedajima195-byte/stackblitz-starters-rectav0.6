@@ -15,16 +15,13 @@ export default function Page() {
   const [isUploading, setIsUploading] = useState(false);
   const [isMineMode, setIsMineMode] = useState<string | null>(null);
   const [activeSideIndex, setActiveSideIndex] = useState<{[key: string]: number}>({});
-  const [isAtTop, setIsAtTop] = useState(true); // スクロール位置の状態
+  const [isAtTop, setIsAtTop] = useState(true);
   
   const scrollRefs = useRef<{[key: string]: HTMLDivElement | null}>({});
   const isDeepInAlley = useMemo(() => Object.values(activeSideIndex).some(idx => idx > 0), [activeSideIndex]);
 
-  // スクロール監視
   useEffect(() => {
-    const handleScroll = () => {
-      setIsAtTop(window.scrollY < 10);
-    };
+    const handleScroll = () => { setIsAtTop(window.scrollY < 10); };
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
@@ -55,6 +52,15 @@ export default function Page() {
       await supabase.from(table).delete().eq('id', id);
       fetchData();
     } catch (err) {}
+  };
+
+  // 横丁から戻るための関数
+  const backToMainline = () => {
+    Object.keys(scrollRefs.current).forEach(id => {
+      if (scrollRefs.current[id]) {
+        scrollRefs.current[id]?.scrollTo({ left: 0, behavior: 'smooth' });
+      }
+    });
   };
 
   const uploadFile = async (e: React.ChangeEvent<HTMLInputElement>, parentId: string | null = null) => {
@@ -98,9 +104,22 @@ export default function Page() {
 
       {!isMineMode ? (
         <div className="max-w-md mx-auto relative">
-          {/* ヘッダー：一番上にいる時、かつ横丁に潜っていない時だけ表示 */}
-          <header className={`fixed top-0 left-0 right-0 h-14 bg-white/80 backdrop-blur-md z-50 flex justify-center items-end pb-3 transition-opacity duration-500 ${isAtTop && !isDeepInAlley ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-            <div onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="w-[12px] h-[24px] bg-black cursor-pointer" />
+          
+          {/* ヘッダー構成を修正 */}
+          <header className={`fixed top-0 left-0 right-0 h-14 z-50 flex justify-center items-end pb-3 transition-all duration-500`}>
+            {/* メインのロゴ：一番上で、かつ横丁にいない時だけ表示 */}
+            <div 
+              onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} 
+              className={`w-[12px] h-[24px] bg-black cursor-pointer transition-opacity duration-500 ${isAtTop && !isDeepInAlley ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} 
+            />
+            
+            {/* 戻るボタン「＜」：横丁にいる時だけ表示 */}
+            <div 
+              onClick={backToMainline}
+              className={`absolute left-6 bottom-3 text-[20px] font-light cursor-pointer transition-opacity duration-500 ${isDeepInAlley ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+            >
+              ＜
+            </div>
           </header>
 
           <div className="pt-20 space-y-12 pb-48">

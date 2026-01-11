@@ -70,23 +70,26 @@ export default function Page() {
   }, []);
 
   const fetchData = useCallback(async () => {
-    const { data: m } = await supabase.from('mainline').select('*').order('created_at', { ascending: false });
-    if (m) setMainline(m);
-    const { data: s } = await supabase.from('side_cells').select('*').order('created_at', { ascending: true });
-    if (s) {
-      const g: {[key: string]: any[]} = {};
-      s.forEach((item: any) => {
-        if (!g[item.parent_id]) g[item.parent_id] = [];
-        g[item.parent_id].push(item);
-      });
-      setSideCells(g);
-    }
+    try {
+      const { data: m } = await supabase.from('mainline').select('*').order('created_at', { ascending: false });
+      if (m) setMainline(m);
+      const { data: s } = await supabase.from('side_cells').select('*').order('created_at', { ascending: true });
+      if (s) {
+        const g: {[key: string]: any[]} = {};
+        s.forEach((item: any) => {
+          if (!g[item.parent_id]) g[item.parent_id] = [];
+          g[item.parent_id].push(item);
+        });
+        setSideCells(g);
+      }
+    } catch (e) { console.error("Fetch error:", e); }
   }, []);
 
   const uploadFile = async (e: any, parentId: string | null = null) => {
     const file = e.target.files?.[0];
     if (!file || isUploading || !pocketId) return;
     setIsUploading(true);
+
     const img = new Image();
     img.src = URL.createObjectURL(file);
     img.onload = async () => {
@@ -103,15 +106,37 @@ export default function Page() {
         else { dW = targetW; dH = targetW / imgRatio; dX = 0; dY = (targetH - dH) / 2; }
         ctx.drawImage(img, dX, dY, dW, dH);
       }
+      
       canvas.toBlob(async (blob) => {
         if (blob) {
-          const fileName = `${Date.now()}.jpg`;
-          await supabase.storage.from('images').upload(fileName, blob, { contentType: 'image/jpeg' });
-          const { data: { publicUrl } } = supabase.storage.from('images').getPublicUrl(fileName);
-          const newCard = { id: fileName, image_url: publicUrl, owner_id: pocketId };
-          if (!parentId) await supabase.from('mainline').insert([newCard]);
-          else await supabase.from('side_cells').insert([{ ...newCard, parent_id: parentId }]);
-          fetchData();
+          try {
+            const fileName = `${Date.now()}.jpg`;
+            const { error: storageError } = await supabase.storage.from('images').upload(fileName, blob, { contentType: 'image/jpeg' });
+            if (storageError) throw storageError;
+
+            const { data: { publicUrl } } = supabase.storage.from('images').getPublicUrl(fileName);
+            
+            // owner_id カラムがない場合でも、一旦保存を試みるロジック
+            const newCard: any = { id: fileName, image_url: publicUrl, owner_id: pocketId };
+            
+            let dbError;
+            if (!parentId) {
+              const res = await supabase.from('mainline').insert([newCard]);
+              dbError = res.error;
+            } else {
+              const res = await supabase.from('side_cells').insert([{ ...newCard, parent_id: parentId }]);
+              dbError = res.error;
+            }
+
+            if (dbError) {
+              console.error("DB Insert Error: owner_idカラムが不足している可能性があります。", dbError);
+              alert("Save failed. Please check if 'owner_id' column exists in Supabase table.");
+            }
+
+            fetchData();
+          } catch (err) {
+            console.error("Upload process error:", err);
+          }
         }
         setIsUploading(false);
       }, 'image/jpeg', 0.6);
@@ -171,7 +196,7 @@ export default function Page() {
           onTouchEnd={() => endPress(item.id)}
         >
           <div className={`relative w-full h-full transition-transform duration-700 [transform-style:preserve-3d] ${flippedIds.has(item.id) ? '[transform:rotateY(180deg)]' : ''}`}>
-            <div className="absolute inset-0 bg-white p-[12px] shadow-[0_12px_45px_rgba(0,0,0,0.12)] [backface-visibility:hidden] rounded-[14px] overflow-hidden">
+            <div className="absolute inset-0 bg-white p-[12px] shadow-[0_12px_45px_rgba(0,0,0,0.12)] [backface-visibility:hidden] rounded-[14px] overflow-hidden border border-black/5">
               <div className="w-full h-full rounded-[4px] pointer-events-none" style={{ backgroundImage: `url(${item.image_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
               <div className={`absolute bottom-4 left-0 right-0 text-center transition-opacity duration-300 pointer-events-none ${pressingId === item.id ? 'opacity-60' : 'opacity-0'}`}>
                 <span className="text-[7px] font-mono tracking-[0.4em] font-bold italic">AUTHENTICATED {item.id.slice(-6).toUpperCase()}</span>
@@ -194,10 +219,7 @@ export default function Page() {
 
   return (
     <div className="min-h-screen bg-[#F2F2F2] text-black overflow-x-hidden font-sans select-none">
-      <style jsx global>{` 
-        body { overscroll-behavior: none; margin: 0; background-color: #F2F2F2; -webkit-tap-highlight-color: transparent; } 
-        .scrollbar-hide::-webkit-scrollbar { display: none; } 
-      `}</style>
+      <style jsx global>{` body { overscroll-behavior: none; margin: 0; background-color: #F2F2F2; -webkit-tap-highlight-color: transparent; } .scrollbar-hide::-webkit-scrollbar { display: none; } `}</style>
       
       <header className="fixed top-0 left-0 right-0 h-24 flex flex-col justify-center items-center z-50 pointer-events-none">
         <div className="w-[1.5px] h-10 bg-black opacity-100 shadow-sm" />
@@ -219,8 +241,8 @@ export default function Page() {
 
       <nav className="fixed bottom-12 left-0 right-0 flex justify-center items-center z-50">
         <div className="flex items-center justify-between w-full max-w-[260px] px-4">
-          <button onClick={() => setIsPocketMode(!isPocketMode)} className={`w-12 h-12 flex items-center justify-start transition-all duration-300 active:scale-75 ${isPocketMode ? 'opacity-100 scale-110' : 'opacity-30'}`}>
-            <div className="w-4 h-4 border-[1.5px] border-black" />
+          <button onClick={() => setIsPocketMode(!isPocketMode)} className={`w-12 h-12 flex items-center justify-start transition-all duration-300 active:scale-75 ${isPocketMode ? 'opacity-100 scale-110 text-black' : 'opacity-30'}`}>
+            <div className={`w-4 h-4 border-[1.5px] border-black ${isPocketMode ? 'bg-black/10' : ''}`} />
           </button>
           <label className={`w-12 h-12 flex items-center justify-center cursor-pointer transition-all active:scale-75 ${isUploading ? 'animate-pulse opacity-100' : 'opacity-100'}`}>
             <div className="w-3 h-3 bg-black rounded-full" />

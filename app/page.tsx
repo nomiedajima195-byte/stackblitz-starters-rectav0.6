@@ -13,14 +13,16 @@ const CardBack = ({ id, wanted, onWant, isOwner, onDelete }: any) => {
     <div className="w-full h-full bg-[#FCF9F2] flex flex-col items-center justify-between p-8 text-[#2A2A2A] select-none border-[0.5px] border-black/10">
       <div className="w-full flex justify-between items-start font-serif">
         <div className="flex flex-col">
-          <span className="text-[6px] tracking-[0.2em] opacity-40 uppercase font-sans">Statement of Registry</span>
+          <span className="text-[6px] tracking-[0.2em] opacity-40 uppercase font-sans">Registry Statement</span>
           <span className="text-[10px] opacity-60 italic">No. {serial}</span>
         </div>
-        <div className="text-[8px] opacity-20 border-[0.5px] border-black/30 px-2 py-0.5 rounded-full uppercase scale-90">Verified</div>
+        <div className="text-[8px] opacity-20 border-[0.5px] border-black/30 px-2 py-0.5 rounded-full uppercase scale-90">
+          {isOwner ? 'Your Collection' : 'Public Record'}
+        </div>
       </div>
-      <div className="flex flex-col items-center py-4">
+      <div className="flex flex-col items-center py-4 text-center">
         <div className="w-12 h-[0.5px] bg-black opacity-10 mb-6" />
-        <p className="text-[12px] tracking-[0.5em] font-serif italic opacity-70 text-center uppercase leading-loose">
+        <p className="text-[12px] tracking-[0.5em] font-serif italic opacity-70 uppercase leading-loose">
           Influencer<br/>is<br/>Rubbish
         </p>
         <div className="w-12 h-[0.5px] bg-black opacity-10 mt-6" />
@@ -50,10 +52,22 @@ export default function Page() {
   const [wantedIds, setWantedIds] = useState<Set<string>>(new Set());
   const [pressingId, setPressingId] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  
+  const [pocketId, setPocketId] = useState<string | null>(null);
+  const [isPocketMode, setIsPocketMode] = useState(false); // 自分のカードだけ表示するモード
+
   const pressTimer = useRef<NodeJS.Timeout | null>(null);
   const touchStartPos = useRef<{ x: number, y: number } | null>(null);
   const isMoving = useRef(false);
+
+  // Step 1: PocketIDの生成と維持
+  useEffect(() => {
+    let id = localStorage.getItem('recta_pocket_id');
+    if (!id) {
+      id = `PKT-${Math.random().toString(36).slice(2, 11).toUpperCase()}`;
+      localStorage.setItem('recta_pocket_id', id);
+    }
+    setPocketId(id);
+  }, []);
 
   const fetchData = useCallback(async () => {
     const { data: m } = await supabase.from('mainline').select('*').order('created_at', { ascending: false });
@@ -73,7 +87,7 @@ export default function Page() {
 
   const uploadFile = async (e: React.ChangeEvent<HTMLInputElement>, parentId: string | null = null) => {
     const file = e.target.files?.[0];
-    if (!file || isUploading) return;
+    if (!file || isUploading || !pocketId) return;
     setIsUploading(true);
 
     const img = new Image();
@@ -97,13 +111,24 @@ export default function Page() {
           const fileName = `${Date.now()}.jpg`;
           await supabase.storage.from('images').upload(fileName, blob, { contentType: 'image/jpeg' });
           const { data: { publicUrl } } = supabase.storage.from('images').getPublicUrl(fileName);
-          if (!parentId) await supabase.from('mainline').insert([{ id: fileName, image_url: publicUrl }]);
-          else await supabase.from('side_cells').insert([{ id: fileName, parent_id: parentId, image_url: publicUrl }]);
+          
+          // Step 2: アップロード時にPocketIDを刻印 (owner_id列を想定)
+          const newCard = { id: fileName, image_url: publicUrl, owner_id: pocketId };
+          if (!parentId) await supabase.from('mainline').insert([newCard]);
+          else await supabase.from('side_cells').insert([{ ...newCard, parent_id: parentId }]);
+          
           fetchData();
         }
         setIsUploading(false);
       }, 'image/jpeg', 0.6);
     };
+  };
+
+  const handleDelete = async (id: string, table: any) => {
+    if(!confirm('Dispose this record?')) return;
+    await supabase.storage.from('images').remove([id]);
+    await supabase.from(table).delete().eq('id', id);
+    fetchData();
   };
 
   const startPress = (id: string, e: any) => {
@@ -136,57 +161,86 @@ export default function Page() {
     touchStartPos.current = null;
   };
 
-  const Card = ({ item, table, isMain }: any) => (
-    <div className="flex-shrink-0 w-screen snap-center px-10 relative flex flex-col items-center">
-      <div 
-        className="relative w-full max-w-[300px] select-none touch-none"
-        style={{ perspective: '1200px', aspectRatio: '1 / 1.618' }}
-        onMouseDown={(e) => startPress(item.id, e)}
-        onMouseMove={handleMove}
-        onMouseUp={() => endPress(item.id)}
-        onTouchStart={(e) => startPress(item.id, e)}
-        onTouchMove={handleMove}
-        onTouchEnd={() => endPress(item.id)}
-      >
-        <div className={`relative w-full h-full transition-transform duration-700 [transform-style:preserve-3d] ${flippedIds.has(item.id) ? '[transform:rotateY(180deg)]' : ''}`}>
-          <div className="absolute inset-0 bg-white p-[12px] shadow-[0_10px_40px_rgba(0,0,0,0.12)] [backface-visibility:hidden] rounded-[12px] overflow-hidden">
-            <div className="w-full h-full rounded-[4px] pointer-events-none" style={{ backgroundImage: `url(${item.image_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
-            <div className={`absolute bottom-3 left-0 right-0 text-center transition-opacity duration-300 pointer-events-none ${pressingId === item.id ? 'opacity-40' : 'opacity-0'}`}>
-              <span className="text-[7px] font-mono tracking-[0.4em] font-bold italic">AUTHENTICATED {item.id.slice(-6).toUpperCase()}</span>
+  const Card = ({ item, table, isMain }: any) => {
+    const isOwner = item.owner_id === pocketId;
+    // ポケットモード時は自分のカード以外非表示（ただし横丁の親が自分なら表示される等、本来はもっと複雑ですがMVPとしてシンプルに）
+    if (isPocketMode && !isOwner) return null;
+
+    return (
+      <div className="flex-shrink-0 w-screen snap-center px-10 relative flex flex-col items-center">
+        <div 
+          className="relative w-full max-w-[300px] select-none touch-none"
+          style={{ perspective: '1200px', aspectRatio: '1 / 1.618' }}
+          onMouseDown={(e) => startPress(item.id, e)}
+          onMouseMove={handleMove}
+          onMouseUp={() => endPress(item.id)}
+          onTouchStart={(e) => startPress(item.id, e)}
+          onTouchMove={handleMove}
+          onTouchEnd={() => endPress(item.id)}
+        >
+          <div className={`relative w-full h-full transition-transform duration-700 [transform-style:preserve-3d] ${flippedIds.has(item.id) ? '[transform:rotateY(180deg)]' : ''}`}>
+            <div className="absolute inset-0 bg-white p-[12px] shadow-[0_10px_40px_rgba(0,0,0,0.12)] [backface-visibility:hidden] rounded-[12px] overflow-hidden">
+              <div className="w-full h-full rounded-[4px] pointer-events-none" style={{ backgroundImage: `url(${item.image_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
+              <div className={`absolute bottom-3 left-0 right-0 text-center transition-opacity duration-300 pointer-events-none ${pressingId === item.id ? 'opacity-40' : 'opacity-0'}`}>
+                <span className="text-[7px] font-mono tracking-[0.4em] font-bold italic">AUTHENTICATED {item.id.slice(-6).toUpperCase()}</span>
+              </div>
+            </div>
+            <div className="absolute inset-0 [transform:rotateY(180deg)] [backface-visibility:hidden] shadow-[0_10px_40px_rgba(0,0,0,0.12)] rounded-[12px] overflow-hidden">
+              <CardBack id={item.id} wanted={wantedIds.has(item.id)} onWant={() => setWantedIds(prev => new Set(prev).add(item.id))} isOwner={isOwner} onDelete={() => handleDelete(item.id, table)} />
             </div>
           </div>
-          <div className="absolute inset-0 [transform:rotateY(180deg)] [backface-visibility:hidden] shadow-[0_10px_40px_rgba(0,0,0,0.12)] rounded-[12px] overflow-hidden">
-            <CardBack id={item.id} wanted={wantedIds.has(item.id)} onWant={() => setWantedIds(prev => new Set(prev).add(item.id))} isOwner={true} onDelete={() => {}} />
-          </div>
         </div>
+        {isMain && isOwner && (
+          <label className="mt-8 opacity-5 hover:opacity-20 transition-opacity cursor-pointer">
+            <span className="text-[10px]">●</span>
+            <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadFile(e, item.id)} />
+          </label>
+        )}
       </div>
-      {/* 横丁へのアップロード口 */}
-      {isMain && (
-        <label className="mt-8 opacity-5 hover:opacity-20 transition-opacity cursor-pointer">
-          <span className="text-[10px]">●</span>
-          <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadFile(e, item.id)} />
-        </label>
-      )}
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="min-h-screen bg-[#F2F2F2] text-black overflow-x-hidden font-sans">
       <style jsx global>{` body { overscroll-behavior: none; margin: 0; background-color: #F2F2F2; -webkit-tap-highlight-color: transparent; } .scrollbar-hide::-webkit-scrollbar { display: none; } `}</style>
-      <header className="h-20 flex justify-center items-center opacity-10"><div className="w-[1px] h-8 bg-black" /></header>
+      
+      {/* 自分のPocketIDを薄く表示（お行儀の良いデバッグ） */}
+      <header className="h-20 flex flex-col justify-center items-center opacity-10">
+        <div className="w-[1px] h-6 bg-black mb-2" />
+        <span className="text-[6px] font-mono tracking-widest uppercase">{pocketId}</span>
+      </header>
+
       <div className="pt-4 space-y-24 pb-48">
-        {mainline.map(main => (
-          <div key={main.id} className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide">
-            <Card item={main} table="mainline" isMain={true} />
-            {(sideCells[main.id] || []).map(side => <Card key={side.id} item={side} table="side_cells" isMain={false} />)}
-          </div>
-        ))}
+        {mainline.map(main => {
+          // メインが自分でなくても、横丁に自分のカードがあれば表示すべきだが、今はシンプルにメイン基準
+          const hasVisibleSide = (sideCells[main.id] || []).some(s => !isPocketMode || s.owner_id === pocketId);
+          if (isPocketMode && main.owner_id !== pocketId && !hasVisibleSide) return null;
+          
+          return (
+            <div key={main.id} className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide">
+              <Card item={main} table="mainline" isMain={true} />
+              {(sideCells[main.id] || []).map(side => <Card key={side.id} item={side} table="side_cells" isMain={false} />)}
+            </div>
+          );
+        })}
       </div>
-      <nav className="fixed bottom-10 left-0 right-0 flex justify-center z-50">
+
+      <nav className="fixed bottom-10 left-0 right-0 flex justify-center items-center space-x-12 z-50 px-10">
+        {/* ポケットフィルタボタン */}
+        <button 
+          onClick={() => setIsPocketMode(!isPocketMode)}
+          className={`text-[8px] tracking-[0.2em] uppercase transition-all duration-700 font-serif italic ${isPocketMode ? 'opacity-80 scale-110 border-b border-black/40' : 'opacity-10'}`}
+        >
+          My Pocket
+        </button>
+
+        {/* アップロードボタン */}
         <label className={`w-10 h-10 border-[0.5px] border-black/20 rounded-full flex items-center justify-center cursor-pointer bg-white/20 backdrop-blur-sm transition-all ${isUploading ? 'animate-pulse' : 'opacity-20 hover:opacity-50'}`}>
           <div className="w-1.5 h-1.5 bg-black rounded-full" />
           <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadFile(e)} />
         </label>
+        
+        <div className="w-10 h-10" /> {/* バランス用ダミー */}
       </nav>
     </div>
   );

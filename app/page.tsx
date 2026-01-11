@@ -121,14 +121,12 @@ export default function Page() {
     fetchData();
   };
 
-  // 昇格ロジック：メインが消えたら横丁から補充
   const deleteCard = async (item: any, isMain: boolean) => {
     if (!confirm('Dispose?')) return;
     if (isMain) {
       const sides = sideCells[item.id] || [];
       if (sides.length > 0) {
         const nextMain = sides[0];
-        // 1枚目をメインに昇格
         await supabase.from('mainline').insert([{ ...nextMain, id: `PROM-${nextMain.id}`, is_public: true }]);
         await supabase.from('side_cells').delete().eq('id', nextMain.id);
       }
@@ -215,14 +213,14 @@ export default function Page() {
       <style jsx global>{` body { overscroll-behavior: none; margin: 0; background-color: #F2F2F2; -webkit-tap-highlight-color: transparent; } .scrollbar-hide::-webkit-scrollbar { display: none; } `}</style>
       
       <header className="fixed top-0 left-0 right-0 h-24 flex justify-center items-center z-50 pointer-events-none">
-        <div className="w-[1.5px] h-10 bg-black" />
+        <div className="w-[1.5px] h-10 bg-black opacity-100" />
       </header>
 
       <div className="pt-28 pb-64 min-h-screen">
         {isPocketMode ? (
           <div className="flex flex-col">
             {vaultedCards.length > 0 ? vaultedCards.map(c => <Card key={c.id} item={c} isMain={true} />) : (
-              <div className="h-[60vh] flex items-center justify-center opacity-5">●</div>
+              <div className="h-[60vh] flex items-center justify-center opacity-5 select-none">●</div>
             )}
           </div>
         ) : (
@@ -239,22 +237,27 @@ export default function Page() {
 
       <nav className="fixed bottom-12 left-0 right-0 flex justify-center items-center z-50">
         <div className="flex items-center justify-between w-full max-w-[240px] px-4">
-          <button onClick={() => setIsPocketMode(true)} className={`w-12 h-12 flex items-center justify-start transition-all ${isPocketMode ? 'opacity-100' : 'opacity-20 hover:opacity-40'}`}>
+          {/* 左：ケース（■） */}
+          <button onClick={() => setIsPocketMode(true)} className={`w-12 h-12 flex items-center justify-start transition-all active:scale-75 ${isPocketMode ? 'opacity-100' : 'opacity-20'}`}>
             <div className="w-4 h-4 border-[1.5px] border-black bg-black/5" />
           </button>
-          <label className={`w-12 h-12 flex items-center justify-center cursor-pointer transition-all active:scale-75 ${isUploading ? 'animate-pulse' : 'opacity-100'}`}>
-            <div className="w-3 h-3 bg-black rounded-full" />
+          
+          {/* 中央：生成（●） */}
+          <label className={`w-12 h-12 flex items-center justify-center cursor-pointer transition-all active:scale-75 ${isUploading ? 'opacity-30' : 'opacity-100'}`}>
+            <div className="w-3.5 h-3.5 bg-black rounded-full shadow-sm" />
             <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadFile(e)} />
           </label>
-          <button onClick={() => setIsPocketMode(false)} className={`w-12 h-12 flex items-center justify-end transition-all ${!isPocketMode ? 'opacity-100' : 'opacity-20 hover:opacity-40'}`}>
-            <div className="w-3 h-3 border-[1.5px] border-black rounded-full" />
+
+          {/* 右：路上（○） */}
+          <button onClick={() => setIsPocketMode(false)} className={`w-12 h-12 flex items-center justify-end transition-all active:scale-75 ${!isPocketMode ? 'opacity-100' : 'opacity-20'}`}>
+            <div className="w-3.5 h-3.5 border-[1.5px] border-black rounded-full" />
           </button>
         </div>
       </nav>
 
       {isUploading && (
         <div className="fixed inset-0 bg-[#F2F2F2]/40 backdrop-blur-sm z-[60] flex items-center justify-center">
-          <div className="w-4 h-[0.5px] bg-black animate-pulse" />
+          <div className="w-4 h-[1px] bg-black animate-pulse" />
         </div>
       )}
     </div>

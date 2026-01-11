@@ -7,13 +7,12 @@ const supabaseUrl = 'https://pfxwhcgdbavycddapqmz.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmeHdoY2dkYmF2eWNkZGFwcW16Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxNjQ0NzUsImV4cCI6MjA4Mjc0MDQ3NX0.YNQlbyocg2olS6-1WxTnbr5N2z52XcVIpI1XR-XrDtM';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// --- 裏面：アンティーク・トランプ風 ---
 const CardBack = ({ id, wanted, onWant, isOwner, onDelete }: any) => {
   const serial = id.split('.')[0].slice(-6).toUpperCase();
   return (
     <div className="w-full h-full bg-[#FCF9F2] flex flex-col items-center justify-between p-8 text-[#1A1A1A] select-none border-[0.5px] border-black/10 shadow-inner">
       <div className="w-full flex justify-between items-start font-serif">
-        <div className="flex flex-col">
+        <div className="flex flex-col text-left">
           <span className="text-[6px] tracking-[0.2em] opacity-40 uppercase font-sans">Registry Statement</span>
           <span className="text-[10px] opacity-60 italic tracking-tighter">No. {serial}</span>
         </div>
@@ -38,7 +37,7 @@ const CardBack = ({ id, wanted, onWant, isOwner, onDelete }: any) => {
             <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="text-[7px] tracking-[0.2em] opacity-30 hover:opacity-100 border-b border-black/20 pb-0.5 uppercase font-serif italic transition-opacity">Dispose</button>
           )}
         </div>
-        <div className="w-full border-t-[0.5px] border-black/5 pt-2 flex justify-center">
+        <div className="w-full border-t-[0.5px] border-black/5 pt-2 flex justify-center text-center">
           <span className="text-[6px] font-mono opacity-10 tracking-[0.1em]">© 2026 RECTA RECORD</span>
         </div>
       </div>
@@ -135,7 +134,7 @@ export default function Page() {
   const handleMove = (e: any) => {
     if (!touchStartPos.current) return;
     const pos = e.touches ? e.touches[0] : e;
-    if (Math.abs(pos.clientX - touchStartPos.current.x) > 10) {
+    if (Math.abs(pos.clientX - touchStartPos.current.x) > 15) {
       isMoving.current = true;
       if (pressTimer.current) clearTimeout(pressTimer.current);
       setPressingId(null);
@@ -160,7 +159,7 @@ export default function Page() {
     if (isPocketMode && !isOwner) return null;
 
     return (
-      <div className="flex-shrink-0 w-[85vw] snap-center px-4 relative flex flex-col items-center">
+      <div className="flex-shrink-0 w-screen snap-center relative flex flex-col items-center">
         <div 
           className="relative w-full max-w-[300px] select-none"
           style={{ perspective: '1200px', aspectRatio: '1 / 1.618' }}
@@ -172,21 +171,19 @@ export default function Page() {
           onTouchEnd={() => endPress(item.id)}
         >
           <div className={`relative w-full h-full transition-transform duration-700 [transform-style:preserve-3d] ${flippedIds.has(item.id) ? '[transform:rotateY(180deg)]' : ''}`}>
-            {/* 表面 */}
-            <div className="absolute inset-0 bg-white p-[12px] shadow-[0_12px_40px_rgba(0,0,0,0.12)] [backface-visibility:hidden] rounded-[12px] overflow-hidden">
+            <div className="absolute inset-0 bg-white p-[12px] shadow-[0_12px_45px_rgba(0,0,0,0.12)] [backface-visibility:hidden] rounded-[14px] overflow-hidden">
               <div className="w-full h-full rounded-[4px] pointer-events-none" style={{ backgroundImage: `url(${item.image_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
               <div className={`absolute bottom-4 left-0 right-0 text-center transition-opacity duration-300 pointer-events-none ${pressingId === item.id ? 'opacity-60' : 'opacity-0'}`}>
                 <span className="text-[7px] font-mono tracking-[0.4em] font-bold italic">AUTHENTICATED {item.id.slice(-6).toUpperCase()}</span>
               </div>
             </div>
-            {/* 裏面 */}
-            <div className="absolute inset-0 [transform:rotateY(180deg)] [backface-visibility:hidden] shadow-[0_12px_40px_rgba(0,0,0,0.12)] rounded-[12px] overflow-hidden">
+            <div className="absolute inset-0 [transform:rotateY(180deg)] [backface-visibility:hidden] shadow-[0_12px_45px_rgba(0,0,0,0.12)] rounded-[14px] overflow-hidden">
               <CardBack id={item.id} wanted={wantedIds.has(item.id)} onWant={() => setWantedIds(prev => new Set(prev).add(item.id))} isOwner={isOwner} onDelete={() => handleDelete(item.id, table)} />
             </div>
           </div>
         </div>
         {isMain && isOwner && (
-          <label className="mt-8 opacity-20 hover:opacity-100 transition-opacity cursor-pointer p-4">
+          <label className="mt-8 opacity-20 hover:opacity-100 transition-opacity cursor-pointer p-4 active:scale-90">
             <div className="w-1.5 h-1.5 border-[1px] border-black rounded-full" />
             <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadFile(e, item.id)} />
           </label>
@@ -202,18 +199,17 @@ export default function Page() {
         .scrollbar-hide::-webkit-scrollbar { display: none; } 
       `}</style>
       
-      {/* 漆黒のセンターロゴ */}
       <header className="fixed top-0 left-0 right-0 h-24 flex flex-col justify-center items-center z-50 pointer-events-none">
         <div className="w-[1.5px] h-10 bg-black opacity-100 shadow-sm" />
         {isPocketMode && <span className="text-[6px] font-mono tracking-[0.4em] uppercase mt-3 opacity-100 animate-pulse">Pocket Mode</span>}
       </header>
 
-      <div className="pt-28 space-y-32 pb-64">
+      <div className="pt-28 space-y-36 pb-64">
         {mainline.map(main => {
           const sides = (sideCells[main.id] || []).filter(s => !isPocketMode || s.owner_id === pocketId);
           if (isPocketMode && main.owner_id !== pocketId && sides.length === 0) return null;
           return (
-            <div key={main.id} className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide focus:outline-none">
+            <div key={main.id} className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide outline-none">
               <Card item={main} table="mainline" isMain={true} />
               {sides.map(side => <Card key={side.id} item={side} table="side_cells" isMain={false} />)}
             </div>
@@ -221,36 +217,22 @@ export default function Page() {
         })}
       </div>
 
-      {/* 固定ナビゲーション */}
       <nav className="fixed bottom-12 left-0 right-0 flex justify-center items-center z-50">
         <div className="flex items-center justify-between w-full max-w-[260px] px-4">
-          
-          {/* 左：■ カードケース */}
-          <button 
-            onClick={() => setIsPocketMode(!isPocketMode)}
-            className={`w-12 h-12 flex items-center justify-start transition-all duration-300 active:scale-90 ${isPocketMode ? 'opacity-100 scale-110' : 'opacity-20'}`}
-          >
+          <button onClick={() => setIsPocketMode(!isPocketMode)} className={`w-12 h-12 flex items-center justify-start transition-all duration-300 active:scale-75 ${isPocketMode ? 'opacity-100 scale-110' : 'opacity-30'}`}>
             <div className="w-4 h-4 border-[1.5px] border-black" />
           </button>
-
-          {/* 中央：● アップロード */}
           <label className={`w-12 h-12 flex items-center justify-center cursor-pointer transition-all active:scale-75 ${isUploading ? 'animate-pulse opacity-100' : 'opacity-100'}`}>
             <div className="w-3 h-3 bg-black rounded-full" />
             <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadFile(e)} />
           </label>
-          
-          {/* 右：不可視のバランス */}
-          <div className="w-12 h-12 flex items-center justify-end opacity-0 pointer-events-none">
-             <div className="w-2 h-2 bg-black rounded-full" />
-          </div>
-          
+          <div className="w-12 h-12 opacity-0 pointer-events-none" />
         </div>
       </nav>
 
-      {/* アップロード中の沈黙 */}
       {isUploading && (
         <div className="fixed inset-0 bg-[#F2F2F2]/40 backdrop-blur-sm z-[60] flex items-center justify-center">
-          <span className="text-[9px] font-serif italic tracking-[0.3em] uppercase opacity-60">Collecting Trash...</span>
+          <span className="text-[9px] font-serif italic tracking-[0.3em] uppercase opacity-60">Recording...</span>
         </div>
       )}
     </div>

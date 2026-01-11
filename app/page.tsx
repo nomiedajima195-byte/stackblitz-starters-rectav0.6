@@ -7,8 +7,19 @@ const supabaseUrl = 'https://pfxwhcgdbavycddapqmz.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmeHdoY2dkYmF2eWNkZGFwcW16Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxNjQ0NzUsImV4cCI6MjA4Mjc0MDQ3NX0.YNQlbyocg2olS6-1WxTnbr5N2z52XcVIpI1XR-XrDtM';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// 1:1.618 黄金比を維持しつつ、画面内に収めるためのスタイル
 const imageBaseClass = `relative overflow-hidden bg-white shadow-[0_4px_12px_rgba(0,0,0,0.08)] transition-all duration-700 p-[12px] flex flex-col items-center justify-center`;
+
+// 鑑定情報のコンポーネント
+const CardMetadata = ({ id, isVisible }: { id: string, isVisible: boolean }) => {
+  // IDから簡易的なシリアルを生成 (例: 123-456)
+  const serial = id.split('.')[0].slice(-6).replace(/(\d{3})(\d{3})/, '$1-$2');
+  return (
+    <div className={`absolute bottom-1.5 left-3 right-3 flex justify-between items-center transition-opacity duration-300 pointer-events-none ${isVisible ? 'opacity-40' : 'opacity-0'}`}>
+      <span className="text-[7px] tracking-[0.2em] font-mono font-bold uppercase">RECTA CERTIFIED</span>
+      <span className="text-[7px] font-mono">SN:{serial}</span>
+    </div>
+  );
+};
 
 export default function Page() {
   const [mainline, setMainline] = useState<any[]>([]);
@@ -17,6 +28,7 @@ export default function Page() {
   const [isMineMode, setIsMineMode] = useState<string | null>(null);
   const [activeSideIndex, setActiveSideIndex] = useState<{[key: string]: number}>({});
   const [isAtTop, setIsAtTop] = useState(true);
+  const [pressingId, setPressingId] = useState<string | null>(null); // 長押し中のカードID
   
   const scrollRefs = useRef<{[key: string]: HTMLDivElement | null}>({});
   const isDeepInAlley = useMemo(() => Object.values(activeSideIndex).some(idx => idx > 0), [activeSideIndex]);
@@ -48,7 +60,7 @@ export default function Page() {
   }, [fetchData]);
 
   const handleDelete = async (id: string, table: 'mainline' | 'side_cells') => {
-    if(!confirm('この記憶を消去しますか？')) return;
+    if(!confirm('消去？')) return;
     try {
       await supabase.storage.from('images').remove([id]);
       await supabase.from(table).delete().eq('id', id);
@@ -100,9 +112,41 @@ export default function Page() {
     e.target.value = '';
   };
 
+  // プレス開始・終了のハンドラ
+  const startPress = (id: string) => setPressingId(id);
+  const endPress = () => setPressingId(null);
+
+  const CardWrapper = ({ item, isMain }: { item: any, isMain: boolean }) => (
+    <div className="flex-shrink-0 w-screen snap-center px-10 relative flex flex-col items-center">
+      <div 
+        className={imageBaseClass} 
+        style={{ width: '100%', maxWidth: '300px', height: 'auto', aspectRatio: '1 / 1.618', borderRadius: '12px' }}
+        onMouseDown={() => startPress(item.id)}
+        onMouseUp={endPress}
+        onMouseLeave={endPress}
+        onTouchStart={() => startPress(item.id)}
+        onTouchEnd={endPress}
+      >
+        <div className="w-full h-full overflow-hidden rounded-[6px]">
+          <img src={item.image_url} className="w-full h-full object-cover" />
+        </div>
+        {/* 長押しで浮き出る情報 */}
+        <CardMetadata id={item.id} isVisible={pressingId === item.id} />
+        
+        {isMain && sideCells[item.id]?.length > 0 && (activeSideIndex[item.id] || 0) === 0 && (
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 w-[1px] h-12 bg-black/10 z-20" />
+        )}
+      </div>
+      <div className="w-full max-w-[300px] flex justify-between px-2 pt-4 opacity-10">
+        <button onClick={() => navigator.clipboard.writeText(`${window.location.origin}?mine=${item.id}`).then(() => alert("●"))} className="p-2 text-[10px]">●</button>
+        <button onClick={() => handleDelete(item.id, isMain ? 'mainline' : 'side_cells')} className="p-2 text-[10px]">✖︎</button>
+      </div>
+    </div>
+  );
+
   return (
     <div className={`min-h-screen bg-[#F2F2F2] text-black font-sans ${isDeepInAlley ? 'overflow-hidden' : 'overflow-x-hidden'}`}>
-      <style jsx global>{` .scrollbar-hide::-webkit-scrollbar { display: none; } body { overscroll-behavior-y: none; margin: 0; background-color: #F2F2F2; } `}</style>
+      <style jsx global>{` .scrollbar-hide::-webkit-scrollbar { display: none; } body { overscroll-behavior-y: none; margin: 0; background-color: #F2F2F2; select-ignore: none; -webkit-touch-callout: none; -webkit-user-select: none; } `}</style>
 
       {!isMineMode ? (
         <div className="max-w-md mx-auto relative min-h-screen">
@@ -112,51 +156,22 @@ export default function Page() {
           </header>
 
           <div className="pt-20 space-y-24 pb-40">
-            {mainline.map((main) => {
-              const hasSide = sideCells[main.id]?.length > 0;
-              const isThisRowDeep = (activeSideIndex[main.id] || 0) > 0;
-              const anyOtherRowDeep = Object.entries(activeSideIndex).some(([id, idx]) => id !== main.id && idx > 0);
-              return (
-                <div key={main.id} className={`relative transition-opacity duration-500 ${anyOtherRowDeep ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
-                  <div ref={el => { scrollRefs.current[main.id] = el; }} className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide w-screen relative left-1/2 right-1/2 -ml-[50vw] -mr-[50vw]" onScroll={(e) => {
-                    const idx = Math.round(e.currentTarget.scrollLeft / e.currentTarget.offsetWidth);
-                    setActiveSideIndex(prev => prev[main.id] === idx ? prev : { ...prev, [main.id]: idx });
-                  }}>
-                    {/* メインカード */}
-                    <div className="flex-shrink-0 w-screen snap-center px-10 relative flex flex-col items-center">
-                      <div className={imageBaseClass} style={{ width: '100%', maxWidth: '300px', height: 'auto', aspectRatio: '1 / 1.618', borderRadius: '12px' }}>
-                        <div className="w-full h-full overflow-hidden rounded-[6px]">
-                           <img src={main.image_url} className="w-full h-full object-cover" />
-                        </div>
-                        {hasSide && !isThisRowDeep && <div className="absolute right-3 top-1/2 -translate-y-1/2 w-[1px] h-12 bg-black/10 z-20" />}
-                      </div>
-                      <div className="w-full max-w-[300px] flex justify-between px-2 pt-4 opacity-10">
-                         <button onClick={() => navigator.clipboard.writeText(`${window.location.origin}?mine=${main.id}`).then(() => alert("●"))} className="p-2 text-[10px]">●</button>
-                         <button onClick={() => handleDelete(main.id, 'mainline')} className="p-2 text-[10px]">✖︎</button>
-                      </div>
-                    </div>
-                    {/* 横丁カード */}
-                    {(sideCells[main.id] || []).map((side) => (
-                      <div key={side.id} className="flex-shrink-0 w-screen snap-center px-10 relative flex flex-col items-center">
-                        <div className={imageBaseClass} style={{ width: '100%', maxWidth: '300px', height: 'auto', aspectRatio: '1 / 1.618', borderRadius: '12px' }}>
-                          <div className="w-full h-full overflow-hidden rounded-[6px]">
-                            <img src={side.image_url} className="w-full h-full object-cover" />
-                          </div>
-                        </div>
-                        <div className="w-full max-w-[300px] flex justify-between px-2 pt-4 opacity-10">
-                           <button onClick={() => navigator.clipboard.writeText(`${window.location.origin}?mine=${side.id}`).then(() => alert("●"))} className="p-2 text-[10px]">●</button>
-                           <button onClick={() => handleDelete(side.id, 'side_cells')} className="p-2 text-[10px]">✖︎</button>
-                        </div>
-                      </div>
-                    ))}
-                    {/* 追加ボタン */}
-                    <div className="flex-shrink-0 w-screen snap-center flex items-center justify-center">
-                       <label className="cursor-pointer opacity-20 p-24 text-[10px] bg-white/50 rounded-full">●<input type="file" className="hidden" accept="image/*" onChange={(e) => uploadFile(e, main.id)} /></label>
-                    </div>
+            {mainline.map((main) => (
+              <div key={main.id} className={`relative transition-opacity duration-500 ${Object.entries(activeSideIndex).some(([id, idx]) => id !== main.id && idx > 0) ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+                <div ref={el => { scrollRefs.current[main.id] = el; }} className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide w-screen relative left-1/2 right-1/2 -ml-[50vw] -mr-[50vw]" onScroll={(e) => {
+                  const idx = Math.round(e.currentTarget.scrollLeft / e.currentTarget.offsetWidth);
+                  setActiveSideIndex(prev => prev[main.id] === idx ? prev : { ...prev, [main.id]: idx });
+                }}>
+                  <CardWrapper item={main} isMain={true} />
+                  {(sideCells[main.id] || []).map((side) => (
+                    <CardWrapper key={side.id} item={side} isMain={false} />
+                  ))}
+                  <div className="flex-shrink-0 w-screen snap-center flex items-center justify-center">
+                    <label className="cursor-pointer opacity-20 p-24 text-[10px] bg-white/50 rounded-full">●<input type="file" className="hidden" accept="image/*" onChange={(e) => uploadFile(e, main.id)} /></label>
                   </div>
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
 
           <nav className={`fixed bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-[#F2F2F2] to-transparent z-50 flex justify-center items-center transition-opacity duration-500 ${isDeepInAlley ? 'opacity-0' : 'opacity-100'}`}>

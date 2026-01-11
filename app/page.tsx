@@ -7,8 +7,7 @@ const supabaseUrl = 'https://pfxwhcgdbavycddapqmz.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmeHdoY2dkYmF2eWNkZGFwcW16Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxNjQ0NzUsImV4cCI6MjA4Mjc0MDQ3NX0.YNQlbyocg2olS6-1WxTnbr5N2z52XcVIpI1XR-XrDtM';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// --- 裏面：Statement & Action ---
-const CardBack = ({ item, isOwner, onAction, onDelete }: any) => {
+const CardBack = ({ item, isOwner, onAction, onDelete, onTransfer }: any) => {
   const serial = item.id.split('.')[0].slice(-6).toUpperCase();
   return (
     <div className="w-full h-full bg-[#FCF9F2] flex flex-col items-center justify-between p-8 text-[#1A1A1A] border-[0.5px] border-black/10 shadow-inner">
@@ -29,9 +28,14 @@ const CardBack = ({ item, isOwner, onAction, onDelete }: any) => {
       <div className="w-full flex justify-between items-end">
         {isOwner && (
           <div className="flex space-x-6 items-center">
+            {/* 路上なら「しまう ▲」、ケース内なら「置く ●」 */}
             <button onClick={(e) => { e.stopPropagation(); onAction(); }} className="text-[16px] opacity-40 hover:opacity-100 transition-opacity pb-1">
               {item.is_public ? '▲' : '●'}
             </button>
+            {/* ケース内限定：譲渡 ◆ */}
+            {!item.is_public && (
+              <button onClick={(e) => { e.stopPropagation(); onTransfer(); }} className="text-[14px] opacity-40 hover:opacity-100 transition-opacity pb-0.5">◆</button>
+            )}
             <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="text-[12px] opacity-10 hover:opacity-40 transition-opacity">×</button>
           </div>
         )}
@@ -49,6 +53,7 @@ export default function Page() {
   const [isUploading, setIsUploading] = useState(false);
   const [pocketId, setPocketId] = useState<string | null>(null);
   const [isPocketMode, setIsPocketMode] = useState(false);
+  const [transferring, setTransferring] = useState(false);
 
   const pressTimer = useRef<NodeJS.Timeout | null>(null);
   const touchStartPos = useRef<{ x: number, y: number } | null>(null);
@@ -61,6 +66,12 @@ export default function Page() {
       localStorage.setItem('recta_pocket_id', id);
     }
     setPocketId(id);
+    
+    // URLパラメータのチェック（譲渡受領）
+    const params = new URLSearchParams(window.location.search);
+    const tId = params.get('t');
+    if (tId) handleAccept(tId, id);
+
     fetchData();
   }, []);
 
@@ -77,6 +88,41 @@ export default function Page() {
       setSideCells(g);
     }
   }, []);
+
+  // 譲渡の開始
+  const startTransfer = async (item: any) => {
+    const tId = Math.random().toString(36).slice(2, 10).toUpperCase();
+    const url = `${window.location.origin}${window.location.pathname}?t=${tId}`;
+    
+    // 所有権を剥奪し、封筒(transfer_id)に入れる
+    const { error } = await supabase.from('mainline').update({ 
+      owner_id: 'PENDING', 
+      transfer_id: tId,
+      is_public: false 
+    }).eq('id', item.id);
+
+    if (!error) {
+      navigator.clipboard.writeText(url);
+      alert("Enveloped. URL copied.");
+      fetchData();
+    }
+  };
+
+  // 譲渡の受領
+  const handleAccept = async (tId: string, pId: string) => {
+    setTransferring(true);
+    const { data } = await supabase.from('mainline').select('*').eq('transfer_id', tId).single();
+    if (data) {
+      await supabase.from('mainline').update({ 
+        owner_id: pId, 
+        transfer_id: null 
+      }).eq('id', data.id);
+      window.history.replaceState({}, '', window.location.pathname);
+      setIsPocketMode(true);
+      fetchData();
+    }
+    setTransferring(false);
+  };
 
   const uploadFile = async (e: any, parentId: string | null = null) => {
     const file = e.target.files?.[0];
@@ -118,15 +164,17 @@ export default function Page() {
   };
 
   const togglePublic = async (item: any) => {
-    await supabase.from('mainline').update({ is_public: !item.is_public }).eq('id', item.id);
+    const nextStatus = !item.is_public;
+    await supabase.from('mainline').update({ is_public: nextStatus }).eq('id', item.id);
+    setIsPocketMode(!nextStatus);
     fetchData();
   };
 
-  // ケース内の最新1枚を路上へ放流する儀式
   const deployLatest = async () => {
     const latestVaulted = allCards.find(c => c.owner_id === pocketId && c.is_public === false);
     if (latestVaulted) {
       await supabase.from('mainline').update({ is_public: true }).eq('id', latestVaulted.id);
+      setIsPocketMode(false);
       fetchData();
     }
   };
@@ -201,7 +249,7 @@ export default function Page() {
               <div className="w-full h-full rounded-[2px]" style={{ backgroundImage: `url(${item.image_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
             </div>
             <div className="absolute inset-0 [transform:rotateY(180deg)] [backface-visibility:hidden] shadow-[0_20px_60px_rgba(0,0,0,0.18)] rounded-[14px] overflow-hidden">
-              <CardBack item={item} isOwner={isOwner} onAction={() => togglePublic(item)} onDelete={() => deleteCard(item, isMain)} />
+              <CardBack item={item} isOwner={isOwner} onAction={() => togglePublic(item)} onDelete={() => deleteCard(item, isMain)} onTransfer={() => startTransfer(item)} />
             </div>
           </div>
         </div>
@@ -247,20 +295,14 @@ export default function Page() {
 
       <nav className="fixed bottom-12 left-0 right-0 flex justify-center items-center z-50">
         <div className="flex items-center justify-between w-full max-w-[240px] px-4">
-          
-          {/* 左：ケースモード切り替え（■） */}
           <button onClick={() => setIsPocketMode(true)} className={`w-12 h-12 flex items-center justify-start transition-all active:scale-75 ${isPocketMode ? 'opacity-100' : 'opacity-20'}`}>
             <div className="w-4 h-4 border-[1.5px] border-black bg-black/5" />
           </button>
-          
-          {/* 中央：コンテクスチュアル・アクション */}
           {isPocketMode ? (
-            // 【ケース内】放流の ● 
-            <button onClick={deployLatest} className="w-12 h-12 flex items-center justify-center transition-all active:scale-75 opacity-100 group">
+            <button onClick={deployLatest} className="w-12 h-12 flex items-center justify-center transition-all active:scale-75 opacity-100">
               <div className="w-3.5 h-3.5 bg-black rounded-full shadow-sm" />
             </button>
           ) : (
-            // 【路上】生成の ◎ 
             <label className="w-12 h-12 flex items-center justify-center cursor-pointer transition-all active:scale-75 opacity-100">
               <div className="relative w-4 h-4 flex items-center justify-center">
                 <div className="absolute inset-0 border-[1.5px] border-black rounded-full" />
@@ -269,16 +311,13 @@ export default function Page() {
               <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadFile(e)} />
             </label>
           )}
-
-          {/* 右：路上モード切り替え（○） */}
           <button onClick={() => setIsPocketMode(false)} className={`w-12 h-12 flex items-center justify-end transition-all active:scale-75 ${!isPocketMode ? 'opacity-100' : 'opacity-20'}`}>
-            <div className="w-3.5 h-3.5 border-[1.5px] border-black rounded-full shadow-sm" />
+            <div className="w-3.5 h-3.5 border-[1.5px] border-black rounded-full" />
           </button>
-          
         </div>
       </nav>
 
-      {isUploading && (
+      {(isUploading || transferring) && (
         <div className="fixed inset-0 bg-[#F2F2F2]/40 backdrop-blur-sm z-[60] flex items-center justify-center">
           <div className="w-4 h-[1px] bg-black animate-pulse" />
         </div>

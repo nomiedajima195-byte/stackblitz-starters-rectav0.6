@@ -7,11 +7,10 @@ const supabaseUrl = 'https://pfxwhcgdbavycddapqmz.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmeHdoY2dkYmF2eWNkZGFwcW16Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxNjQ0NzUsImV4cCI6MjA4Mjc0MDQ3NX0.YNQlbyocg2olS6-1WxTnbr5N2z52XcVIpI1XR-XrDtM';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-const imageBaseClass = `relative overflow-hidden bg-white shadow-[0_4px_12px_rgba(0,0,0,0.08)] transition-all duration-700 p-[12px] flex flex-col items-center justify-center`;
+const imageBaseClass = `relative overflow-hidden bg-white shadow-[0_4px_12px_rgba(0,0,0,0.08)] transition-all duration-700 p-[12px] flex flex-col items-center justify-center select-none`;
 
 // 鑑定情報のコンポーネント
 const CardMetadata = ({ id, isVisible }: { id: string, isVisible: boolean }) => {
-  // IDから簡易的なシリアルを生成 (例: 123-456)
   const serial = id.split('.')[0].slice(-6).replace(/(\d{3})(\d{3})/, '$1-$2');
   return (
     <div className={`absolute bottom-1.5 left-3 right-3 flex justify-between items-center transition-opacity duration-300 pointer-events-none ${isVisible ? 'opacity-40' : 'opacity-0'}`}>
@@ -28,7 +27,7 @@ export default function Page() {
   const [isMineMode, setIsMineMode] = useState<string | null>(null);
   const [activeSideIndex, setActiveSideIndex] = useState<{[key: string]: number}>({});
   const [isAtTop, setIsAtTop] = useState(true);
-  const [pressingId, setPressingId] = useState<string | null>(null); // 長押し中のカードID
+  const [pressingId, setPressingId] = useState<string | null>(null);
   
   const scrollRefs = useRef<{[key: string]: HTMLDivElement | null}>({});
   const isDeepInAlley = useMemo(() => Object.values(activeSideIndex).some(idx => idx > 0), [activeSideIndex]);
@@ -112,7 +111,6 @@ export default function Page() {
     e.target.value = '';
   };
 
-  // プレス開始・終了のハンドラ
   const startPress = (id: string) => setPressingId(id);
   const endPress = () => setPressingId(null);
 
@@ -120,17 +118,32 @@ export default function Page() {
     <div className="flex-shrink-0 w-screen snap-center px-10 relative flex flex-col items-center">
       <div 
         className={imageBaseClass} 
-        style={{ width: '100%', maxWidth: '300px', height: 'auto', aspectRatio: '1 / 1.618', borderRadius: '12px' }}
-        onMouseDown={() => startPress(item.id)}
+        style={{ 
+          width: '100%', 
+          maxWidth: '300px', 
+          height: 'auto', 
+          aspectRatio: '1 / 1.618', 
+          borderRadius: '12px',
+          WebkitTouchCallout: 'none',
+          WebkitUserSelect: 'none',
+          userSelect: 'none'
+        }}
+        onMouseDown={(e) => { e.preventDefault(); startPress(item.id); }}
         onMouseUp={endPress}
         onMouseLeave={endPress}
-        onTouchStart={() => startPress(item.id)}
+        onTouchStart={(e) => { startPress(item.id); }}
         onTouchEnd={endPress}
+        onTouchMove={endPress}
       >
-        <div className="w-full h-full overflow-hidden rounded-[6px]">
-          <img src={item.image_url} className="w-full h-full object-cover" />
-        </div>
-        {/* 長押しで浮き出る情報 */}
+        <div 
+          className="w-full h-full overflow-hidden rounded-[6px] pointer-events-none"
+          style={{
+            backgroundImage: `url(${item.image_url})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+          }}
+        />
+        
         <CardMetadata id={item.id} isVisible={pressingId === item.id} />
         
         {isMain && sideCells[item.id]?.length > 0 && (activeSideIndex[item.id] || 0) === 0 && (
@@ -146,7 +159,11 @@ export default function Page() {
 
   return (
     <div className={`min-h-screen bg-[#F2F2F2] text-black font-sans ${isDeepInAlley ? 'overflow-hidden' : 'overflow-x-hidden'}`}>
-      <style jsx global>{` .scrollbar-hide::-webkit-scrollbar { display: none; } body { overscroll-behavior-y: none; margin: 0; background-color: #F2F2F2; select-ignore: none; -webkit-touch-callout: none; -webkit-user-select: none; } `}</style>
+      <style jsx global>{` 
+        .scrollbar-hide::-webkit-scrollbar { display: none; } 
+        body { overscroll-behavior-y: none; margin: 0; background-color: #F2F2F2; -webkit-tap-highlight-color: transparent; } 
+        img { -webkit-touch-callout: none; }
+      `}</style>
 
       {!isMineMode ? (
         <div className="max-w-md mx-auto relative min-h-screen">
@@ -183,7 +200,11 @@ export default function Page() {
         </div>
       ) : (
         <div className="flex items-center justify-center min-h-screen px-10 bg-[#F2F2F2]" onClick={() => setIsMineMode(null)}>
-          <div className="w-full max-w-[300px]"><div className={imageBaseClass} style={{ aspectRatio: '1 / 1.618', borderRadius: '12px' }}><div className="w-full h-full overflow-hidden rounded-[6px]"><img src={mainline.concat(Object.values(sideCells).flat()).find(i=>i.id===isMineMode)?.image_url} className="w-full h-full object-cover" /></div></div></div>
+          <div className="w-full max-w-[300px]">
+            <div className={imageBaseClass} style={{ aspectRatio: '1 / 1.618', borderRadius: '12px' }}>
+              <div className="w-full h-full overflow-hidden rounded-[6px]" style={{ backgroundImage: `url(${mainline.concat(Object.values(sideCells).flat()).find(i=>i.id===isMineMode)?.image_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
+            </div>
+          </div>
         </div>
       )}
     </div>

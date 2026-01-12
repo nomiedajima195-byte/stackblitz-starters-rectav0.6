@@ -7,6 +7,7 @@ const supabaseUrl = 'https://pfxwhcgdbavycddapqmz.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmeHdoY2dkYmF2eWNkZGFwcW16Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxNjQ0NzUsImV4cCI6MjA4Mjc0MDQ3NX0.YNQlbyocg2olS6-1WxTnbr5N2z52XcVIpI1XR-XrDtM';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+// --- 裏面：Statement（Human is Rubbish） ---
 const CardBack = ({ item }: any) => {
   const serial = item.id.split('.')[0].slice(-6).toUpperCase();
   return (
@@ -19,7 +20,7 @@ const CardBack = ({ item }: any) => {
       </div>
       <div className="flex flex-col items-center text-center px-2">
         <p className="text-[11px] tracking-[0.4em] font-serif italic opacity-70 uppercase leading-[2.2]">
-          User<br/>is<br/>Rubbish
+          Human<br/>is<br/>Rubbish
         </p>
       </div>
       <div className="w-full flex justify-end">

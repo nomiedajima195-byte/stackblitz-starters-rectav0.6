@@ -180,6 +180,10 @@ export default function Page() {
 
     return (
       <div className="flex-shrink-0 w-screen snap-center relative flex flex-col items-center py-12">
+        {isMain && (sideCells[item.id]?.length > 0) && !isPocketMode && (
+          <div className="absolute right-2 top-1/2 -translate-y-1/2 w-[1px] h-32 bg-black opacity-10" />
+        )}
+        
         <div 
           className="relative w-full max-w-[280px] select-none z-20"
           style={{ perspective: '1200px', aspectRatio: '1 / 1.618' }}
@@ -213,10 +217,15 @@ export default function Page() {
               )}
             </>
           ) : (
-            isMain && !isPocketMode && (
+            !isPocketMode && (
               <label className="opacity-10 hover:opacity-100 cursor-pointer p-4 group">
                 <div className="w-1.5 h-1.5 bg-black rounded-full group-hover:scale-[2] transition-transform" />
-                <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadFile(e, item.id)} />
+                <input 
+                  type="file" 
+                  className="hidden" 
+                  accept="image/*" 
+                  onChange={(e) => uploadFile(e, isMain ? item.id : item.parent_id)} 
+                />
               </label>
             )
           )}
@@ -225,7 +234,6 @@ export default function Page() {
     );
   };
 
-  // --- 定義をここに復元 ---
   const publicCards = allCards.filter(c => c.is_public !== false);
   const vaultedCards = allCards.filter(c => c.owner_id === pocketId && c.is_public === false);
 

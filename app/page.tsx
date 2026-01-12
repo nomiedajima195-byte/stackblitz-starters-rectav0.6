@@ -9,12 +9,10 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const CardBack = ({ item, isOwner, isMain, onAction, onDelete }: any) => {
   const serial = item.id.split('.')[0].slice(-6).toUpperCase();
-  // 路上にある(メインのpublic または 横丁にある)なら誰でも拾える(▲)
-  // ケース内(メインのprivate)なら所有者だけが置ける(●)
   const canAction = isMain ? (item.is_public || isOwner) : true; 
 
   return (
-    <div className="w-full h-full bg-[#FCF9F2] flex flex-col items-center justify-between p-8 text-[#1A1A1A] border-[0.5px] border-black/10 shadow-inner">
+    <div className="w-full h-full bg-[#FCF9F2] flex flex-col items-center justify-between p-8 text-[#1A1A1A] border-[0.5px] border-black/10 shadow-inner overflow-hidden">
       <div className="w-full flex justify-between items-start font-serif">
         <div className="flex flex-col text-left">
           <span className="text-[6px] tracking-[0.2em] opacity-40 uppercase font-sans">Statement</span>
@@ -26,15 +24,23 @@ const CardBack = ({ item, isOwner, isMain, onAction, onDelete }: any) => {
           Influencer<br/>is<br/>Rubbish
         </p>
       </div>
-      <div className="w-full flex justify-between items-end">
+      <div className="w-full flex justify-between items-end relative z-20">
         <div className="flex space-x-6 items-center">
           {canAction && (
-            <button onClick={(e) => { e.stopPropagation(); onAction(); }} className="text-[16px] opacity-40 hover:opacity-100 transition-opacity pb-1">
+            <button 
+              onClick={(e) => { e.stopPropagation(); onAction(); }} 
+              className="text-[16px] opacity-40 hover:opacity-100 transition-opacity pb-1 min-w-[32px] min-h-[32px] flex items-center justify-center"
+            >
               {(isMain && !item.is_public) ? '●' : '▲'}
             </button>
           )}
           {isOwner && (
-            <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="text-[12px] opacity-10 hover:opacity-40 transition-opacity">×</button>
+            <button 
+              onClick={(e) => { e.stopPropagation(); onDelete(); }} 
+              className="text-[12px] opacity-10 hover:opacity-40 transition-opacity min-w-[32px] min-h-[32px] flex items-center justify-center"
+            >
+              ×
+            </button>
           )}
         </div>
         <span className="text-[6px] font-mono opacity-10 tracking-[0.1em] uppercase">© 2026 RECTA</span>
@@ -122,22 +128,14 @@ export default function Page() {
   const handleAction = async (item: any, isMain: boolean) => {
     if (isMain) {
       if (item.is_public) {
-        // メインを拾う：所有権を奪い、ケースへ
         await supabase.from('mainline').update({ is_public: false, owner_id: pocketId }).eq('id', item.id);
         setIsPocketMode(true);
       } else {
-        // ケースから置く：路上へ
         await supabase.from('mainline').update({ is_public: true }).eq('id', item.id);
         setIsPocketMode(false);
       }
     } else {
-      // 横丁を拾う：mainlineのプライベート（ケース）へ昇格させ、sideからは消す
-      await supabase.from('mainline').insert([{ 
-        id: `PICK-${Date.now()}`, 
-        image_url: item.image_url, 
-        owner_id: pocketId, 
-        is_public: false 
-      }]);
+      await supabase.from('mainline').insert([{ id: `PICK-${Date.now()}`, image_url: item.image_url, owner_id: pocketId, is_public: false }]);
       await supabase.from('side_cells').delete().eq('id', item.id);
       setIsPocketMode(true);
     }
@@ -193,15 +191,36 @@ export default function Page() {
           className="relative w-full max-w-[280px] select-none z-10"
           style={{ perspective: '1200px', aspectRatio: '1 / 1.618' }}
           onMouseDown={(e) => startPress(item.id, e)}
+          onMouseMove={(e) => {
+            if (!touchStartPos.current) return;
+            const dx = Math.abs(e.clientX - touchStartPos.current.x);
+            const dy = Math.abs(e.clientY - touchStartPos.current.y);
+            if (dx > 10 || dy > 10) {
+              isMoving.current = true;
+              if (pressTimer.current) clearTimeout(pressTimer.current);
+              setPressingId(null);
+            }
+          }}
           onMouseUp={() => endPress(item.id)}
           onTouchStart={(e) => startPress(item.id, e)}
+          onTouchMove={(e) => {
+            if (!touchStartPos.current) return;
+            const touch = e.touches[0];
+            const dx = Math.abs(touch.clientX - touchStartPos.current.x);
+            const dy = Math.abs(touch.clientY - touchStartPos.current.y);
+            if (dx > 10 || dy > 10) {
+              isMoving.current = true;
+              if (pressTimer.current) clearTimeout(pressTimer.current);
+              setPressingId(null);
+            }
+          }}
           onTouchEnd={() => endPress(item.id)}
         >
           <div className={`relative w-full h-full transition-transform duration-700 [transform-style:preserve-3d] ${flippedIds.has(item.id) ? '[transform:rotateY(180deg)]' : ''}`}>
-            <div className="absolute inset-0 bg-white p-[10px] shadow-[0_20px_60px_rgba(0,0,0,0.18)] [backface-visibility:hidden] rounded-[14px] overflow-hidden border border-black/5">
+            <div className="absolute inset-0 bg-white p-[10px] shadow-[0_20px_60px_rgba(0,0,0,0.18)] [backface-visibility:hidden] rounded-[14px] border border-black/5 overflow-hidden">
               <div className="w-full h-full rounded-[2px]" style={{ backgroundImage: `url(${item.image_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
             </div>
-            <div className="absolute inset-0 [transform:rotateY(180deg)] [backface-visibility:hidden] shadow-[0_20px_60px_rgba(0,0,0,0.18)] rounded-[14px] overflow-hidden">
+            <div className="absolute inset-0 [transform:rotateY(180deg)] [backface-visibility:hidden] shadow-[0_20px_60px_rgba(0,0,0,0.18)] rounded-[14px] border border-black/5 overflow-hidden">
               <CardBack 
                 item={item} 
                 isOwner={isOwner} 
@@ -228,11 +247,9 @@ export default function Page() {
   return (
     <div className="min-h-screen bg-[#F2F2F2] text-black overflow-x-hidden font-sans select-none">
       <style jsx global>{` body { overscroll-behavior: none; margin: 0; background-color: #F2F2F2; -webkit-tap-highlight-color: transparent; } .scrollbar-hide::-webkit-scrollbar { display: none; } `}</style>
-      
       <header className="fixed top-0 left-0 right-0 h-24 flex justify-center items-center z-50 pointer-events-none">
-        <div className="w-[1.5px] h-10 bg-black" />
+        <div className="w-[1.5px] h-10 bg-black opacity-100" />
       </header>
-
       <div className="pt-28 pb-64 min-h-screen">
         {isPocketMode ? (
           <div className="flex flex-col">
@@ -251,7 +268,6 @@ export default function Page() {
           </div>
         )}
       </div>
-
       <nav className="fixed bottom-12 left-0 right-0 flex justify-center items-center z-50">
         <div className="flex items-center justify-between w-full max-w-[240px] px-4">
           <button onClick={() => setIsPocketMode(true)} className={`w-12 h-12 flex items-center justify-start transition-all active:scale-75 ${isPocketMode ? 'opacity-100' : 'opacity-20'}`}>
@@ -275,7 +291,6 @@ export default function Page() {
           </button>
         </div>
       </nav>
-
       {isUploading && (
         <div className="fixed inset-0 bg-[#F2F2F2]/40 backdrop-blur-sm z-[60] flex items-center justify-center">
           <div className="w-4 h-[1px] bg-black animate-pulse" />

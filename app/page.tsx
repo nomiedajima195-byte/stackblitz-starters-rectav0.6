@@ -13,7 +13,7 @@ const CardBack = ({ item }: any) => {
     <div className="w-full h-full bg-[#FCF9F2] flex flex-col items-center justify-between p-8 text-[#1A1A1A] border-[0.5px] border-black/10 shadow-inner overflow-hidden">
       <div className="w-full flex justify-between items-start font-serif">
         <div className="flex flex-col text-left">
-          <span className="text-[6px] tracking-[0.2em] opacity-40 uppercase font-sans">Statement</span>
+          <span className="text-[6px] tracking-[0.2em] opacity-40 uppercase font-sans font-bold">Statement</span>
           <span className="text-[10px] opacity-60 italic tracking-tighter">No. {serial}</span>
         </div>
       </div>
@@ -74,28 +74,39 @@ export default function Page() {
     img.src = URL.createObjectURL(file);
     img.onload = async () => {
       const canvas = document.createElement('canvas');
-      const targetW = 400; 
-      const targetH = 648; // 1.62 ratio
-      canvas.width = targetW; 
-      canvas.height = targetH;
+      const targetW = 600; 
+      const targetH = Math.round(600 * 1.618); 
+      canvas.width = targetW; canvas.height = targetH;
       const ctx = canvas.getContext('2d');
       if (ctx) {
-        ctx.fillStyle = "white"; 
-        ctx.fillRect(0, 0, targetW, targetH);
-        
+        ctx.fillStyle = "white"; ctx.fillRect(0, 0, targetW, targetH);
         const imgRatio = img.width / img.height;
-        // もし画像がスクエア（比率 0.8〜1.2）なら、上部に配置して下を余白に
+        
+        // 角丸のクリッピング関数
+        const roundRect = (x:number, y:number, w:number, h:number, r:number) => {
+          ctx.beginPath(); ctx.moveTo(x+r, y); ctx.lineTo(x+w-r, y); ctx.quadraticCurveTo(x+w, y, x+w, y+r);
+          ctx.lineTo(x+w, y+h-r); ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h); ctx.lineTo(x+r, y+h);
+          ctx.quadraticCurveTo(x, y+h, x, y+h-r); ctx.lineTo(x, y+r); ctx.quadraticCurveTo(x, y, x+r, y); ctx.closePath();
+        };
+
         if (imgRatio >= 0.8 && imgRatio <= 1.2) {
-          const dW = targetW;
-          const dH = targetW / imgRatio;
-          ctx.drawImage(img, 0, 0, dW, dH);
+          // スクエア画像：上配置
+          ctx.save();
+          roundRect(20, 20, targetW-40, targetW-40, 12);
+          ctx.clip();
+          ctx.drawImage(img, 20, 20, targetW-40, targetW-40);
+          ctx.restore();
         } else {
-          // それ以外（長方形など）は中央にクロップ配置（今まで通り）
+          // 長方形：中央クロップ
+          ctx.save();
+          roundRect(0, 0, targetW, targetH, 0); // 長方形は全面
+          ctx.clip();
           const targetRatio = targetW / targetH;
           let dW, dH, dX, dY;
           if (imgRatio > targetRatio) { dH = targetH; dW = targetH * imgRatio; dX = (targetW - dW) / 2; dY = 0; }
           else { dW = targetW; dH = targetW / imgRatio; dX = 0; dY = (targetH - dH) / 2; }
           ctx.drawImage(img, dX, dY, dW, dH);
+          ctx.restore();
         }
       }
       canvas.toBlob(async (blob) => {
@@ -103,7 +114,6 @@ export default function Page() {
           const fileName = `${Date.now()}.jpg`;
           await supabase.storage.from('images').upload(fileName, blob, { contentType: 'image/jpeg' });
           const { data: { publicUrl } } = supabase.storage.from('images').getPublicUrl(fileName);
-          
           if (!parentId) {
             await supabase.from('mainline').insert([{ id: fileName, image_url: publicUrl, owner_id: pocketId, is_public: false }]);
             setIsPocketMode(true);
@@ -113,7 +123,7 @@ export default function Page() {
           fetchData();
         }
         setIsUploading(false);
-      }, 'image/jpeg', 0.8);
+      }, 'image/jpeg', 0.85);
     };
   };
 
@@ -166,13 +176,11 @@ export default function Page() {
         return next;
       });
     }
-    setPressingId(null);
-    touchStartPos.current = null;
+    setPressingId(null); touchStartPos.current = null;
   };
 
   const Card = ({ item, isMain }: any) => {
     const isOwner = item.owner_id === pocketId;
-    const hasSide = isMain && (sideCells[item.id]?.length > 0);
     const isFlipped = flippedIds.has(item.id);
     const serial = item.id.split('.')[0].slice(-6).toUpperCase();
 
@@ -187,36 +195,36 @@ export default function Page() {
           onTouchEnd={() => endPress(item.id)}
         >
           <div className={`relative w-full h-full transition-transform duration-700 [transform-style:preserve-3d] ${isFlipped ? '[transform:rotateY(180deg)]' : ''}`}>
-            {/* 表：画像 + シリアル */}
-            <div className="absolute inset-0 bg-white p-[10px] shadow-[0_20px_60px_rgba(0,0,0,0.18)] [backface-visibility:hidden] rounded-[14px] border border-black/5 overflow-hidden flex flex-col">
-              <div className="w-full h-full rounded-[2px] relative" style={{ backgroundImage: `url(${item.image_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
-                <span className="absolute bottom-2 left-2 text-[6px] font-mono text-white/40 tracking-widest pointer-events-none uppercase">
+            {/* 表 */}
+            <div className="absolute inset-0 bg-white p-[8px] shadow-[0_20px_60px_rgba(0,0,0,0.12)] [backface-visibility:hidden] rounded-[18px] border border-black/5 overflow-hidden">
+              <div className="w-full h-full rounded-[12px] relative overflow-hidden bg-[#F9F9F9]" style={{ backgroundImage: `url(${item.image_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
+                <span className="absolute bottom-3 left-3 text-[7px] font-mono text-white/50 tracking-[0.2em] pointer-events-none mix-blend-difference uppercase">
                   No.{serial}
                 </span>
               </div>
             </div>
-            {/* 裏：User is Rubbish */}
-            <div className="absolute inset-0 [transform:rotateY(180deg)] [backface-visibility:hidden] shadow-[0_20px_60px_rgba(0,0,0,0.18)] rounded-[14px] border border-black/5 overflow-hidden">
+            {/* 裏 */}
+            <div className="absolute inset-0 [transform:rotateY(180deg)] [backface-visibility:hidden] shadow-[0_20px_60px_rgba(0,0,0,0.12)] rounded-[18px] border border-black/5 overflow-hidden">
               <CardBack item={item} />
             </div>
           </div>
         </div>
 
         {/* Shadow Commands */}
-        <div className="h-16 mt-6 flex items-center justify-center space-x-14 z-10 transition-all duration-500">
+        <div className="h-16 mt-6 flex items-center justify-center space-x-14 z-10 transition-all">
           {isFlipped ? (
             <>
-              <button onClick={(e) => { e.stopPropagation(); handleAction(item, isMain); }} className="text-[20px] opacity-30 hover:opacity-100 px-4">
+              <button onClick={(e) => { e.stopPropagation(); handleAction(item, isMain); }} className="text-[20px] opacity-30 hover:opacity-100 px-4 active:scale-75 transition-all">
                 {(isMain && !item.is_public) ? '●' : '▲'}
               </button>
               {isOwner && (
-                <button onClick={(e) => { e.stopPropagation(); deleteCard(item, isMain); }} className="text-[14px] opacity-5 hover:opacity-40 px-4">×</button>
+                <button onClick={(e) => { e.stopPropagation(); deleteCard(item, isMain); }} className="text-[14px] opacity-5 hover:opacity-40 px-4 active:scale-75 transition-all">×</button>
               )}
             </>
           ) : (
             isMain && !isPocketMode && (
               <label className="opacity-10 hover:opacity-100 cursor-pointer p-4 group">
-                <div className="w-1.5 h-1.5 bg-black rounded-full group-hover:scale-[1.8] transition-transform" />
+                <div className="w-1.5 h-1.5 bg-black rounded-full group-hover:scale-[2] transition-transform" />
                 <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadFile(e, item.id)} />
               </label>
             )
@@ -226,24 +234,21 @@ export default function Page() {
     );
   };
 
-  const publicCards = allCards.filter(c => c.is_public !== false);
-  const vaultedCards = allCards.filter(c => c.owner_id === pocketId && c.is_public === false);
-
   return (
     <div className="min-h-screen bg-[#F2F2F2] text-black overflow-x-hidden font-sans select-none">
-      <style jsx global>{` body { overscroll-behavior: none; margin: 0; background-color: #F2F2F2; -webkit-tap-highlight-color: transparent; } .scrollbar-hide::-webkit-scrollbar { display: none; } `}</style>
+      <style jsx global>{` body { overscroll-behavior: none; margin: 0; background-color: #F2F2F2; } .scrollbar-hide::-webkit-scrollbar { display: none; } `}</style>
       <header className="fixed top-0 left-0 right-0 h-24 flex justify-center items-center z-50 pointer-events-none">
-        <div className="w-[1.5px] h-10 bg-black" />
+        <div className="w-[1px] h-10 bg-black/80" />
       </header>
       <div className="pt-28 pb-64 min-h-screen">
         {isPocketMode ? (
           <div className="flex flex-col">
             {vaultedCards.map(c => <Card key={c.id} item={c} isMain={true} />)}
-            {vaultedCards.length === 0 && <div className="h-[60vh] flex items-center justify-center opacity-5 text-[20px]">●</div>}
+            {vaultedCards.length === 0 && <div className="h-[60vh] flex items-center justify-center opacity-5 text-[12px] tracking-[0.5em] uppercase">Pocket is Empty</div>}
           </div>
         ) : (
           <div className="flex flex-col space-y-16">
-            {publicCards.map(c => (
+            {allCards.filter(c => c.is_public !== false).map(c => (
               <div key={c.id} className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide outline-none">
                 <Card item={c} isMain={true} />
                 {(sideCells[c.id] || []).map(side => <Card key={side.id} item={side} isMain={false} />)}
@@ -254,32 +259,28 @@ export default function Page() {
       </div>
       <nav className="fixed bottom-12 left-0 right-0 flex justify-center items-center z-50">
         <div className="flex items-center justify-between w-full max-w-[240px] px-4">
-          <button onClick={() => setIsPocketMode(true)} className={`w-12 h-12 flex items-center justify-start transition-all ${isPocketMode ? 'opacity-100' : 'opacity-20'}`}>
-            <div className="w-4 h-4 border-[1.5px] border-black bg-black/5" />
+          <button onClick={() => setIsPocketMode(true)} className={`w-12 h-12 flex items-center justify-start transition-all active:scale-75 ${isPocketMode ? 'opacity-100' : 'opacity-20'}`}>
+            <div className="w-4 h-4 border-[1.5px] border-black" />
           </button>
-          {isPocketMode ? (
-            <button onClick={() => { if(vaultedCards[0]) handleAction(vaultedCards[0], true); }} className="w-12 h-12 flex items-center justify-center opacity-100">
-              <div className="w-3.5 h-3.5 bg-black rounded-full" />
-            </button>
-          ) : (
-            <label className="w-12 h-12 flex items-center justify-center cursor-pointer opacity-100">
+          {!isPocketMode ? (
+            <label className="w-12 h-12 flex items-center justify-center cursor-pointer transition-all active:scale-75 opacity-100">
               <div className="relative w-4 h-4 flex items-center justify-center">
                 <div className="absolute inset-0 border-[1.5px] border-black rounded-full" />
                 <div className="w-1.5 h-1.5 bg-black rounded-full" />
               </div>
               <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadFile(e)} />
             </label>
+          ) : (
+            <button onClick={() => { if(vaultedCards[0]) handleAction(vaultedCards[0], true); }} className="w-12 h-12 flex items-center justify-center active:scale-75 transition-all opacity-100">
+              <div className="w-3.5 h-3.5 bg-black rounded-full" />
+            </button>
           )}
-          <button onClick={() => setIsPocketMode(false)} className={`w-12 h-12 flex items-center justify-end transition-all ${!isPocketMode ? 'opacity-100' : 'opacity-20'}`}>
+          <button onClick={() => setIsPocketMode(false)} className={`w-12 h-12 flex items-center justify-end transition-all active:scale-75 ${!isPocketMode ? 'opacity-100' : 'opacity-20'}`}>
             <div className="w-3.5 h-3.5 border-[1.5px] border-black rounded-full" />
           </button>
         </div>
       </nav>
-      {isUploading && (
-        <div className="fixed inset-0 bg-[#F2F2F2]/40 backdrop-blur-sm z-[60] flex items-center justify-center">
-          <div className="w-4 h-[1px] bg-black animate-pulse" />
-        </div>
-      )}
+      {isUploading && <div className="fixed inset-0 bg-[#F2F2F2]/40 backdrop-blur-sm z-[60] flex items-center justify-center"><div className="w-4 h-[1px] bg-black animate-pulse" /></div>}
     </div>
   );
 }

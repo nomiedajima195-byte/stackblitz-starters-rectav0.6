@@ -81,8 +81,6 @@ export default function Page() {
       if (ctx) {
         ctx.fillStyle = "white"; ctx.fillRect(0, 0, targetW, targetH);
         const imgRatio = img.width / img.height;
-        
-        // 角丸のクリッピング関数
         const roundRect = (x:number, y:number, w:number, h:number, r:number) => {
           ctx.beginPath(); ctx.moveTo(x+r, y); ctx.lineTo(x+w-r, y); ctx.quadraticCurveTo(x+w, y, x+w, y+r);
           ctx.lineTo(x+w, y+h-r); ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h); ctx.lineTo(x+r, y+h);
@@ -90,17 +88,13 @@ export default function Page() {
         };
 
         if (imgRatio >= 0.8 && imgRatio <= 1.2) {
-          // スクエア画像：上配置
           ctx.save();
           roundRect(20, 20, targetW-40, targetW-40, 12);
           ctx.clip();
           ctx.drawImage(img, 20, 20, targetW-40, targetW-40);
           ctx.restore();
         } else {
-          // 長方形：中央クロップ
           ctx.save();
-          roundRect(0, 0, targetW, targetH, 0); // 長方形は全面
-          ctx.clip();
           const targetRatio = targetW / targetH;
           let dW, dH, dX, dY;
           if (imgRatio > targetRatio) { dH = targetH; dW = targetH * imgRatio; dX = (targetW - dW) / 2; dY = 0; }
@@ -195,7 +189,6 @@ export default function Page() {
           onTouchEnd={() => endPress(item.id)}
         >
           <div className={`relative w-full h-full transition-transform duration-700 [transform-style:preserve-3d] ${isFlipped ? '[transform:rotateY(180deg)]' : ''}`}>
-            {/* 表 */}
             <div className="absolute inset-0 bg-white p-[8px] shadow-[0_20px_60px_rgba(0,0,0,0.12)] [backface-visibility:hidden] rounded-[18px] border border-black/5 overflow-hidden">
               <div className="w-full h-full rounded-[12px] relative overflow-hidden bg-[#F9F9F9]" style={{ backgroundImage: `url(${item.image_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
                 <span className="absolute bottom-3 left-3 text-[7px] font-mono text-white/50 tracking-[0.2em] pointer-events-none mix-blend-difference uppercase">
@@ -203,14 +196,12 @@ export default function Page() {
                 </span>
               </div>
             </div>
-            {/* 裏 */}
             <div className="absolute inset-0 [transform:rotateY(180deg)] [backface-visibility:hidden] shadow-[0_20px_60px_rgba(0,0,0,0.12)] rounded-[18px] border border-black/5 overflow-hidden">
               <CardBack item={item} />
             </div>
           </div>
         </div>
 
-        {/* Shadow Commands */}
         <div className="h-16 mt-6 flex items-center justify-center space-x-14 z-10 transition-all">
           {isFlipped ? (
             <>
@@ -234,21 +225,24 @@ export default function Page() {
     );
   };
 
+  // --- 定義をここに復元 ---
+  const publicCards = allCards.filter(c => c.is_public !== false);
+  const vaultedCards = allCards.filter(c => c.owner_id === pocketId && c.is_public === false);
+
   return (
     <div className="min-h-screen bg-[#F2F2F2] text-black overflow-x-hidden font-sans select-none">
-      <style jsx global>{` body { overscroll-behavior: none; margin: 0; background-color: #F2F2F2; } .scrollbar-hide::-webkit-scrollbar { display: none; } `}</style>
       <header className="fixed top-0 left-0 right-0 h-24 flex justify-center items-center z-50 pointer-events-none">
         <div className="w-[1px] h-10 bg-black/80" />
       </header>
       <div className="pt-28 pb-64 min-h-screen">
         {isPocketMode ? (
           <div className="flex flex-col">
-            {vaultedCards.map(c => <Card key={c.id} item={c} isMain={true} />)}
+            {vaultedCards.map((c: any) => <Card key={c.id} item={c} isMain={true} />)}
             {vaultedCards.length === 0 && <div className="h-[60vh] flex items-center justify-center opacity-5 text-[12px] tracking-[0.5em] uppercase">Pocket is Empty</div>}
           </div>
         ) : (
           <div className="flex flex-col space-y-16">
-            {allCards.filter(c => c.is_public !== false).map(c => (
+            {publicCards.map(c => (
               <div key={c.id} className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide outline-none">
                 <Card item={c} isMain={true} />
                 {(sideCells[c.id] || []).map(side => <Card key={side.id} item={side} isMain={false} />)}

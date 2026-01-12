@@ -7,9 +7,10 @@ const supabaseUrl = 'https://pfxwhcgdbavycddapqmz.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmeHdoY2dkYmF2eWNkZGFwcW16Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxNjQ0NzUsImV4cCI6MjA4Mjc0MDQ3NX0.YNQlbyocg2olS6-1WxTnbr5N2z52XcVIpI1XR-XrDtM';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+// --- 裏面：Statement & Common Action ---
 const CardBack = ({ item, isOwner, onAction, onDelete }: any) => {
   const serial = item.id.split('.')[0].slice(-6).toUpperCase();
-  // 路上にあれば誰でも拾える(▲)、ケース内なら所有者だけが置ける(●)
+  // 路上なら誰でも拾える(▲)、ケース内なら所有者だけが置ける(●)
   const canAction = item.is_public || isOwner;
 
   return (
@@ -109,7 +110,6 @@ export default function Page() {
             await supabase.from('mainline').insert([{ id: fileName, image_url: publicUrl, owner_id: pocketId, is_public: false }]);
             setIsPocketMode(true);
           } else {
-            // 横丁（Side Cell）への追加
             await supabase.from('side_cells').insert([{ id: fileName, image_url: publicUrl, owner_id: pocketId, parent_id: parentId }]);
           }
           fetchData();
@@ -120,12 +120,13 @@ export default function Page() {
   };
 
   const handleAction = async (item: any) => {
+    // RLS無効化により、誰でもowner_idを書き換え可能に
     if (item.is_public) {
-      // 拾得（▲）: 所有権を自分に書き換え、ケースへ移動
+      // ▲ 拾う：路上から自分のポケットへ
       await supabase.from('mainline').update({ is_public: false, owner_id: pocketId }).eq('id', item.id);
       setIsPocketMode(true);
     } else {
-      // 配置（●）: 路上へ放流
+      // ● 置く：自分のポケットから路上へ
       await supabase.from('mainline').update({ is_public: true }).eq('id', item.id);
       setIsPocketMode(false);
     }
@@ -138,7 +139,12 @@ export default function Page() {
       const sides = sideCells[item.id] || [];
       if (sides.length > 0) {
         const nextMain = sides[0];
-        await supabase.from('mainline').insert([{ id: `PROM-${Date.now()}`, image_url: nextMain.image_url, owner_id: nextMain.owner_id, is_public: true }]);
+        await supabase.from('mainline').insert([{ 
+            id: `PROM-${Date.now()}`, 
+            image_url: nextMain.image_url, 
+            owner_id: nextMain.owner_id, 
+            is_public: true 
+        }]);
         await supabase.from('side_cells').delete().eq('id', nextMain.id);
       }
       await supabase.from('mainline').delete().eq('id', item.id);
@@ -146,6 +152,26 @@ export default function Page() {
       await supabase.from('side_cells').delete().eq('id', item.id);
     }
     fetchData();
+  };
+
+  const startPress = (id: string, e: any) => {
+    const pos = e.touches ? e.touches[0] : e;
+    touchStartPos.current = { x: pos.clientX, y: pos.clientY };
+    isMoving.current = false;
+    pressTimer.current = setTimeout(() => { if(!isMoving.current) setPressingId(id); }, 300);
+  };
+
+  const endPress = (id: string) => {
+    if (pressTimer.current) clearTimeout(pressTimer.current);
+    if (!isMoving.current && !pressingId) {
+      setFlippedIds(prev => {
+        const next = new Set(prev);
+        next.has(id) ? next.delete(id) : next.add(id);
+        return next;
+      });
+    }
+    setPressingId(null);
+    touchStartPos.current = null;
   };
 
   const Card = ({ item, isMain }: any) => {
@@ -197,35 +223,15 @@ export default function Page() {
             </div>
           </div>
         </div>
-        {/* 横丁への追加ボタン（路上かつメインカードのみ） */}
+        {/* 横丁への拡張ボタン */}
         {isMain && !isPocketMode && (
-          <label className="mt-8 opacity-10 hover:opacity-40 transition-opacity cursor-pointer p-4">
-            <div className="w-1.5 h-1.5 bg-black rounded-full" />
+          <label className="mt-8 opacity-10 hover:opacity-100 transition-opacity cursor-pointer p-4 group">
+            <div className="w-1.5 h-1.5 bg-black rounded-full group-hover:scale-150 transition-transform" />
             <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadFile(e, item.id)} />
           </label>
         )}
       </div>
     );
-  };
-
-  const startPress = (id: string, e: any) => {
-    const pos = e.touches ? e.touches[0] : e;
-    touchStartPos.current = { x: pos.clientX, y: pos.clientY };
-    isMoving.current = false;
-    pressTimer.current = setTimeout(() => { if(!isMoving.current) setPressingId(id); }, 300);
-  };
-
-  const endPress = (id: string) => {
-    if (pressTimer.current) clearTimeout(pressTimer.current);
-    if (!isMoving.current && !pressingId) {
-      setFlippedIds(prev => {
-        const next = new Set(prev);
-        next.has(id) ? next.delete(id) : next.add(id);
-        return next;
-      });
-    }
-    setPressingId(null);
-    touchStartPos.current = null;
   };
 
   const publicCards = allCards.filter(c => c.is_public !== false);
@@ -249,7 +255,7 @@ export default function Page() {
         ) : (
           <div className="flex flex-col space-y-16">
             {publicCards.map(c => (
-              <div key={c.id} className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide outline-none z-10">
+              <div key={c.id} className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide outline-none">
                 <Card item={c} isMain={true} />
                 {(sideCells[c.id] || []).map(side => <Card key={side.id} item={side} isMain={false} />)}
               </div>
@@ -260,15 +266,14 @@ export default function Page() {
 
       <nav className="fixed bottom-12 left-0 right-0 flex justify-center items-center z-50">
         <div className="flex items-center justify-between w-full max-w-[240px] px-4">
+          {/* 左：ケース（■） */}
           <button onClick={() => setIsPocketMode(true)} className={`w-12 h-12 flex items-center justify-start transition-all active:scale-75 ${isPocketMode ? 'opacity-100' : 'opacity-20'}`}>
             <div className="w-4 h-4 border-[1.5px] border-black bg-black/5" />
           </button>
           
+          {/* 中央：生成または放流 */}
           {isPocketMode ? (
-            <button onClick={() => {
-              const latest = vaultedCards[0];
-              if(latest) handleAction(latest);
-            }} className="w-12 h-12 flex items-center justify-center transition-all active:scale-75 opacity-100">
+            <button onClick={() => { if(vaultedCards[0]) handleAction(vaultedCards[0]); }} className="w-12 h-12 flex items-center justify-center transition-all active:scale-75 opacity-100">
               <div className="w-3.5 h-3.5 bg-black rounded-full" />
             </button>
           ) : (
@@ -281,6 +286,7 @@ export default function Page() {
             </label>
           )}
 
+          {/* 右：路上（○） */}
           <button onClick={() => setIsPocketMode(false)} className={`w-12 h-12 flex items-center justify-end transition-all active:scale-75 ${!isPocketMode ? 'opacity-100' : 'opacity-20'}`}>
             <div className="w-3.5 h-3.5 border-[1.5px] border-black rounded-full" />
           </button>

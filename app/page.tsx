@@ -37,7 +37,6 @@ export default function Page() {
   const [isUploading, setIsUploading] = useState(false);
   const [pocketId, setPocketId] = useState<string | null>(null);
   const [isPocketMode, setIsPocketMode] = useState(false);
-  const [section, setSection] = useState('000');
 
   const pressTimer = useRef<NodeJS.Timeout | null>(null);
   const touchStartPos = useRef<{ x: number, y: number } | null>(null);
@@ -51,7 +50,7 @@ export default function Page() {
     }
     setPocketId(id);
     fetchData();
-  }, [section]); // セクションが変わるたびに再取得
+  }, []);
 
   const fetchData = useCallback(async () => {
     const { data: m } = await supabase.from('mainline').select('*').order('created_at', { ascending: false });
@@ -107,8 +106,9 @@ export default function Page() {
           const { data: { publicUrl } } = supabase.storage.from('images').getPublicUrl(fileName);
           
           if (!parentId) {
+            // セクションなし。即座に公開状態でメインロードへ。
             await supabase.from('mainline').insert([{ 
-              id: fileName, image_url: publicUrl, owner_id: pocketId, is_public: true, section_id: section 
+              id: fileName, image_url: publicUrl, owner_id: pocketId, is_public: true 
             }]);
             setIsPocketMode(false);
           } else {
@@ -116,7 +116,7 @@ export default function Page() {
               id: fileName, image_url: publicUrl, owner_id: pocketId, parent_id: parentId 
             }]);
           }
-          await fetchData(); // 確実にリロード
+          await fetchData();
         }
         setIsUploading(false);
       }, 'image/jpeg', 0.85);
@@ -126,15 +126,18 @@ export default function Page() {
   const handleAction = async (item: any, isMain: boolean) => {
     if (isMain) {
       if (item.is_public) {
+        // 路上から拾う
         await supabase.from('mainline').update({ is_public: false, owner_id: pocketId }).eq('id', item.id);
         setIsPocketMode(true);
       } else {
-        await supabase.from('mainline').update({ is_public: true, section_id: section }).eq('id', item.id);
+        // ケースから路上へ捨てる
+        await supabase.from('mainline').update({ is_public: true }).eq('id', item.id);
         setIsPocketMode(false);
       }
     } else {
+      // 横丁から奪う
       await supabase.from('mainline').insert([{ 
-        id: `PICK-${Date.now()}`, image_url: item.image_url, owner_id: pocketId, is_public: false, section_id: section 
+        id: `PICK-${Date.now()}`, image_url: item.image_url, owner_id: pocketId, is_public: false 
       }]);
       await supabase.from('side_cells').delete().eq('id', item.id);
       setIsPocketMode(true);
@@ -149,7 +152,7 @@ export default function Page() {
       if (sides.length > 0) {
         const nextMain = sides[0];
         await supabase.from('mainline').insert([{ 
-          id: `PROM-${Date.now()}`, image_url: nextMain.image_url, owner_id: nextMain.owner_id, is_public: true, section_id: section 
+          id: `PROM-${Date.now()}`, image_url: nextMain.image_url, owner_id: nextMain.owner_id, is_public: true 
         }]);
         await supabase.from('side_cells').delete().eq('id', nextMain.id);
       }
@@ -231,29 +234,16 @@ export default function Page() {
     );
   };
 
-  // 救済ロジック：section_id が NULL または現在のセクションと一致するものを表示
-  const publicCards = allCards.filter(c => 
-    c.is_public !== false && 
-    (c.section_id === section || (!c.section_id && section === '000'))
-  );
+  const publicCards = allCards.filter(c => c.is_public !== false);
   const vaultedCards = allCards.filter(c => c.owner_id === pocketId && c.is_public === false);
 
   return (
     <div className="min-h-screen bg-[#F2F2F2] text-black overflow-x-hidden font-sans select-none">
-      <header className="fixed top-0 left-0 right-0 h-24 flex flex-col justify-center items-center z-50">
+      <header className="fixed top-0 left-0 right-0 h-24 flex flex-col justify-center items-center z-50 pointer-events-none">
         {isPocketMode ? (
           <div className="w-4 h-4 border-[1.5px] border-black opacity-80" />
         ) : (
-          <>
-            <div className="w-[1px] h-8 bg-black/80 mb-2" />
-            <input 
-              type="text" 
-              value={section} 
-              onChange={(e) => setSection(e.target.value.slice(0, 3))}
-              className="bg-transparent text-[10px] text-center w-12 font-mono tracking-widest outline-none opacity-40 focus:opacity-100 transition-opacity"
-              placeholder="000"
-            />
-          </>
+          <div className="w-[1px] h-10 bg-black/80" />
         )}
       </header>
 
@@ -271,7 +261,7 @@ export default function Page() {
                 {(sideCells[c.id] || []).map(side => <Card key={side.id} item={side} isMain={false} />)}
               </div>
             ))}
-            {publicCards.length === 0 && <div className="h-[60vh] flex items-center justify-center opacity-5 text-[12px] tracking-[0.5em] uppercase font-mono">Empty District</div>}
+            {publicCards.length === 0 && <div className="h-[60vh] flex items-center justify-center opacity-5 text-[12px] tracking-[0.5em] uppercase font-mono">The Street is Quiet</div>}
           </div>
         )}
       </div>

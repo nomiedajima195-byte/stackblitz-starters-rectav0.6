@@ -51,7 +51,7 @@ export default function Page() {
     }
     setPocketId(id);
     fetchData();
-  }, []);
+  }, [section]); // セクションが変わるたびに再取得
 
   const fetchData = useCallback(async () => {
     const { data: m } = await supabase.from('mainline').select('*').order('created_at', { ascending: false });
@@ -89,11 +89,7 @@ export default function Page() {
         };
 
         if (imgRatio >= 0.8 && imgRatio <= 1.2) {
-          ctx.save();
-          roundRect(20, 20, targetW-40, targetW-40, 12);
-          ctx.clip();
-          ctx.drawImage(img, 20, 20, targetW-40, targetW-40);
-          ctx.restore();
+          ctx.save(); roundRect(20, 20, targetW-40, targetW-40, 12); ctx.clip(); ctx.drawImage(img, 20, 20, targetW-40, targetW-40); ctx.restore();
         } else {
           ctx.save();
           const targetRatio = targetW / targetH;
@@ -111,24 +107,16 @@ export default function Page() {
           const { data: { publicUrl } } = supabase.storage.from('images').getPublicUrl(fileName);
           
           if (!parentId) {
-            // 修正：直接メインロード（is_public: true）にアップロード
             await supabase.from('mainline').insert([{ 
-              id: fileName, 
-              image_url: publicUrl, 
-              owner_id: pocketId, 
-              is_public: true, 
-              section_id: section 
+              id: fileName, image_url: publicUrl, owner_id: pocketId, is_public: true, section_id: section 
             }]);
-            setIsPocketMode(false); // メインロードを表示
+            setIsPocketMode(false);
           } else {
             await supabase.from('side_cells').insert([{ 
-              id: fileName, 
-              image_url: publicUrl, 
-              owner_id: pocketId, 
-              parent_id: parentId 
+              id: fileName, image_url: publicUrl, owner_id: pocketId, parent_id: parentId 
             }]);
           }
-          fetchData();
+          await fetchData(); // 確実にリロード
         }
         setIsUploading(false);
       }, 'image/jpeg', 0.85);
@@ -146,11 +134,7 @@ export default function Page() {
       }
     } else {
       await supabase.from('mainline').insert([{ 
-        id: `PICK-${Date.now()}`, 
-        image_url: item.image_url, 
-        owner_id: pocketId, 
-        is_public: false, 
-        section_id: section 
+        id: `PICK-${Date.now()}`, image_url: item.image_url, owner_id: pocketId, is_public: false, section_id: section 
       }]);
       await supabase.from('side_cells').delete().eq('id', item.id);
       setIsPocketMode(true);
@@ -165,11 +149,7 @@ export default function Page() {
       if (sides.length > 0) {
         const nextMain = sides[0];
         await supabase.from('mainline').insert([{ 
-          id: `PROM-${Date.now()}`, 
-          image_url: nextMain.image_url, 
-          owner_id: nextMain.owner_id, 
-          is_public: true, 
-          section_id: section 
+          id: `PROM-${Date.now()}`, image_url: nextMain.image_url, owner_id: nextMain.owner_id, is_public: true, section_id: section 
         }]);
         await supabase.from('side_cells').delete().eq('id', nextMain.id);
       }
@@ -251,17 +231,19 @@ export default function Page() {
     );
   };
 
-  const publicCards = allCards.filter(c => c.is_public !== false && c.section_id === section);
+  // 救済ロジック：section_id が NULL または現在のセクションと一致するものを表示
+  const publicCards = allCards.filter(c => 
+    c.is_public !== false && 
+    (c.section_id === section || (!c.section_id && section === '000'))
+  );
   const vaultedCards = allCards.filter(c => c.owner_id === pocketId && c.is_public === false);
 
   return (
     <div className="min-h-screen bg-[#F2F2F2] text-black overflow-x-hidden font-sans select-none">
       <header className="fixed top-0 left-0 right-0 h-24 flex flex-col justify-center items-center z-50">
         {isPocketMode ? (
-          /* ケース画面では ⬜︎ を表示 */
           <div className="w-4 h-4 border-[1.5px] border-black opacity-80" />
         ) : (
-          /* メインロード画面では区画を表示 */
           <>
             <div className="w-[1px] h-8 bg-black/80 mb-2" />
             <input 

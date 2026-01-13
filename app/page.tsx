@@ -86,7 +86,6 @@ export default function Page() {
           ctx.lineTo(x+w, y+h-r); ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h); ctx.lineTo(x+r, y+h);
           ctx.quadraticCurveTo(x, y+h, x, y+h-r); ctx.lineTo(x, y+r); ctx.quadraticCurveTo(x, y, x+r, y); ctx.closePath();
         };
-
         if (imgRatio >= 0.8 && imgRatio <= 1.2) {
           ctx.save(); roundRect(20, 20, targetW-40, targetW-40, 12); ctx.clip(); ctx.drawImage(img, 20, 20, targetW-40, targetW-40); ctx.restore();
         } else {
@@ -104,17 +103,11 @@ export default function Page() {
           const fileName = `${Date.now()}.jpg`;
           await supabase.storage.from('images').upload(fileName, blob, { contentType: 'image/jpeg' });
           const { data: { publicUrl } } = supabase.storage.from('images').getPublicUrl(fileName);
-          
           if (!parentId) {
-            // セクションなし。即座に公開状態でメインロードへ。
-            await supabase.from('mainline').insert([{ 
-              id: fileName, image_url: publicUrl, owner_id: pocketId, is_public: true 
-            }]);
+            await supabase.from('mainline').insert([{ id: fileName, image_url: publicUrl, owner_id: pocketId, is_public: true }]);
             setIsPocketMode(false);
           } else {
-            await supabase.from('side_cells').insert([{ 
-              id: fileName, image_url: publicUrl, owner_id: pocketId, parent_id: parentId 
-            }]);
+            await supabase.from('side_cells').insert([{ id: fileName, image_url: publicUrl, owner_id: pocketId, parent_id: parentId }]);
           }
           await fetchData();
         }
@@ -126,19 +119,14 @@ export default function Page() {
   const handleAction = async (item: any, isMain: boolean) => {
     if (isMain) {
       if (item.is_public) {
-        // 路上から拾う
         await supabase.from('mainline').update({ is_public: false, owner_id: pocketId }).eq('id', item.id);
         setIsPocketMode(true);
       } else {
-        // ケースから路上へ捨てる
         await supabase.from('mainline').update({ is_public: true }).eq('id', item.id);
         setIsPocketMode(false);
       }
     } else {
-      // 横丁から奪う
-      await supabase.from('mainline').insert([{ 
-        id: `PICK-${Date.now()}`, image_url: item.image_url, owner_id: pocketId, is_public: false 
-      }]);
+      await supabase.from('mainline').insert([{ id: `PICK-${Date.now()}`, image_url: item.image_url, owner_id: pocketId, is_public: false }]);
       await supabase.from('side_cells').delete().eq('id', item.id);
       setIsPocketMode(true);
     }
@@ -151,9 +139,7 @@ export default function Page() {
       const sides = sideCells[item.id] || [];
       if (sides.length > 0) {
         const nextMain = sides[0];
-        await supabase.from('mainline').insert([{ 
-          id: `PROM-${Date.now()}`, image_url: nextMain.image_url, owner_id: nextMain.owner_id, is_public: true 
-        }]);
+        await supabase.from('mainline').insert([{ id: `PROM-${Date.now()}`, image_url: nextMain.image_url, owner_id: nextMain.owner_id, is_public: true }]);
         await supabase.from('side_cells').delete().eq('id', nextMain.id);
       }
       await supabase.from('mainline').delete().eq('id', item.id);
@@ -198,14 +184,17 @@ export default function Page() {
           onTouchEnd={() => endPress(item.id)}
         >
           <div className={`relative w-full h-full transition-transform duration-700 [transform-style:preserve-3d] ${isFlipped ? '[transform:rotateY(180deg)]' : ''}`}>
-            <div className="absolute inset-0 bg-white p-[8px] shadow-[0_20px_60px_rgba(0,0,0,0.12)] [backface-visibility:hidden] rounded-[18px] border border-black/5 overflow-hidden">
+            {/* 多層シャドウ：柔らかい広がりと、直下の濃い影をミックス */}
+            <div className="absolute inset-0 bg-white p-[8px] rounded-[18px] border border-black/5 overflow-hidden [backface-visibility:hidden] 
+              shadow-[0_20px_50px_rgba(0,0,0,0.1),0_10px_20px_rgba(0,0,0,0.08)]">
               <div className="w-full h-full rounded-[12px] relative overflow-hidden bg-[#F9F9F9]" style={{ backgroundImage: `url(${item.image_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
                 <span className="absolute bottom-3 left-3 text-[7px] font-mono text-white/50 tracking-[0.2em] pointer-events-none mix-blend-difference uppercase">
                   No.{serial}
                 </span>
               </div>
             </div>
-            <div className="absolute inset-0 [transform:rotateY(180deg)] [backface-visibility:hidden] shadow-[0_20px_60px_rgba(0,0,0,0.12)] rounded-[18px] border border-black/5 overflow-hidden">
+            <div className="absolute inset-0 [transform:rotateY(180deg)] [backface-visibility:hidden] rounded-[18px] border border-black/5 overflow-hidden
+              shadow-[0_20px_50px_rgba(0,0,0,0.1),0_10px_20px_rgba(0,0,0,0.08)]">
               <CardBack item={item} />
             </div>
           </div>

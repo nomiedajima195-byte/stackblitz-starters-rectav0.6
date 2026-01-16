@@ -8,21 +8,21 @@ const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const LIFESPAN_MS = 168 * 60 * 60 * 1000;
-const CARD_BG = "#F5F2E9";
+const CARD_BG_COLOR = "#F5F2E9";
 
 const CardBack = ({ item }: any) => {
   return (
-    <div className="w-full h-full bg-[#F5F2E9] flex flex-col items-center justify-center p-10 text-[#121212] border-[0.5px] border-black/5 shadow-inner overflow-hidden font-serif">
-      <div className="absolute top-8 left-8 text-left opacity-40">
-        <p className="text-[9px] leading-tight font-serif uppercase tracking-tighter">Presslie Action</p>
+    <div className="w-full h-full bg-[#F5F2E9] flex flex-col items-center justify-center p-10 text-[#2D2D2D] border-[0.5px] border-black/5 shadow-inner overflow-hidden font-serif">
+      <div className="absolute top-10 left-10 text-left opacity-60">
+        <p className="text-[11px] leading-tight font-serif font-bold">Presslie Action</p>
       </div>
       <div className="flex flex-col items-center text-center">
-        <p className="text-[28px] leading-[1.1] font-bold tracking-tighter opacity-90">
+        <p className="text-[34px] leading-[1.1] font-bold tracking-tighter opacity-95">
           User<br/>is<br/>Rubbish
         </p>
       </div>
-      <div className="absolute bottom-8 w-full text-center opacity-10">
-        <span className="text-[6px] font-mono tracking-[0.4em] uppercase">RECTA ARTIFACT SYSTEM</span>
+      <div className="absolute bottom-10 w-full text-center opacity-20">
+        <span className="text-[8px] font-mono tracking-[0.5em] uppercase font-bold">RECTA ARTIFACT</span>
       </div>
     </div>
   );
@@ -34,6 +34,7 @@ export default function Page() {
   const [flippedIds, setFlippedIds] = useState<Set<string>>(new Set());
   const [isUploading, setIsUploading] = useState(false);
   const [pocketId, setPocketId] = useState<string | null>(null);
+  
   const lastClickTime = useRef<{ [key: string]: number }>({});
 
   useEffect(() => {
@@ -44,14 +45,6 @@ export default function Page() {
     }
     setPocketId(id);
     fetchData();
-
-    const hash = window.location.hash;
-    if (hash) {
-      setTimeout(() => {
-        const el = document.getElementById(hash.replace('#', ''));
-        el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }, 1000);
-    }
   }, []);
 
   const fetchData = useCallback(async () => {
@@ -83,27 +76,17 @@ export default function Page() {
     img.src = URL.createObjectURL(file);
     img.onload = async () => {
       const canvas = document.createElement('canvas');
-      const maxDim = 1200;
-      const ratio = img.width / img.height;
-      if (ratio > 1) { canvas.width = maxDim; canvas.height = maxDim / ratio; }
-      else { canvas.height = maxDim; canvas.width = maxDim * ratio; }
-      
+      const size = 1000;
+      canvas.width = size;
+      canvas.height = size;
       const ctx = canvas.getContext('2d');
       if (ctx) {
-        const radius = (canvas.width / 280) * 12; 
-        ctx.beginPath();
-        ctx.moveTo(radius, 0); ctx.lineTo(canvas.width - radius, 0); ctx.quadraticCurveTo(canvas.width, 0, canvas.width, radius);
-        ctx.lineTo(canvas.width, canvas.height - radius); ctx.quadraticCurveTo(canvas.width, canvas.height, canvas.width - radius, canvas.height);
-        ctx.lineTo(radius, canvas.height); ctx.quadraticCurveTo(0, canvas.height, 0, canvas.height - radius);
-        ctx.lineTo(0, radius); ctx.quadraticCurveTo(0, 0, radius, 0); ctx.closePath(); ctx.clip();
-
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        
-        const grad = ctx.createRadialGradient(canvas.width/2, canvas.height/2, 0, canvas.width/2, canvas.height/2, Math.max(canvas.width, canvas.height) * 0.7);
-        grad.addColorStop(0.3, 'rgba(0,0,0,0)');
-        grad.addColorStop(1, 'rgba(0,0,0,0.75)');
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.clearRect(0, 0, size, size);
+        const ratio = img.width / img.height;
+        let dW, dH, dX, dY;
+        if (ratio > 1) { dW = size; dH = size / ratio; dX = 0; dY = (size - dH) / 2; }
+        else { dH = size; dW = size * ratio; dX = (size - dW) / 2; dY = 0; }
+        ctx.drawImage(img, dX, dY, dW, dH);
       }
       
       canvas.toBlob(async (blob) => {
@@ -123,83 +106,61 @@ export default function Page() {
     };
   };
 
-  const generateLink = (id: string) => {
-    const url = `${window.location.origin}${window.location.pathname}#${id}`;
-    navigator.clipboard.writeText(url);
-    alert('Link Copied');
-  };
-
-  const deleteCard = async (item: any, isMain: boolean) => {
-    if (!confirm('Dispose this rubbish?')) return;
-    if (isMain) {
-      const sides = sideCells[item.id] || [];
-      if (sides.length > 0) {
-        const nextMain = sides[0];
-        await supabase.from('mainline').insert([{ id: `PROM-${Date.now()}`, image_url: nextMain.image_url, owner_id: nextMain.owner_id, is_public: true }]);
-        await supabase.from('side_cells').delete().eq('id', nextMain.id);
-      }
-      await supabase.from('mainline').delete().eq('id', item.id);
-    } else {
-      await supabase.from('side_cells').delete().eq('id', item.id);
-    }
-    fetchData();
+  const handleFlipRequest = (id: string) => {
+    const now = Date.now();
+    const lastClick = lastClickTime.current[id] || 0;
+    if (now - lastClick < 300) {
+      setFlippedIds(prev => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id); else next.add(id);
+        return next;
+      });
+      lastClickTime.current[id] = 0;
+    } else { lastClickTime.current[id] = now; }
   };
 
   const Card = ({ item, isMain }: any) => {
-    const isOwner = item.owner_id === pocketId;
     const isFlipped = flippedIds.has(item.id);
     const serial = item.id.split('.')[0].slice(-6).toUpperCase();
 
     return (
-      <div id={item.id} className="flex-shrink-0 w-screen snap-center relative flex flex-col items-center py-12">
+      <div id={item.id} className="flex-shrink-0 w-screen snap-center relative flex flex-col items-center py-12 font-serif">
         <div 
-          className="relative w-full max-w-[280px] select-none z-20 cursor-pointer"
+          className="relative w-full max-w-[300px] select-none z-20 cursor-pointer"
           style={{ perspective: '1200px', aspectRatio: '1 / 1.618' }}
-          onClick={() => {
-            const now = Date.now();
-            if (now - (lastClickTime.current[item.id] || 0) < 300) {
-              setFlippedIds(prev => {
-                const next = new Set(prev);
-                if (next.has(item.id)) next.delete(item.id); else next.add(item.id);
-                return next;
-              });
-            }
-            lastClickTime.current[item.id] = now;
-          }}
+          onClick={() => handleFlipRequest(item.id)}
         >
           <div className={`relative w-full h-full transition-transform duration-700 [transform-style:preserve-3d] ${isFlipped ? '[transform:rotateY(180deg)]' : ''}`}>
-            {/* Front */}
-            <div className="absolute inset-0 bg-[#F5F2E9] rounded-[24px] border border-black/[0.04] [backface-visibility:hidden] 
-              shadow-[0_25px_60px_rgba(0,0,0,0.15)] flex flex-col overflow-hidden">
-              <div className="p-6 pb-2 text-[9px] opacity-60 leading-tight font-serif">
+            {/* Front: Toy Camera Style */}
+            <div className="absolute inset-0 bg-[#F5F2E9] rounded-[28px] border border-black/[0.04] [backface-visibility:hidden] 
+              shadow-[0_20px_50px_rgba(0,0,0,0.12)] flex flex-col overflow-hidden">
+              
+              {/* 文字サイズ拡大 */}
+              <div className="p-8 pb-4 text-[12px] font-bold opacity-80 leading-tight">
                 <p>Statement</p>
-                <p className="italic font-serif">No. {serial} ... (s8d7)</p>
+                <p className="italic">No. {serial} ... (v18.0)</p>
               </div>
-              <div className="flex-grow w-full flex items-center justify-center bg-[#F5F2E9] px-6 py-2">
-                <img src={item.image_url} alt="" className="max-w-full max-h-full object-contain mix-blend-multiply rounded-[12px]" />
+
+              {/* ヴィネット効果レイヤー */}
+              <div className="flex-grow w-full relative flex items-center justify-center bg-[#F5F2E9]">
+                <div className="w-[88%] h-full relative overflow-hidden flex items-center justify-center">
+                  <img src={item.image_url} alt="" className="w-full h-full object-cover mix-blend-multiply opacity-90" />
+                  {/* トイカメラ風の影を被せる */}
+                  <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_80px_rgba(0,0,0,0.5)] bg-radial-gradient" 
+                       style={{ background: 'radial-gradient(circle, transparent 40%, rgba(0,0,0,0.3) 100%)' }} />
+                </div>
               </div>
-              <div className="p-6 pt-2 text-[8px] opacity-40 font-serif italic text-left tracking-tight">
-                <p>No. / Artifact / {serial} / RECTA</p>
+
+              {/* 文字サイズ拡大 */}
+              <div className="p-8 pt-4 text-[11px] font-bold opacity-60 italic tracking-tighter">
+                <p>No. / Artifact / {serial} / RECTA_SYS</p>
               </div>
             </div>
-            {/* Back */}
-            <div className="absolute inset-0 [transform:rotateY(180deg)] [backface-visibility:hidden] rounded-[24px] overflow-hidden shadow-[0_25px_60px_rgba(0,0,0,0.15)]">
+
+            <div className="absolute inset-0 [transform:rotateY(180deg)] [backface-visibility:hidden] rounded-[28px] border border-black/[0.04] overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.12)]">
               <CardBack item={item} />
             </div>
           </div>
-        </div>
-
-        <div className="h-16 mt-8 flex items-center justify-center space-x-12 z-10">
-          {isFlipped ? (
-            <>
-              <button onClick={(e) => { e.stopPropagation(); generateLink(item.id); }} className="text-[16px] opacity-30 hover:opacity-100 px-4 active:scale-75 transition-all text-black font-sans">▲</button>
-              {isOwner && (
-                <button onClick={(e) => { e.stopPropagation(); deleteCard(item, isMain); }} className="text-[20px] opacity-10 hover:opacity-100 px-4 active:scale-75 transition-all text-black font-sans font-light">×</button>
-              )}
-            </>
-          ) : (
-            <div className="w-4 h-4" />
-          )}
         </div>
       </div>
     );
@@ -212,39 +173,32 @@ export default function Page() {
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
 
-      {/* 修正：fixedからrelative（絶対配置ではなく、通常のスクロールフロー）に変更 */}
-      <header className="relative h-40 flex flex-col justify-center items-center">
-        <div className="w-[1px] h-10 bg-black opacity-10" />
-        <div className="mt-3 text-[8px] opacity-20 tracking-[0.6em] font-serif uppercase italic ml-[0.6em]">rubbish</div>
-      </header>
-
-      <div className="pb-64 min-h-screen flex flex-col space-y-20">
-        {allCards.map(main => (
-          <div key={main.id} className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar outline-none">
-            <Card item={main} isMain={true} />
-            {(sideCells[main.id] || []).map(side => <Card key={side.id} item={side} isMain={false} />)}
-            <div className="flex-shrink-0 w-screen snap-center flex items-center justify-center py-12">
-              <label className="w-[280px] h-[453px] flex items-center justify-center cursor-pointer group rounded-[24px] bg-black/[0.015] border border-black/[0.02] transition-all">
-                <div className="text-[20px] opacity-5 group-hover:opacity-15 font-serif italic font-light">○</div>
-                <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadFile(e, main.id)} />
-              </label>
+      <div className="pt-28 pb-64 min-h-screen">
+        <div className="flex flex-col space-y-24">
+          {allCards.map(main => (
+            <div key={main.id} className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar outline-none">
+              <Card item={main} isMain={true} />
+              {(sideCells[main.id] || []).map(side => <Card key={side.id} item={side} isMain={false} />)}
+              <div className="flex-shrink-0 w-screen snap-center flex items-center justify-center">
+                <label className="w-[300px] h-[485px] flex items-center justify-center cursor-pointer rounded-[28px] border-2 border-dashed border-black/5 hover:bg-black/5 transition-all">
+                  <span className="text-2xl opacity-10">○</span>
+                  <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadFile(e, main.id)} />
+                </label>
+              </div>
             </div>
-          </div>
-        ))}
-        {allCards.length === 0 && <div className="h-[40vh] flex items-center justify-center opacity-10 text-[10px] tracking-[0.4em] uppercase font-serif italic">The street is quiet</div>}
+          ))}
+        </div>
       </div>
 
-      {/* フッター（ボタン類）は操作のためにfixedを維持 */}
       <nav className="fixed bottom-12 left-0 right-0 flex flex-col items-center z-50">
-        <label className="relative w-16 h-16 flex items-center justify-center cursor-pointer transition-all active:scale-90 hover:scale-105">
-          <div className="absolute inset-0 bg-[#F5F2E9]/60 backdrop-blur-xl rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.1)] border border-white/40" />
-          <span className="relative text-[32px] opacity-70 leading-none mt-[-2px]">◎</span>
+        <label className="w-16 h-16 flex items-center justify-center cursor-pointer bg-[#F5F2E9] rounded-full shadow-xl border border-black/5 active:scale-90 transition-transform">
+          <span className="text-2xl opacity-60">◎</span>
           <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadFile(e)} />
         </label>
-        <div className="mt-5 text-[8px] opacity-20 tracking-[0.4em] font-serif uppercase italic">© 1992 RUBBISH</div>
+        <p className="mt-4 text-[9px] opacity-30 tracking-[0.3em] font-bold">RECTA ARTIFACT SYSTEM v18.0</p>
       </nav>
 
-      {isUploading && <div className="fixed inset-0 bg-[#EBE8DB]/80 backdrop-blur-md z-[60] flex items-center justify-center font-serif text-[10px] tracking-[0.3em] opacity-40 italic">Capturing Rubbish...</div>}
+      {isUploading && <div className="fixed inset-0 bg-white/20 backdrop-blur-sm z-[100] flex items-center justify-center animate-pulse">Processing...</div>}
     </div>
   );
 }

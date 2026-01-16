@@ -7,7 +7,7 @@ const supabaseUrl = 'https://pfxwhcgdbavycddapqmz.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmeHdoY2dkYmF2eWNkZGFwcW16Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxNjQ0NzUsImV4cCI6MjA4Mjc0MDQ3NX0.YNQlbyocg2olS6-1WxTnbr5N2z52XcVIpI1XR-XrDtM';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-const LIFESPAN_MS = 168 * 60 * 60 * 1000; // 168時間
+const LIFESPAN_MS = 168 * 60 * 60 * 1000;
 
 const CardBack = ({ item }: any) => {
   const serial = item.id.split('.')[0].slice(-6).toUpperCase();
@@ -49,7 +49,6 @@ export default function Page() {
     setPocketId(id);
     fetchData();
 
-    // ディープリンク対応：URLにハッシュがあればそこへスクロール
     const hash = window.location.hash;
     if (hash) {
       setTimeout(() => {
@@ -61,16 +60,11 @@ export default function Page() {
 
   const fetchData = useCallback(async () => {
     const now = new Date().getTime();
-    
-    // メインロード取得
     const { data: m } = await supabase.from('mainline').select('*').order('created_at', { ascending: false });
     if (m) {
-      // 寿命(168h)フィルタリング
       const activeMain = m.filter(card => (now - new Date(card.created_at).getTime()) < LIFESPAN_MS);
       setAllCards(activeMain);
     }
-
-    // 横丁取得
     const { data: s } = await supabase.from('side_cells').select('*').order('created_at', { ascending: true });
     if (s) {
       const g: {[key: string]: any[]} = {};
@@ -114,7 +108,6 @@ export default function Page() {
           const fileName = `${Date.now()}.jpg`;
           await supabase.storage.from('images').upload(fileName, blob, { contentType: 'image/jpeg' });
           const { data: { publicUrl } } = supabase.storage.from('images').getPublicUrl(fileName);
-          
           if (!parentId) {
             await supabase.from('mainline').insert([{ id: fileName, image_url: publicUrl, owner_id: pocketId, is_public: true }]);
           } else {
@@ -136,7 +129,6 @@ export default function Page() {
   const deleteCard = async (item: any, isMain: boolean) => {
     if (!confirm('Dispose?')) return;
     if (isMain) {
-      // メイン削除時、横丁の1枚目を昇格させるロジック（保存情報より）
       const sides = sideCells[item.id] || [];
       if (sides.length > 0) {
         const nextMain = sides[0];
@@ -155,7 +147,7 @@ export default function Page() {
   const handleFlipRequest = (id: string) => {
     const now = Date.now();
     const lastClick = lastClickTime.current[id] || 0;
-    if (now - lastClick < 300) { // 300ms以内の2タップで裏返し
+    if (now - lastClick < 300) {
       setFlippedIds(prev => {
         const next = new Set(prev);
         if (next.has(id)) next.delete(id); else next.add(id);
@@ -198,17 +190,13 @@ export default function Page() {
         <div className="h-16 mt-6 flex items-center justify-center space-x-14 z-10">
           {isFlipped ? (
             <>
-              <button onClick={(e) => { e.stopPropagation(); generateLink(item.id); }} className="text-[16px] opacity-30 hover:opacity-100 px-4 active:scale-75 transition-all text-black">
-                ▲
-              </button>
+              <button onClick={(e) => { e.stopPropagation(); generateLink(item.id); }} className="text-[16px] opacity-30 hover:opacity-100 px-4 active:scale-75 transition-all text-black">▲</button>
               {isOwner && (
-                <button onClick={(e) => { e.stopPropagation(); deleteCard(item, isMain); }} className="text-[18px] opacity-10 hover:opacity-100 px-4 active:scale-75 transition-all text-black">
-                  ×
-                </button>
+                <button onClick={(e) => { e.stopPropagation(); deleteCard(item, isMain); }} className="text-[18px] opacity-10 hover:opacity-100 px-4 active:scale-75 transition-all text-black">×</button>
               )}
             </>
           ) : (
-            <div className="w-4 h-4" /> // 表面はクリーンに
+            <div className="w-4 h-4" />
           )}
         </div>
       </div>
@@ -217,6 +205,12 @@ export default function Page() {
 
   return (
     <div className="min-h-screen bg-[#F2F2F2] text-black overflow-x-hidden font-sans select-none">
+      {/* スクロールバー消去用スタイル */}
+      <style jsx global>{`
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      `}</style>
+
       <header className="fixed top-0 left-0 right-0 h-24 flex flex-col justify-center items-center z-50 pointer-events-none">
         <div className="w-[1px] h-10 bg-black/80" />
       </header>
@@ -224,16 +218,9 @@ export default function Page() {
       <div className="pt-28 pb-64 min-h-screen">
         <div className="flex flex-col space-y-24">
           {allCards.map(main => (
-            <div key={main.id} className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide outline-none items-start">
-              {/* メインカード */}
+            <div key={main.id} className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar outline-none items-start">
               <Card item={main} isMain={true} />
-              
-              {/* 横丁空間 */}
-              {(sideCells[main.id] || []).map(side => (
-                <Card key={side.id} item={side} isMain={false} />
-              ))}
-              
-              {/* 横丁追加用プレースホルダー */}
+              {(sideCells[main.id] || []).map(side => <Card key={side.id} item={side} isMain={false} />)}
               <div className="flex-shrink-0 w-screen snap-center flex flex-col items-center py-12 h-full justify-center">
                 <label className="w-[280px] h-[453px] flex items-center justify-center cursor-pointer group">
                   <div className="text-[24px] opacity-5 group-hover:opacity-40 transition-opacity">○</div>

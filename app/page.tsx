@@ -8,7 +8,7 @@ const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const LIFESPAN_MS = 168 * 60 * 60 * 1000;
-const CARD_BG_COLOR = "#F5F2E9";
+const CARD_BG = "#F5F2E9";
 
 const CardBack = ({ item }: any) => {
   return (
@@ -71,28 +71,24 @@ export default function Page() {
     const file = e.target.files?.[0];
     if (!file || isUploading || !pocketId) return;
     setIsUploading(true);
-
     const img = new Image();
     img.src = URL.createObjectURL(file);
     img.onload = async () => {
       const canvas = document.createElement('canvas');
-      const size = 1000;
-      canvas.width = size;
-      canvas.height = size;
+      // 縦横比を維持して最大1200pxでリサイズ
+      const maxSide = 1200;
+      let w = img.width;
+      let h = img.height;
+      if (w > h) { if (w > maxSide) { h *= maxSide / w; w = maxSide; } }
+      else { if (h > maxSide) { w *= maxSide / h; h = maxSide; } }
+      canvas.width = w; canvas.height = h;
       const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.clearRect(0, 0, size, size);
-        const ratio = img.width / img.height;
-        let dW, dH, dX, dY;
-        if (ratio > 1) { dW = size; dH = size / ratio; dX = 0; dY = (size - dH) / 2; }
-        else { dH = size; dW = size * ratio; dX = (size - dW) / 2; dY = 0; }
-        ctx.drawImage(img, dX, dY, dW, dH);
-      }
+      ctx?.drawImage(img, 0, 0, w, h);
       
       canvas.toBlob(async (blob) => {
         if (blob) {
-          const fileName = `${Date.now()}.png`;
-          await supabase.storage.from('images').upload(fileName, blob, { contentType: 'image/png' });
+          const fileName = `${Date.now()}.jpg`;
+          await supabase.storage.from('images').upload(fileName, blob, { contentType: 'image/jpeg' });
           const { data: { publicUrl } } = supabase.storage.from('images').getPublicUrl(fileName);
           if (!parentId) {
             await supabase.from('mainline').insert([{ id: fileName, image_url: publicUrl, owner_id: pocketId, is_public: true }]);
@@ -102,7 +98,7 @@ export default function Page() {
           await fetchData();
         }
         setIsUploading(false);
-      }, 'image/png');
+      }, 'image/jpeg', 0.9);
     };
   };
 
@@ -131,29 +127,33 @@ export default function Page() {
           onClick={() => handleFlipRequest(item.id)}
         >
           <div className={`relative w-full h-full transition-transform duration-700 [transform-style:preserve-3d] ${isFlipped ? '[transform:rotateY(180deg)]' : ''}`}>
-            {/* Front: Toy Camera Style */}
+            {/* Front */}
             <div className="absolute inset-0 bg-[#F5F2E9] rounded-[28px] border border-black/[0.04] [backface-visibility:hidden] 
               shadow-[0_20px_50px_rgba(0,0,0,0.12)] flex flex-col overflow-hidden">
               
-              {/* 文字サイズ拡大 */}
-              <div className="p-8 pb-4 text-[12px] font-bold opacity-80 leading-tight">
+              {/* 上部テキスト（固定領域） */}
+              <div className="p-8 pb-4 text-[12px] font-bold opacity-80 leading-tight shrink-0">
                 <p>Statement</p>
-                <p className="italic">No. {serial} ... (v18.0)</p>
+                <p className="italic">No. {serial} ... (v18.1)</p>
               </div>
 
-              {/* ヴィネット効果レイヤー */}
-              <div className="flex-grow w-full relative flex items-center justify-center bg-[#F5F2E9]">
-                <div className="w-[88%] h-full relative overflow-hidden flex items-center justify-center">
-                  <img src={item.image_url} alt="" className="w-full h-full object-cover mix-blend-multiply opacity-90" />
-                  {/* トイカメラ風の影を被せる */}
-                  <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_80px_rgba(0,0,0,0.5)] bg-radial-gradient" 
-                       style={{ background: 'radial-gradient(circle, transparent 40%, rgba(0,0,0,0.3) 100%)' }} />
+              {/* 画像エリア：縦長でも下が切れないように調整 */}
+              <div className="flex-grow w-full relative flex items-center justify-center px-6">
+                <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
+                  <img 
+                    src={item.image_url} 
+                    alt="" 
+                    className="max-w-full max-h-full object-contain mix-blend-multiply opacity-95" 
+                  />
+                  {/* 画像のサイズに合わせたトイカメラ風ヴィネット */}
+                  <div className="absolute inset-0 pointer-events-none opacity-50" 
+                       style={{ background: 'radial-gradient(circle, transparent 30%, rgba(0,0,0,0.4) 100%)' }} />
                 </div>
               </div>
 
-              {/* 文字サイズ拡大 */}
-              <div className="p-8 pt-4 text-[11px] font-bold opacity-60 italic tracking-tighter">
-                <p>No. / Artifact / {serial} / RECTA_SYS</p>
+              {/* 下部テキスト（固定領域） */}
+              <div className="p-8 pt-4 text-[11px] font-bold opacity-60 italic tracking-tighter shrink-0">
+                <p>No. / Artifact / {serial} / RECTA_FRAME</p>
               </div>
             </div>
 
@@ -176,29 +176,30 @@ export default function Page() {
       <div className="pt-28 pb-64 min-h-screen">
         <div className="flex flex-col space-y-24">
           {allCards.map(main => (
-            <div key={main.id} className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar outline-none">
+            <div key={main.id} className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar outline-none items-start">
               <Card item={main} isMain={true} />
               {(sideCells[main.id] || []).map(side => <Card key={side.id} item={side} isMain={false} />)}
               <div className="flex-shrink-0 w-screen snap-center flex items-center justify-center">
                 <label className="w-[300px] h-[485px] flex items-center justify-center cursor-pointer rounded-[28px] border-2 border-dashed border-black/5 hover:bg-black/5 transition-all">
-                  <span className="text-2xl opacity-10">○</span>
+                  <span className="text-2xl opacity-5 font-serif italic">○</span>
                   <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadFile(e, main.id)} />
                 </label>
               </div>
             </div>
           ))}
+          {allCards.length === 0 && <div className="h-[60vh] flex items-center justify-center opacity-10 text-[10px] tracking-[0.4em] uppercase font-serif italic">Artifacts standing in silence</div>}
         </div>
       </div>
 
       <nav className="fixed bottom-12 left-0 right-0 flex flex-col items-center z-50">
         <label className="w-16 h-16 flex items-center justify-center cursor-pointer bg-[#F5F2E9] rounded-full shadow-xl border border-black/5 active:scale-90 transition-transform">
-          <span className="text-2xl opacity-60">◎</span>
+          <span className="text-2xl opacity-60 font-serif">◎</span>
           <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadFile(e)} />
         </label>
-        <p className="mt-4 text-[9px] opacity-30 tracking-[0.3em] font-bold">RECTA ARTIFACT SYSTEM v18.0</p>
+        <p className="mt-4 text-[9px] opacity-20 tracking-[0.4em] font-bold font-serif uppercase">recta . 2026</p>
       </nav>
 
-      {isUploading && <div className="fixed inset-0 bg-white/20 backdrop-blur-sm z-[100] flex items-center justify-center animate-pulse">Processing...</div>}
+      {isUploading && <div className="fixed inset-0 bg-[#EBE8DB]/60 backdrop-blur-sm z-[100] flex items-center justify-center"><div className="w-8 h-[1px] bg-black opacity-30 animate-pulse" /></div>}
     </div>
   );
 }

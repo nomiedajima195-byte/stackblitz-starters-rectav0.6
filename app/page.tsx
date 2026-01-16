@@ -44,6 +44,14 @@ export default function Page() {
     }
     setPocketId(id);
     fetchData();
+
+    const hash = window.location.hash;
+    if (hash) {
+      setTimeout(() => {
+        const el = document.getElementById(hash.replace('#', ''));
+        el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 1000);
+    }
   }, []);
 
   const fetchData = useCallback(async () => {
@@ -75,7 +83,6 @@ export default function Page() {
     img.src = URL.createObjectURL(file);
     img.onload = async () => {
       const canvas = document.createElement('canvas');
-      // 画像の元比率を維持するための計算
       const maxDim = 1200;
       const ratio = img.width / img.height;
       if (ratio > 1) { canvas.width = maxDim; canvas.height = maxDim / ratio; }
@@ -83,31 +90,18 @@ export default function Page() {
       
       const ctx = canvas.getContext('2d');
       if (ctx) {
-        // 角丸のクリッピング（12px相当をキャンバスサイズにスケール）
         const radius = (canvas.width / 280) * 12; 
         ctx.beginPath();
-        ctx.moveTo(radius, 0);
-        ctx.lineTo(canvas.width - radius, 0);
-        ctx.quadraticCurveTo(canvas.width, 0, canvas.width, radius);
-        ctx.lineTo(canvas.width, canvas.height - radius);
-        ctx.quadraticCurveTo(canvas.width, canvas.height, canvas.width - radius, canvas.height);
-        ctx.lineTo(radius, canvas.height);
-        ctx.quadraticCurveTo(0, canvas.height, 0, canvas.height - radius);
-        ctx.lineTo(0, radius);
-        ctx.quadraticCurveTo(0, 0, radius, 0);
-        ctx.closePath();
-        ctx.clip();
+        ctx.moveTo(radius, 0); ctx.lineTo(canvas.width - radius, 0); ctx.quadraticCurveTo(canvas.width, 0, canvas.width, radius);
+        ctx.lineTo(canvas.width, canvas.height - radius); ctx.quadraticCurveTo(canvas.width, canvas.height, canvas.width - radius, canvas.height);
+        ctx.lineTo(radius, canvas.height); ctx.quadraticCurveTo(0, canvas.height, 0, canvas.height - radius);
+        ctx.lineTo(0, radius); ctx.quadraticCurveTo(0, 0, radius, 0); ctx.closePath(); ctx.clip();
 
-        // 画像描画
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         
-        // がっちりしたビネット（四隅の影）
-        const grad = ctx.createRadialGradient(
-          canvas.width/2, canvas.height/2, 0, 
-          canvas.width/2, canvas.height/2, Math.max(canvas.width, canvas.height) * 0.7
-        );
+        const grad = ctx.createRadialGradient(canvas.width/2, canvas.height/2, 0, canvas.width/2, canvas.height/2, Math.max(canvas.width, canvas.height) * 0.7);
         grad.addColorStop(0.3, 'rgba(0,0,0,0)');
-        grad.addColorStop(1, 'rgba(0,0,0,0.7)'); // 影をがっちり濃く
+        grad.addColorStop(1, 'rgba(0,0,0,0.75)');
         ctx.fillStyle = grad;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
@@ -129,6 +123,28 @@ export default function Page() {
     };
   };
 
+  const generateLink = (id: string) => {
+    const url = `${window.location.origin}${window.location.pathname}#${id}`;
+    navigator.clipboard.writeText(url);
+    alert('Link Copied');
+  };
+
+  const deleteCard = async (item: any, isMain: boolean) => {
+    if (!confirm('Dispose this rubbish?')) return;
+    if (isMain) {
+      const sides = sideCells[item.id] || [];
+      if (sides.length > 0) {
+        const nextMain = sides[0];
+        await supabase.from('mainline').insert([{ id: `PROM-${Date.now()}`, image_url: nextMain.image_url, owner_id: nextMain.owner_id, is_public: true }]);
+        await supabase.from('side_cells').delete().eq('id', nextMain.id);
+      }
+      await supabase.from('mainline').delete().eq('id', item.id);
+    } else {
+      await supabase.from('side_cells').delete().eq('id', item.id);
+    }
+    fetchData();
+  };
+
   const Card = ({ item, isMain }: any) => {
     const isOwner = item.owner_id === pocketId;
     const isFlipped = flippedIds.has(item.id);
@@ -144,7 +160,7 @@ export default function Page() {
             if (now - (lastClickTime.current[item.id] || 0) < 300) {
               setFlippedIds(prev => {
                 const next = new Set(prev);
-                if (next.has(item.id)) next.delete(id); else next.add(item.id);
+                if (next.has(item.id)) next.delete(item.id); else next.add(item.id);
                 return next;
               });
             }
@@ -155,20 +171,13 @@ export default function Page() {
             {/* Front */}
             <div className="absolute inset-0 bg-[#F5F2E9] rounded-[24px] border border-black/[0.04] [backface-visibility:hidden] 
               shadow-[0_25px_60px_rgba(0,0,0,0.15)] flex flex-col overflow-hidden">
-              
               <div className="p-6 pb-2 text-[9px] opacity-60 leading-tight font-serif">
                 <p>Statement</p>
                 <p className="italic font-serif">No. {serial} ... (s8d7)</p>
               </div>
-
               <div className="flex-grow w-full flex items-center justify-center bg-[#F5F2E9] px-6 py-2">
-                <img 
-                  src={item.image_url} 
-                  alt="" 
-                  className="max-w-full max-h-full object-contain mix-blend-multiply rounded-[12px]" 
-                />
+                <img src={item.image_url} alt="" className="max-w-full max-h-full object-contain mix-blend-multiply rounded-[12px]" />
               </div>
-
               <div className="p-6 pt-2 text-[8px] opacity-40 font-serif italic text-left tracking-tight">
                 <p>No. / Artifact / {serial} / RECTA</p>
               </div>
@@ -180,12 +189,12 @@ export default function Page() {
           </div>
         </div>
 
-        <div className="h-16 mt-8 flex items-center justify-center space-x-16 z-10">
+        <div className="h-16 mt-8 flex items-center justify-center space-x-12 z-10">
           {isFlipped ? (
             <>
               <button onClick={(e) => { e.stopPropagation(); generateLink(item.id); }} className="text-[16px] opacity-30 hover:opacity-100 px-4 active:scale-75 transition-all text-black font-sans">▲</button>
               {isOwner && (
-                <button onClick={(e) => { e.stopPropagation(); deleteCard(item, isMain); }} className="text-[18px] opacity-10 hover:opacity-100 px-4 active:scale-75 transition-all text-black font-sans">×</button>
+                <button onClick={(e) => { e.stopPropagation(); deleteCard(item, isMain); }} className="text-[20px] opacity-10 hover:opacity-100 px-4 active:scale-75 transition-all text-black font-sans font-light">×</button>
               )}
             </>
           ) : (
@@ -203,14 +212,19 @@ export default function Page() {
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
 
-      <div className="pt-28 pb-64 min-h-screen flex flex-col space-y-20">
+      <header className="fixed top-0 left-0 right-0 h-28 flex flex-col justify-center items-center z-50 pointer-events-none">
+        <div className="w-[1px] h-10 bg-black opacity-10" />
+        <div className="mt-3 text-[8px] opacity-20 tracking-[0.6em] font-serif uppercase italic ml-[0.6em]">rubbish</div>
+      </header>
+
+      <div className="pt-32 pb-64 min-h-screen flex flex-col space-y-20">
         {allCards.map(main => (
           <div key={main.id} className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar outline-none">
             <Card item={main} isMain={true} />
             {(sideCells[main.id] || []).map(side => <Card key={side.id} item={side} isMain={false} />)}
             <div className="flex-shrink-0 w-screen snap-center flex items-center justify-center py-12">
               <label className="w-[280px] h-[453px] flex items-center justify-center cursor-pointer group rounded-[24px] bg-black/[0.015] border border-black/[0.02] transition-all">
-                <div className="text-[20px] opacity-5 group-hover:opacity-15 font-serif italic italic font-light">○</div>
+                <div className="text-[20px] opacity-5 group-hover:opacity-15 font-serif italic font-light">○</div>
                 <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadFile(e, main.id)} />
               </label>
             </div>
@@ -224,14 +238,10 @@ export default function Page() {
           <span className="relative text-[32px] opacity-70 leading-none mt-[-2px]">◎</span>
           <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadFile(e)} />
         </label>
-        <div className="mt-5 text-[8px] opacity-20 tracking-[0.4em] font-serif uppercase italic italic">© 2026 RECTA</div>
+        <div className="mt-5 text-[8px] opacity-20 tracking-[0.4em] font-serif uppercase italic italic">© 1992 RUBBISH</div>
       </nav>
 
-      {isUploading && (
-        <div className="fixed inset-0 bg-[#EBE8DB]/80 backdrop-blur-md z-[60] flex items-center justify-center font-serif text-[10px] tracking-[0.3em] opacity-40 italic italic">
-          Capturing Artifact...
-        </div>
-      )}
+      {isUploading && <div className="fixed inset-0 bg-[#EBE8DB]/80 backdrop-blur-md z-[60] flex items-center justify-center font-serif text-[10px] tracking-[0.3em] opacity-40 italic">Capturing Rubbish...</div>}
     </div>
   );
 }

@@ -17,7 +17,7 @@ const CardBack = ({ item }: any) => {
         <p className="text-[9px] leading-tight font-serif uppercase tracking-tighter">Presslie Action</p>
       </div>
       <div className="flex flex-col items-center text-center">
-        <p className="text-[32px] leading-[1.1] font-bold tracking-tighter opacity-90">
+        <p className="text-[28px] leading-[1.1] font-bold tracking-tighter opacity-90">
           User<br/>is<br/>Rubbish
         </p>
       </div>
@@ -75,19 +75,41 @@ export default function Page() {
     img.src = URL.createObjectURL(file);
     img.onload = async () => {
       const canvas = document.createElement('canvas');
-      const size = 1000;
-      canvas.width = size; canvas.height = size;
+      // 画像の元比率を維持するための計算
+      const maxDim = 1200;
+      const ratio = img.width / img.height;
+      if (ratio > 1) { canvas.width = maxDim; canvas.height = maxDim / ratio; }
+      else { canvas.height = maxDim; canvas.width = maxDim * ratio; }
+      
       const ctx = canvas.getContext('2d');
       if (ctx) {
-        // トイカメラ風加工（ビネット）
-        ctx.clearRect(0, 0, size, size);
-        ctx.drawImage(img, 0, 0, size, size);
+        // 角丸のクリッピング（12px相当をキャンバスサイズにスケール）
+        const radius = (canvas.width / 280) * 12; 
+        ctx.beginPath();
+        ctx.moveTo(radius, 0);
+        ctx.lineTo(canvas.width - radius, 0);
+        ctx.quadraticCurveTo(canvas.width, 0, canvas.width, radius);
+        ctx.lineTo(canvas.width, canvas.height - radius);
+        ctx.quadraticCurveTo(canvas.width, canvas.height, canvas.width - radius, canvas.height);
+        ctx.lineTo(radius, canvas.height);
+        ctx.quadraticCurveTo(0, canvas.height, 0, canvas.height - radius);
+        ctx.lineTo(0, radius);
+        ctx.quadraticCurveTo(0, 0, radius, 0);
+        ctx.closePath();
+        ctx.clip();
+
+        // 画像描画
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         
-        const grad = ctx.createRadialGradient(size/2, size/2, size * 0.2, size/2, size/2, size * 0.7);
-        grad.addColorStop(0, 'rgba(0,0,0,0)');
-        grad.addColorStop(1, 'rgba(0,0,0,0.4)'); // 四隅を暗く
+        // がっちりしたビネット（四隅の影）
+        const grad = ctx.createRadialGradient(
+          canvas.width/2, canvas.height/2, 0, 
+          canvas.width/2, canvas.height/2, Math.max(canvas.width, canvas.height) * 0.7
+        );
+        grad.addColorStop(0.3, 'rgba(0,0,0,0)');
+        grad.addColorStop(1, 'rgba(0,0,0,0.7)'); // 影をがっちり濃く
         ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, size, size);
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
       
       canvas.toBlob(async (blob) => {
@@ -122,7 +144,7 @@ export default function Page() {
             if (now - (lastClickTime.current[item.id] || 0) < 300) {
               setFlippedIds(prev => {
                 const next = new Set(prev);
-                if (next.has(item.id)) next.delete(item.id); else next.add(item.id);
+                if (next.has(item.id)) next.delete(id); else next.add(item.id);
                 return next;
               });
             }
@@ -133,16 +155,22 @@ export default function Page() {
             {/* Front */}
             <div className="absolute inset-0 bg-[#F5F2E9] rounded-[24px] border border-black/[0.04] [backface-visibility:hidden] 
               shadow-[0_25px_60px_rgba(0,0,0,0.15)] flex flex-col overflow-hidden">
-              <div className="p-7 pb-4 font-mono text-[10px] leading-tight text-black font-bold opacity-80">
-                <p>div clane"" relative w.foll</p>
-                <p className="opacity-40">asppetivo : 1120x"</p>
+              
+              <div className="p-6 pb-2 text-[9px] opacity-60 leading-tight font-serif">
+                <p>Statement</p>
+                <p className="italic font-serif">No. {serial} ... (s8d7)</p>
               </div>
-              <div className="flex-grow w-full flex items-center justify-center bg-[#F5F2E9]">
-                <img src={item.image_url} alt="" className="w-[88%] h-auto mix-blend-multiply opacity-95" />
+
+              <div className="flex-grow w-full flex items-center justify-center bg-[#F5F2E9] px-6 py-2">
+                <img 
+                  src={item.image_url} 
+                  alt="" 
+                  className="max-w-full max-h-full object-contain mix-blend-multiply rounded-[12px]" 
+                />
               </div>
-              <div className="p-7 pt-4 font-mono text-[10px] leading-tight text-black font-bold opacity-80">
-                <p>" 0 12up 24px raagadox 00.000.08"</p>
-                <p className="text-[8px] opacity-20 mt-1 tracking-widest uppercase italic font-serif">shox-shadow rataca</p>
+
+              <div className="p-6 pt-2 text-[8px] opacity-40 font-serif italic text-left tracking-tight">
+                <p>No. / Artifact / {serial} / RECTA</p>
               </div>
             </div>
             {/* Back */}
@@ -150,6 +178,19 @@ export default function Page() {
               <CardBack item={item} />
             </div>
           </div>
+        </div>
+
+        <div className="h-16 mt-8 flex items-center justify-center space-x-16 z-10">
+          {isFlipped ? (
+            <>
+              <button onClick={(e) => { e.stopPropagation(); generateLink(item.id); }} className="text-[16px] opacity-30 hover:opacity-100 px-4 active:scale-75 transition-all text-black font-sans">▲</button>
+              {isOwner && (
+                <button onClick={(e) => { e.stopPropagation(); deleteCard(item, isMain); }} className="text-[18px] opacity-10 hover:opacity-100 px-4 active:scale-75 transition-all text-black font-sans">×</button>
+              )}
+            </>
+          ) : (
+            <div className="w-4 h-4" />
+          )}
         </div>
       </div>
     );
@@ -162,14 +203,14 @@ export default function Page() {
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
 
-      <div className="pt-28 pb-64 min-h-screen flex flex-col space-y-24">
+      <div className="pt-28 pb-64 min-h-screen flex flex-col space-y-20">
         {allCards.map(main => (
           <div key={main.id} className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar outline-none">
             <Card item={main} isMain={true} />
             {(sideCells[main.id] || []).map(side => <Card key={side.id} item={side} isMain={false} />)}
             <div className="flex-shrink-0 w-screen snap-center flex items-center justify-center py-12">
-              <label className="w-[280px] h-[453px] flex items-center justify-center cursor-pointer group rounded-[24px] bg-black/[0.02] border border-black/[0.03] transition-all hover:bg-black/[0.04]">
-                <div className="text-[24px] opacity-10 group-hover:opacity-30 font-serif italic italic font-light">○</div>
+              <label className="w-[280px] h-[453px] flex items-center justify-center cursor-pointer group rounded-[24px] bg-black/[0.015] border border-black/[0.02] transition-all">
+                <div className="text-[20px] opacity-5 group-hover:opacity-15 font-serif italic italic font-light">○</div>
                 <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadFile(e, main.id)} />
               </label>
             </div>
@@ -179,17 +220,16 @@ export default function Page() {
 
       <nav className="fixed bottom-12 left-0 right-0 flex flex-col items-center z-50">
         <label className="relative w-16 h-16 flex items-center justify-center cursor-pointer transition-all active:scale-90 hover:scale-105">
-          {/* v16.3風のデザインボタン */}
           <div className="absolute inset-0 bg-[#F5F2E9]/60 backdrop-blur-xl rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.1)] border border-white/40" />
           <span className="relative text-[32px] opacity-70 leading-none mt-[-2px]">◎</span>
           <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadFile(e)} />
         </label>
-        <div className="mt-5 text-[9px] opacity-10 tracking-[0.5em] font-mono uppercase italic italic">sys.recta.artifact</div>
+        <div className="mt-5 text-[8px] opacity-20 tracking-[0.4em] font-serif uppercase italic italic">© 2026 RECTA</div>
       </nav>
 
       {isUploading && (
-        <div className="fixed inset-0 bg-[#EBE8DB]/80 backdrop-blur-md z-[60] flex items-center justify-center font-mono text-[10px] tracking-[0.3em] opacity-40">
-          DEVELOPING ARTIFACT...
+        <div className="fixed inset-0 bg-[#EBE8DB]/80 backdrop-blur-md z-[60] flex items-center justify-center font-serif text-[10px] tracking-[0.3em] opacity-40 italic italic">
+          Capturing Artifact...
         </div>
       )}
     </div>

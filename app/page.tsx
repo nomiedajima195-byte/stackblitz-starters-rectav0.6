@@ -212,12 +212,13 @@ export default function Page() {
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
 
-      <header className="fixed top-0 left-0 right-0 h-28 flex flex-col justify-center items-center z-50 pointer-events-none">
+      {/* 修正：fixedからrelative（絶対配置ではなく、通常のスクロールフロー）に変更 */}
+      <header className="relative h-40 flex flex-col justify-center items-center">
         <div className="w-[1px] h-10 bg-black opacity-10" />
         <div className="mt-3 text-[8px] opacity-20 tracking-[0.6em] font-serif uppercase italic ml-[0.6em]">rubbish</div>
       </header>
 
-      <div className="pt-32 pb-64 min-h-screen flex flex-col space-y-20">
+      <div className="pb-64 min-h-screen flex flex-col space-y-20">
         {allCards.map(main => (
           <div key={main.id} className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar outline-none">
             <Card item={main} isMain={true} />
@@ -230,15 +231,17 @@ export default function Page() {
             </div>
           </div>
         ))}
+        {allCards.length === 0 && <div className="h-[40vh] flex items-center justify-center opacity-10 text-[10px] tracking-[0.4em] uppercase font-serif italic">The street is quiet</div>}
       </div>
 
+      {/* フッター（ボタン類）は操作のためにfixedを維持 */}
       <nav className="fixed bottom-12 left-0 right-0 flex flex-col items-center z-50">
         <label className="relative w-16 h-16 flex items-center justify-center cursor-pointer transition-all active:scale-90 hover:scale-105">
           <div className="absolute inset-0 bg-[#F5F2E9]/60 backdrop-blur-xl rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.1)] border border-white/40" />
           <span className="relative text-[32px] opacity-70 leading-none mt-[-2px]">◎</span>
           <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadFile(e)} />
         </label>
-        <div className="mt-5 text-[8px] opacity-20 tracking-[0.4em] font-serif uppercase italic italic">© 1992 RUBBISH</div>
+        <div className="mt-5 text-[8px] opacity-20 tracking-[0.4em] font-serif uppercase italic">© 1992 RUBBISH</div>
       </nav>
 
       {isUploading && <div className="fixed inset-0 bg-[#EBE8DB]/80 backdrop-blur-md z-[60] flex items-center justify-center font-serif text-[10px] tracking-[0.3em] opacity-40 italic">Capturing Rubbish...</div>}

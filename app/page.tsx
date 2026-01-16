@@ -9,21 +9,20 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const LIFESPAN_MS = 168 * 60 * 60 * 1000;
 
+// 裏面：v15.5のタイポグラフィを忠実に再現
 const CardBack = ({ item }: any) => {
   return (
-    <div className="w-full h-full bg-[#F7F5ED] flex flex-col items-center justify-between p-10 text-[#121212] border-[0.5px] border-black/10 shadow-inner overflow-hidden font-serif">
-      <div className="w-full flex justify-between text-[9px] font-mono tracking-tighter opacity-60">
-        <span>asppetivo : 1120x"</span>
-        <span>(03.08)</span>
+    <div className="w-full h-full bg-[#F5F2E9] flex flex-col items-center justify-center p-10 text-[#2D2D2D] border-[0.5px] border-black/5 shadow-inner overflow-hidden font-serif">
+      <div className="absolute top-8 left-8 text-left opacity-40">
+        <p className="text-[9px] leading-tight font-serif">Presslie Action</p>
       </div>
-      <div className="flex flex-col items-center text-center space-y-4">
-        <p className="text-[32px] leading-tight font-bold tracking-tight">
+      <div className="flex flex-col items-center text-center">
+        <p className="text-[28px] leading-[1.2] font-medium tracking-tight opacity-90">
           User<br/>is<br/>Rubbish
         </p>
-        <p className="text-[9px] opacity-40 tracking-[0.4em] uppercase font-mono">shox-shadow rataca</p>
       </div>
-      <div className="w-full text-[9px] opacity-20 font-mono text-center tracking-widest uppercase italic">
-        recta-sys-trace
+      <div className="absolute bottom-8 w-full text-center opacity-10">
+        <span className="text-[6px] font-mono tracking-[0.4em] uppercase">RECTA ARTIFACT</span>
       </div>
     </div>
   );
@@ -89,13 +88,11 @@ export default function Page() {
       canvas.width = targetW; canvas.height = targetH;
       const ctx = canvas.getContext('2d');
       if (ctx) {
-        ctx.fillStyle = "#F7F5ED"; ctx.fillRect(0, 0, targetW, targetH);
-        const imgRatio = img.width / img.height;
-        // 画像のデザイン通りの余白感（スクエア時も下余白が出ないよう調整）
-        const drawW = targetW; 
-        const drawH = targetW; 
-        const drawY = 80; 
-        ctx.drawImage(img, 0, drawY, drawW, drawH);
+        ctx.fillStyle = "#F5F2E9"; ctx.fillRect(0, 0, targetW, targetH);
+        const padding = 40;
+        const drawW = targetW - (padding * 2);
+        const drawH = drawW; 
+        ctx.drawImage(img, padding, 100, drawW, drawH);
       }
       canvas.toBlob(async (blob) => {
         if (blob) {
@@ -154,39 +151,37 @@ export default function Page() {
   const Card = ({ item, isMain }: any) => {
     const isOwner = item.owner_id === pocketId;
     const isFlipped = flippedIds.has(item.id);
+    const serial = item.id.split('.')[0].slice(-6).toUpperCase();
 
     return (
-      <div id={item.id} className="flex-shrink-0 w-screen snap-center relative flex flex-col items-center py-12">
+      <div id={item.id} className="flex-shrink-0 w-screen snap-center relative flex flex-col items-center py-12 font-serif">
         <div 
           className="relative w-full max-w-[280px] select-none z-20 cursor-pointer"
           style={{ perspective: '1200px', aspectRatio: '1 / 1.618' }}
           onClick={() => handleFlipRequest(item.id)}
         >
           <div className={`relative w-full h-full transition-transform duration-700 [transform-style:preserve-3d] ${isFlipped ? '[transform:rotateY(180deg)]' : ''}`}>
-            {/* Front: Artifact Style */}
-            <div className="absolute inset-0 bg-[#F7F5ED] rounded-[22px] border border-black/[0.04] [backface-visibility:hidden] 
-              shadow-[0_20px_50px_rgba(0,0,0,0.15),0_10px_20px_rgba(0,0,0,0.1)] flex flex-col overflow-hidden">
+            {/* Front: v15.5 Style */}
+            <div className="absolute inset-0 bg-[#F5F2E9] rounded-[24px] border border-black/[0.03] [backface-visibility:hidden] 
+              shadow-[0_15px_45px_rgba(0,0,0,0.1),0_5px_15px_rgba(0,0,0,0.05)] flex flex-col p-6">
               
-              {/* 上部：適度な密度の文字列 */}
-              <div className="pt-6 px-6 font-mono text-[10px] leading-tight text-black font-bold opacity-90">
-                <p>div clane"" relative w.foll</p>
-                <p className="opacity-40 text-[9px]">asppetivo : 1120x"</p>
+              <div className="text-[9px] opacity-60 leading-tight mb-4">
+                <p>Statement</p>
+                <p className="italic font-serif">No. {serial} ... (s8d7)</p>
               </div>
 
-              {/* 画像エリア：カード地の色を背景に、余白を最小化 */}
-              <div className="flex-grow w-full mt-2 bg-[#F7F5ED]" 
+              {/* 画像：カード地の上に直接配置されたような質感 */}
+              <div className="flex-grow w-full rounded-sm overflow-hidden" 
                 style={{ backgroundImage: `url(${item.image_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
               </div>
 
-              {/* 下部：画像のすぐ下に配置 */}
-              <div className="pb-6 px-6 font-mono text-[10px] leading-tight text-black font-bold opacity-90">
-                <p>" 0 12up 24px raagadox 00.000.08"</p>
-                <p className="text-[8px] opacity-20 mt-1 tracking-[0.1em] uppercase">shox-shadow rataca</p>
+              <div className="mt-8 text-[8px] opacity-40 font-serif italic text-left tracking-tight">
+                <p>No. / Artifact / {serial} / RECTA</p>
               </div>
             </div>
 
-            <div className="absolute inset-0 [transform:rotateY(180deg)] [backface-visibility:hidden] rounded-[22px] border border-black/[0.04] overflow-hidden
-              shadow-[0_20px_50px_rgba(0,0,0,0.15),0_10px_20px_rgba(0,0,0,0.1)]">
+            <div className="absolute inset-0 [transform:rotateY(180deg)] [backface-visibility:hidden] rounded-[24px] border border-black/[0.03] overflow-hidden
+              shadow-[0_15px_45px_rgba(0,0,0,0.1),0_5px_15px_rgba(0,0,0,0.05)]">
               <CardBack item={item} />
             </div>
           </div>
@@ -195,9 +190,9 @@ export default function Page() {
         <div className="h-16 mt-8 flex items-center justify-center space-x-16 z-10">
           {isFlipped ? (
             <>
-              <button onClick={(e) => { e.stopPropagation(); generateLink(item.id); }} className="text-[18px] opacity-30 hover:opacity-100 px-4 active:scale-75 transition-all text-black">▲</button>
+              <button onClick={(e) => { e.stopPropagation(); generateLink(item.id); }} className="text-[16px] opacity-30 hover:opacity-100 px-4 active:scale-75 transition-all text-black font-sans">▲</button>
               {isOwner && (
-                <button onClick={(e) => { e.stopPropagation(); deleteCard(item, isMain); }} className="text-[20px] opacity-10 hover:opacity-100 px-4 active:scale-75 transition-all text-black">×</button>
+                <button onClick={(e) => { e.stopPropagation(); deleteCard(item, isMain); }} className="text-[18px] opacity-10 hover:opacity-100 px-4 active:scale-75 transition-all text-black font-sans">×</button>
               )}
             </>
           ) : (
@@ -209,7 +204,7 @@ export default function Page() {
   };
 
   return (
-    <div className="min-h-screen bg-[#EAE7D9] text-[#121212] overflow-x-hidden select-none">
+    <div className="min-h-screen bg-[#EBE8DB] text-[#2D2D2D] overflow-x-hidden select-none">
       <style jsx global>{`
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -220,32 +215,32 @@ export default function Page() {
       </header>
 
       <div className="pt-28 pb-64 min-h-screen">
-        <div className="flex flex-col space-y-20">
+        <div className="flex flex-col space-y-24">
           {allCards.map(main => (
             <div key={main.id} className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar outline-none items-start">
               <Card item={main} isMain={true} />
               {(sideCells[main.id] || []).map(side => <Card key={side.id} item={side} isMain={false} />)}
               <div className="flex-shrink-0 w-screen snap-center flex flex-col items-center py-12 h-full justify-center">
-                <label className="w-[280px] h-[453px] flex items-center justify-center cursor-pointer group rounded-[22px] bg-black/[0.02] border border-black/[0.03]">
-                  <div className="text-[24px] opacity-5 group-hover:opacity-20 transition-opacity font-serif italic">○</div>
+                <label className="w-[280px] h-[453px] flex items-center justify-center cursor-pointer group rounded-[24px] bg-black/[0.015] border border-black/[0.02]">
+                  <div className="text-[20px] opacity-5 group-hover:opacity-15 transition-opacity font-serif italic italic">○</div>
                   <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadFile(e, main.id)} />
                 </label>
               </div>
             </div>
           ))}
-          {allCards.length === 0 && <div className="h-[60vh] flex items-center justify-center opacity-10 text-[10px] tracking-[0.4em] uppercase font-serif italic italic">The street is quiet</div>}
+          {allCards.length === 0 && <div className="h-[60vh] flex items-center justify-center opacity-10 text-[10px] tracking-[0.4em] uppercase font-serif italic">Seria(The Rounded Artifact)</div>}
         </div>
       </div>
 
       <nav className="fixed bottom-12 left-0 right-0 flex flex-col items-center z-50">
-        <label className="w-16 h-16 flex items-center justify-center cursor-pointer transition-all active:scale-75 hover:scale-105 bg-[#F7F5ED] rounded-full shadow-xl border border-black/5">
-          <span className="text-[28px] opacity-60 leading-none">◎</span>
+        <label className="w-14 h-14 flex items-center justify-center cursor-pointer transition-all active:scale-75 hover:scale-105 bg-[#F5F2E9]/80 backdrop-blur-md rounded-full shadow-lg border border-black/5">
+          <span className="text-[24px] opacity-60 leading-none">◎</span>
           <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadFile(e)} />
         </label>
-        <div className="mt-4 text-[8px] opacity-10 tracking-[0.4em] font-mono uppercase italic">sys.recta.artifact</div>
+        <div className="mt-4 text-[8px] opacity-20 tracking-[0.4em] font-serif uppercase">© 2026 RECTA</div>
       </nav>
 
-      {isUploading && <div className="fixed inset-0 bg-[#EAE7D9]/60 backdrop-blur-sm z-[60] flex items-center justify-center"><div className="w-6 h-[1px] bg-black opacity-30 animate-pulse" /></div>}
+      {isUploading && <div className="fixed inset-0 bg-[#EBE8DB]/60 backdrop-blur-sm z-[60] flex items-center justify-center"><div className="w-6 h-[1px] bg-black opacity-30 animate-pulse" /></div>}
     </div>
   );
 }

@@ -8,7 +8,7 @@ const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const LIFESPAN_MS = 168 * 60 * 60 * 1000;
-const CARD_BG = "#F5F2E9"; // カードの地の色
+const CARD_BG_COLOR = "#F5F2E9"; // 定数として定義
 
 const CardBack = ({ item }: any) => {
   return (
@@ -79,29 +79,32 @@ export default function Page() {
     const file = e.target.files?.[0];
     if (!file || isUploading || !pocketId) return;
     setIsUploading(true);
+
     const img = new Image();
     img.src = URL.createObjectURL(file);
     img.onload = async () => {
       const canvas = document.createElement('canvas');
-      const targetW = 600; 
-      const targetH = Math.round(600 * 1.618); 
-      canvas.width = targetW; canvas.height = targetH;
+      // キャンバス自体はスクエアに。余白はフロントエンドで制御
+      const size = 800;
+      canvas.width = size;
+      canvas.height = size;
       const ctx = canvas.getContext('2d');
       if (ctx) {
-        // 余白を埋める色をカードの地の色（生成り）に指定
-        ctx.fillStyle = CARD_BG; 
-        ctx.fillRect(0, 0, targetW, targetH);
-        
-        const padding = 40;
-        const drawW = targetW - (padding * 2);
-        // 画像を中央付近に配置。余白は自動的に背景色と馴染む。
-        ctx.drawImage(img, padding, 100, drawW, drawW);
+        // 背景を塗らず、透明のまま描画することで「白い枠」の発生を物理的に防ぐ
+        ctx.clearRect(0, 0, size, size);
+        const ratio = img.width / img.height;
+        let dW, dH, dX, dY;
+        if (ratio > 1) { dW = size; dH = size / ratio; dX = 0; dY = (size - dH) / 2; }
+        else { dH = size; dW = size * ratio; dX = (size - dW) / 2; dY = 0; }
+        ctx.drawImage(img, dX, dY, dW, dH);
       }
+      
       canvas.toBlob(async (blob) => {
         if (blob) {
-          const fileName = `${Date.now()}.jpg`;
-          await supabase.storage.from('images').upload(fileName, blob, { contentType: 'image/jpeg' });
+          const fileName = `${Date.now()}.png`; // 透過を維持するためPNGで保存
+          await supabase.storage.from('images').upload(fileName, blob, { contentType: 'image/png' });
           const { data: { publicUrl } } = supabase.storage.from('images').getPublicUrl(fileName);
+          
           if (!parentId) {
             await supabase.from('mainline').insert([{ id: fileName, image_url: publicUrl, owner_id: pocketId, is_public: true }]);
           } else {
@@ -110,7 +113,7 @@ export default function Page() {
           await fetchData();
         }
         setIsUploading(false);
-      }, 'image/jpeg', 0.85);
+      }, 'image/png');
     };
   };
 
@@ -164,21 +167,26 @@ export default function Page() {
           onClick={() => handleFlipRequest(item.id)}
         >
           <div className={`relative w-full h-full transition-transform duration-700 [transform-style:preserve-3d] ${isFlipped ? '[transform:rotateY(180deg)]' : ''}`}>
-            {/* Front: Artifact Style */}
-            <div className={`absolute inset-0 bg-[${CARD_BG}] rounded-[24px] border border-black/[0.03] [backface-visibility:hidden] 
-              shadow-[0_15px_45px_rgba(0,0,0,0.1),0_5px_15px_rgba(0,0,0,0.05)] flex flex-col p-6`}>
+            {/* Front */}
+            <div className="absolute inset-0 bg-[#F5F2E9] rounded-[24px] border border-black/[0.03] [backface-visibility:hidden] 
+              shadow-[0_15px_45px_rgba(0,0,0,0.1),0_5px_15px_rgba(0,0,0,0.05)] flex flex-col overflow-hidden">
               
-              <div className="text-[9px] opacity-60 leading-tight mb-4">
+              <div className="p-6 pb-2 text-[9px] opacity-60 leading-tight">
                 <p>Statement</p>
                 <p className="italic font-serif">No. {serial} ... (s8d7)</p>
               </div>
 
-              {/* 画像表示エリア。カードの地の色と一体化するよう bg-inherit を設定 */}
-              <div className="flex-grow w-full rounded-sm overflow-hidden bg-inherit flex items-start justify-center">
-                <img src={item.image_url} alt="" className="w-full h-auto object-contain" />
+              {/* ここが重要：コンテナの背景色をカードに合わせ、画像をその上に載せる */}
+              <div className="flex-grow w-full flex items-center justify-center bg-[#F5F2E9]">
+                <img 
+                  src={item.image_url} 
+                  alt="" 
+                  className="w-[85%] h-auto object-contain mix-blend-multiply" 
+                  style={{ filter: 'contrast(1.05) brightness(0.98)' }}
+                />
               </div>
 
-              <div className="mt-8 text-[8px] opacity-40 font-serif italic text-left tracking-tight">
+              <div className="p-6 pt-2 text-[8px] opacity-40 font-serif italic text-left tracking-tight">
                 <p>No. / Artifact / {serial} / RECTA</p>
               </div>
             </div>
@@ -225,13 +233,12 @@ export default function Page() {
               {(sideCells[main.id] || []).map(side => <Card key={side.id} item={side} isMain={false} />)}
               <div className="flex-shrink-0 w-screen snap-center flex flex-col items-center py-12 h-full justify-center">
                 <label className="w-[280px] h-[453px] flex items-center justify-center cursor-pointer group rounded-[24px] bg-black/[0.015] border border-black/[0.02]">
-                  <div className="text-[20px] opacity-5 group-hover:opacity-15 transition-opacity font-serif italic">○</div>
+                  <div className="text-[20px] opacity-5 group-hover:opacity-15 transition-opacity font-serif italic italic">○</div>
                   <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadFile(e, main.id)} />
                 </label>
               </div>
             </div>
           ))}
-          {allCards.length === 0 && <div className="h-[60vh] flex items-center justify-center opacity-10 text-[10px] tracking-[0.4em] uppercase font-serif italic">The Street is Quiet</div>}
         </div>
       </div>
 

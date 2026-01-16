@@ -8,21 +8,21 @@ const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const LIFESPAN_MS = 168 * 60 * 60 * 1000;
-const CARD_BG_COLOR = "#F5F2E9"; // 定数として定義
+const CARD_BG = "#F5F2E9";
 
 const CardBack = ({ item }: any) => {
   return (
-    <div className="w-full h-full bg-[#F5F2E9] flex flex-col items-center justify-center p-10 text-[#2D2D2D] border-[0.5px] border-black/5 shadow-inner overflow-hidden font-serif">
+    <div className="w-full h-full bg-[#F5F2E9] flex flex-col items-center justify-center p-10 text-[#121212] border-[0.5px] border-black/5 shadow-inner overflow-hidden font-serif">
       <div className="absolute top-8 left-8 text-left opacity-40">
-        <p className="text-[9px] leading-tight font-serif">Presslie Action</p>
+        <p className="text-[9px] leading-tight font-serif uppercase tracking-tighter">Presslie Action</p>
       </div>
       <div className="flex flex-col items-center text-center">
-        <p className="text-[28px] leading-[1.2] font-medium tracking-tight opacity-90">
+        <p className="text-[32px] leading-[1.1] font-bold tracking-tighter opacity-90">
           User<br/>is<br/>Rubbish
         </p>
       </div>
       <div className="absolute bottom-8 w-full text-center opacity-10">
-        <span className="text-[6px] font-mono tracking-[0.4em] uppercase">RECTA ARTIFACT</span>
+        <span className="text-[6px] font-mono tracking-[0.4em] uppercase">RECTA ARTIFACT SYSTEM</span>
       </div>
     </div>
   );
@@ -34,7 +34,6 @@ export default function Page() {
   const [flippedIds, setFlippedIds] = useState<Set<string>>(new Set());
   const [isUploading, setIsUploading] = useState(false);
   const [pocketId, setPocketId] = useState<string | null>(null);
-  
   const lastClickTime = useRef<{ [key: string]: number }>({});
 
   useEffect(() => {
@@ -45,14 +44,6 @@ export default function Page() {
     }
     setPocketId(id);
     fetchData();
-
-    const hash = window.location.hash;
-    if (hash) {
-      setTimeout(() => {
-        const el = document.getElementById(hash.replace('#', ''));
-        el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }, 1000);
-    }
   }, []);
 
   const fetchData = useCallback(async () => {
@@ -84,27 +75,26 @@ export default function Page() {
     img.src = URL.createObjectURL(file);
     img.onload = async () => {
       const canvas = document.createElement('canvas');
-      // キャンバス自体はスクエアに。余白はフロントエンドで制御
-      const size = 800;
-      canvas.width = size;
-      canvas.height = size;
+      const size = 1000;
+      canvas.width = size; canvas.height = size;
       const ctx = canvas.getContext('2d');
       if (ctx) {
-        // 背景を塗らず、透明のまま描画することで「白い枠」の発生を物理的に防ぐ
+        // トイカメラ風加工（ビネット）
         ctx.clearRect(0, 0, size, size);
-        const ratio = img.width / img.height;
-        let dW, dH, dX, dY;
-        if (ratio > 1) { dW = size; dH = size / ratio; dX = 0; dY = (size - dH) / 2; }
-        else { dH = size; dW = size * ratio; dX = (size - dW) / 2; dY = 0; }
-        ctx.drawImage(img, dX, dY, dW, dH);
+        ctx.drawImage(img, 0, 0, size, size);
+        
+        const grad = ctx.createRadialGradient(size/2, size/2, size * 0.2, size/2, size/2, size * 0.7);
+        grad.addColorStop(0, 'rgba(0,0,0,0)');
+        grad.addColorStop(1, 'rgba(0,0,0,0.4)'); // 四隅を暗く
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, size, size);
       }
       
       canvas.toBlob(async (blob) => {
         if (blob) {
-          const fileName = `${Date.now()}.png`; // 透過を維持するためPNGで保存
+          const fileName = `${Date.now()}.png`;
           await supabase.storage.from('images').upload(fileName, blob, { contentType: 'image/png' });
           const { data: { publicUrl } } = supabase.storage.from('images').getPublicUrl(fileName);
-          
           if (!parentId) {
             await supabase.from('mainline').insert([{ id: fileName, image_url: publicUrl, owner_id: pocketId, is_public: true }]);
           } else {
@@ -117,98 +107,49 @@ export default function Page() {
     };
   };
 
-  const generateLink = (id: string) => {
-    const url = `${window.location.origin}${window.location.pathname}#${id}`;
-    navigator.clipboard.writeText(url);
-    alert('Link Copied');
-  };
-
-  const deleteCard = async (item: any, isMain: boolean) => {
-    if (!confirm('Dispose?')) return;
-    if (isMain) {
-      const sides = sideCells[item.id] || [];
-      if (sides.length > 0) {
-        const nextMain = sides[0];
-        await supabase.from('mainline').insert([{ id: `PROM-${Date.now()}`, image_url: nextMain.image_url, owner_id: nextMain.owner_id, is_public: true }]);
-        await supabase.from('side_cells').delete().eq('id', nextMain.id);
-      }
-      await supabase.from('mainline').delete().eq('id', item.id);
-    } else {
-      await supabase.from('side_cells').delete().eq('id', item.id);
-    }
-    fetchData();
-  };
-
-  const handleFlipRequest = (id: string) => {
-    const now = Date.now();
-    const lastClick = lastClickTime.current[id] || 0;
-    if (now - lastClick < 300) {
-      setFlippedIds(prev => {
-        const next = new Set(prev);
-        if (next.has(id)) next.delete(id); else next.add(id);
-        return next;
-      });
-      lastClickTime.current[id] = 0;
-    } else {
-      lastClickTime.current[id] = now;
-    }
-  };
-
   const Card = ({ item, isMain }: any) => {
     const isOwner = item.owner_id === pocketId;
     const isFlipped = flippedIds.has(item.id);
     const serial = item.id.split('.')[0].slice(-6).toUpperCase();
 
     return (
-      <div id={item.id} className="flex-shrink-0 w-screen snap-center relative flex flex-col items-center py-12 font-serif">
+      <div id={item.id} className="flex-shrink-0 w-screen snap-center relative flex flex-col items-center py-12">
         <div 
           className="relative w-full max-w-[280px] select-none z-20 cursor-pointer"
           style={{ perspective: '1200px', aspectRatio: '1 / 1.618' }}
-          onClick={() => handleFlipRequest(item.id)}
+          onClick={() => {
+            const now = Date.now();
+            if (now - (lastClickTime.current[item.id] || 0) < 300) {
+              setFlippedIds(prev => {
+                const next = new Set(prev);
+                if (next.has(item.id)) next.delete(item.id); else next.add(item.id);
+                return next;
+              });
+            }
+            lastClickTime.current[item.id] = now;
+          }}
         >
           <div className={`relative w-full h-full transition-transform duration-700 [transform-style:preserve-3d] ${isFlipped ? '[transform:rotateY(180deg)]' : ''}`}>
             {/* Front */}
-            <div className="absolute inset-0 bg-[#F5F2E9] rounded-[24px] border border-black/[0.03] [backface-visibility:hidden] 
-              shadow-[0_15px_45px_rgba(0,0,0,0.1),0_5px_15px_rgba(0,0,0,0.05)] flex flex-col overflow-hidden">
-              
-              <div className="p-6 pb-2 text-[9px] opacity-60 leading-tight">
-                <p>Statement</p>
-                <p className="italic font-serif">No. {serial} ... (s8d7)</p>
+            <div className="absolute inset-0 bg-[#F5F2E9] rounded-[24px] border border-black/[0.04] [backface-visibility:hidden] 
+              shadow-[0_25px_60px_rgba(0,0,0,0.15)] flex flex-col overflow-hidden">
+              <div className="p-7 pb-4 font-mono text-[10px] leading-tight text-black font-bold opacity-80">
+                <p>div clane"" relative w.foll</p>
+                <p className="opacity-40">asppetivo : 1120x"</p>
               </div>
-
-              {/* ここが重要：コンテナの背景色をカードに合わせ、画像をその上に載せる */}
               <div className="flex-grow w-full flex items-center justify-center bg-[#F5F2E9]">
-                <img 
-                  src={item.image_url} 
-                  alt="" 
-                  className="w-[85%] h-auto object-contain mix-blend-multiply" 
-                  style={{ filter: 'contrast(1.05) brightness(0.98)' }}
-                />
+                <img src={item.image_url} alt="" className="w-[88%] h-auto mix-blend-multiply opacity-95" />
               </div>
-
-              <div className="p-6 pt-2 text-[8px] opacity-40 font-serif italic text-left tracking-tight">
-                <p>No. / Artifact / {serial} / RECTA</p>
+              <div className="p-7 pt-4 font-mono text-[10px] leading-tight text-black font-bold opacity-80">
+                <p>" 0 12up 24px raagadox 00.000.08"</p>
+                <p className="text-[8px] opacity-20 mt-1 tracking-widest uppercase italic font-serif">shox-shadow rataca</p>
               </div>
             </div>
-
-            <div className="absolute inset-0 [transform:rotateY(180deg)] [backface-visibility:hidden] rounded-[24px] border border-black/[0.03] overflow-hidden
-              shadow-[0_15px_45px_rgba(0,0,0,0.1),0_5px_15px_rgba(0,0,0,0.05)]">
+            {/* Back */}
+            <div className="absolute inset-0 [transform:rotateY(180deg)] [backface-visibility:hidden] rounded-[24px] overflow-hidden shadow-[0_25px_60px_rgba(0,0,0,0.15)]">
               <CardBack item={item} />
             </div>
           </div>
-        </div>
-
-        <div className="h-16 mt-8 flex items-center justify-center space-x-16 z-10">
-          {isFlipped ? (
-            <>
-              <button onClick={(e) => { e.stopPropagation(); generateLink(item.id); }} className="text-[16px] opacity-30 hover:opacity-100 px-4 active:scale-75 transition-all text-black font-sans">▲</button>
-              {isOwner && (
-                <button onClick={(e) => { e.stopPropagation(); deleteCard(item, isMain); }} className="text-[18px] opacity-10 hover:opacity-100 px-4 active:scale-75 transition-all text-black font-sans">×</button>
-              )}
-            </>
-          ) : (
-            <div className="w-4 h-4" />
-          )}
         </div>
       </div>
     );
@@ -221,36 +162,36 @@ export default function Page() {
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
 
-      <header className="fixed top-0 left-0 right-0 h-24 flex flex-col justify-center items-center z-50 pointer-events-none">
-        <div className="w-[1px] h-10 bg-black opacity-10" />
-      </header>
-
-      <div className="pt-28 pb-64 min-h-screen">
-        <div className="flex flex-col space-y-24">
-          {allCards.map(main => (
-            <div key={main.id} className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar outline-none items-start">
-              <Card item={main} isMain={true} />
-              {(sideCells[main.id] || []).map(side => <Card key={side.id} item={side} isMain={false} />)}
-              <div className="flex-shrink-0 w-screen snap-center flex flex-col items-center py-12 h-full justify-center">
-                <label className="w-[280px] h-[453px] flex items-center justify-center cursor-pointer group rounded-[24px] bg-black/[0.015] border border-black/[0.02]">
-                  <div className="text-[20px] opacity-5 group-hover:opacity-15 transition-opacity font-serif italic italic">○</div>
-                  <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadFile(e, main.id)} />
-                </label>
-              </div>
+      <div className="pt-28 pb-64 min-h-screen flex flex-col space-y-24">
+        {allCards.map(main => (
+          <div key={main.id} className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar outline-none">
+            <Card item={main} isMain={true} />
+            {(sideCells[main.id] || []).map(side => <Card key={side.id} item={side} isMain={false} />)}
+            <div className="flex-shrink-0 w-screen snap-center flex items-center justify-center py-12">
+              <label className="w-[280px] h-[453px] flex items-center justify-center cursor-pointer group rounded-[24px] bg-black/[0.02] border border-black/[0.03] transition-all hover:bg-black/[0.04]">
+                <div className="text-[24px] opacity-10 group-hover:opacity-30 font-serif italic italic font-light">○</div>
+                <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadFile(e, main.id)} />
+              </label>
             </div>
-          ))}
-        </div>
+          </div>
+        ))}
       </div>
 
       <nav className="fixed bottom-12 left-0 right-0 flex flex-col items-center z-50">
-        <label className="w-14 h-14 flex items-center justify-center cursor-pointer transition-all active:scale-75 hover:scale-105 bg-[#F5F2E9]/80 backdrop-blur-md rounded-full shadow-lg border border-black/5">
-          <span className="text-[24px] opacity-60 leading-none">◎</span>
+        <label className="relative w-16 h-16 flex items-center justify-center cursor-pointer transition-all active:scale-90 hover:scale-105">
+          {/* v16.3風のデザインボタン */}
+          <div className="absolute inset-0 bg-[#F5F2E9]/60 backdrop-blur-xl rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.1)] border border-white/40" />
+          <span className="relative text-[32px] opacity-70 leading-none mt-[-2px]">◎</span>
           <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadFile(e)} />
         </label>
-        <div className="mt-4 text-[8px] opacity-20 tracking-[0.4em] font-serif uppercase">© 2026 RECTA</div>
+        <div className="mt-5 text-[9px] opacity-10 tracking-[0.5em] font-mono uppercase italic italic">sys.recta.artifact</div>
       </nav>
 
-      {isUploading && <div className="fixed inset-0 bg-[#EBE8DB]/60 backdrop-blur-sm z-[60] flex items-center justify-center"><div className="w-6 h-[1px] bg-black opacity-30 animate-pulse" /></div>}
+      {isUploading && (
+        <div className="fixed inset-0 bg-[#EBE8DB]/80 backdrop-blur-md z-[60] flex items-center justify-center font-mono text-[10px] tracking-[0.3em] opacity-40">
+          DEVELOPING ARTIFACT...
+        </div>
+      )}
     </div>
   );
 }

@@ -10,16 +10,6 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 const LIFESPAN_MS = 168 * 60 * 60 * 1000;
 const CARD_BG = "#F5F2E9";
 
-// 配列をシャッフルするユーティリティ
-const shuffle = (array: any[]) => {
-  const newArray = [...array];
-  for (let i = newArray.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
-  }
-  return newArray;
-};
-
 const CardBack = ({ item }: any) => {
   return (
     <div className="w-full h-full bg-[#F5F2E9] flex flex-col items-center justify-center p-10 text-[#2D2D2D] border-[0.5px] border-black/5 shadow-inner overflow-hidden font-serif">
@@ -32,7 +22,7 @@ const CardBack = ({ item }: any) => {
         </p>
       </div>
       <div className="absolute bottom-10 w-full text-center opacity-20">
-        <span className="text-[8px] font-mono tracking-[0.5em] uppercase font-bold">RECTA ARTIFACT</span>
+        <span className="text-[8px] font-mono tracking-[0.5em] uppercase font-bold">1992 RUBBISH</span>
       </div>
     </div>
   );
@@ -44,7 +34,6 @@ export default function Page() {
   const [flippedIds, setFlippedIds] = useState<Set<string>>(new Set());
   const [isUploading, setIsUploading] = useState(false);
   const [pocketId, setPocketId] = useState<string | null>(null);
-  
   const lastClickTime = useRef<{ [key: string]: number }>({});
 
   useEffect(() => {
@@ -59,15 +48,11 @@ export default function Page() {
 
   const fetchData = useCallback(async () => {
     const now = new Date().getTime();
-    
-    // メインラインの取得とシャッフル
-    const { data: m } = await supabase.from('mainline').select('*');
+    const { data: m } = await supabase.from('mainline').select('*').order('created_at', { ascending: false });
     if (m) {
       const activeMain = m.filter(card => (now - new Date(card.created_at).getTime()) < LIFESPAN_MS);
-      // ここでランダムに並び替え
-      setAllCards(shuffle(activeMain));
+      setAllCards(activeMain);
     }
-
     const { data: s } = await supabase.from('side_cells').select('*').order('created_at', { ascending: true });
     if (s) {
       const g: {[key: string]: any[]} = {};
@@ -89,19 +74,16 @@ export default function Page() {
     img.src = URL.createObjectURL(file);
     img.onload = async () => {
       const canvas = document.createElement('canvas');
-      const maxSide = 1200;
-      let w = img.width;
-      let h = img.height;
-      if (w > h) { if (w > maxSide) { h *= maxSide / w; w = maxSide; } }
-      else { if (h > maxSide) { w *= maxSide / h; h = maxSide; } }
-      canvas.width = w; canvas.height = h;
+      canvas.width = 1000; canvas.height = 1000;
       const ctx = canvas.getContext('2d');
-      ctx?.drawImage(img, 0, 0, w, h);
-      
+      if (ctx) {
+        ctx.clearRect(0, 0, 1000, 1000);
+        ctx.drawImage(img, 0, 0, 1000, 1000); // 完全にスクエアにフィット
+      }
       canvas.toBlob(async (blob) => {
         if (blob) {
-          const fileName = `${Date.now()}.jpg`;
-          await supabase.storage.from('images').upload(fileName, blob, { contentType: 'image/jpeg' });
+          const fileName = `${Date.now()}.png`;
+          await supabase.storage.from('images').upload(fileName, blob, { contentType: 'image/png' });
           const { data: { publicUrl } } = supabase.storage.from('images').getPublicUrl(fileName);
           if (!parentId) {
             await supabase.from('mainline').insert([{ id: fileName, image_url: publicUrl, owner_id: pocketId, is_public: true }]);
@@ -111,24 +93,8 @@ export default function Page() {
           await fetchData();
         }
         setIsUploading(false);
-      }, 'image/jpeg', 0.9);
+      }, 'image/png');
     };
-  };
-
-  const deleteCard = async (item: any, isMain: boolean) => {
-    if (!confirm('Dispose?')) return;
-    if (isMain) {
-      const sides = sideCells[item.id] || [];
-      if (sides.length > 0) {
-        const nextMain = sides[0];
-        await supabase.from('mainline').insert([{ id: `PROM-${Date.now()}`, image_url: nextMain.image_url, owner_id: nextMain.owner_id, is_public: true }]);
-        await supabase.from('side_cells').delete().eq('id', nextMain.id);
-      }
-      await supabase.from('mainline').delete().eq('id', item.id);
-    } else {
-      await supabase.from('side_cells').delete().eq('id', item.id);
-    }
-    fetchData();
   };
 
   const handleFlipRequest = (id: string) => {
@@ -145,7 +111,6 @@ export default function Page() {
   };
 
   const Card = ({ item, isMain }: any) => {
-    const isOwner = item.owner_id === pocketId;
     const isFlipped = flippedIds.has(item.id);
     const serial = item.id.split('.')[0].slice(-6).toUpperCase();
 
@@ -158,58 +123,58 @@ export default function Page() {
         >
           <div className={`relative w-full h-full transition-transform duration-700 [transform-style:preserve-3d] ${isFlipped ? '[transform:rotateY(180deg)]' : ''}`}>
             {/* Front */}
-            <div className="absolute inset-0 bg-[#F5F2E9] rounded-[28px] border border-black/[0.04] [backface-visibility:hidden] 
-              shadow-[0_20px_50px_rgba(0,0,0,0.12)] flex flex-col overflow-hidden">
-              
-              <div className="p-8 pb-4 text-[12px] font-bold opacity-80 leading-tight shrink-0">
+            <div className="absolute inset-0 bg-[#F5F2E9] rounded-[28px] border border-black/[0.04] [backface-visibility:hidden] shadow-[0_20px_50px_rgba(0,0,0,0.12)] flex flex-col overflow-hidden">
+              <div className="p-8 pb-4 text-[12px] font-bold opacity-80 leading-tight">
                 <p>Statement</p>
-                <p className="italic font-bold">No. {serial} ... (v18.2)</p>
+                <p className="italic font-serif">No. {serial} ... (s8d7)</p>
               </div>
 
-              <div className="flex-grow w-full relative flex items-center justify-center px-6">
-                <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
-                  <img src={item.image_url} alt="" className="max-w-full max-h-full object-contain mix-blend-multiply opacity-95" />
-                  <div className="absolute inset-0 pointer-events-none opacity-40" 
-                       style={{ background: 'radial-gradient(circle, transparent 30%, rgba(0,0,0,0.5) 100%)' }} />
+              {/* グレーの余白を消去：画像コンテナが下まで伸び、背景と一体化 */}
+              <div className="flex-grow w-full relative flex flex-col items-center bg-[#F5F2E9]">
+                <div className="w-[88%] aspect-square relative overflow-hidden flex items-center justify-center">
+                  <img src={item.image_url} alt="" className="w-full h-full object-cover mix-blend-multiply opacity-90" />
+                  <div className="absolute inset-0 pointer-events-none" 
+                       style={{ background: 'radial-gradient(circle, transparent 40%, rgba(0,0,0,0.3) 100%)' }} />
                 </div>
+                {/* 画像の下にグレーが出ないよう、カードの地の色で埋める */}
+                <div className="flex-grow w-full bg-[#F5F2E9]" />
               </div>
 
-              <div className="p-8 pt-4 text-[11px] font-bold opacity-60 italic tracking-tighter shrink-0">
-                <p>No. / Artifact / {serial} / RANDOM_ST</p>
+              <div className="p-8 pt-4 text-[11px] font-bold opacity-60 italic tracking-tighter">
+                <p>No. / Artifact / {serial} / 1992 RUBBISH</p>
               </div>
             </div>
-
             <div className="absolute inset-0 [transform:rotateY(180deg)] [backface-visibility:hidden] rounded-[28px] border border-black/[0.04] overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.12)]">
               <CardBack item={item} />
             </div>
           </div>
-        </div>
-
-        <div className="h-16 mt-8 flex items-center justify-center space-x-16 z-10">
-          {isFlipped && (
-            <button onClick={(e) => { e.stopPropagation(); deleteCard(item, isMain); }} className="text-[18px] opacity-10 hover:opacity-100 px-4 active:scale-75 transition-all text-black font-sans">×</button>
-          )}
         </div>
       </div>
     );
   };
 
   return (
-    <div className="min-h-screen bg-[#EBE8DB] text-[#2D2D2D] overflow-x-hidden select-none">
+    <div className="min-h-screen bg-[#EBE8DB] text-[#2D2D2D] overflow-x-hidden select-none font-serif">
       <style jsx global>{`
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
 
-      <div className="pt-28 pb-64 min-h-screen">
+      {/* 1番上に固定され、スクロールで見えなくなるヘッダー */}
+      <header className="w-full h-32 flex flex-col items-center justify-center opacity-40">
+        <p className="text-[10px] tracking-[0.5em] font-bold uppercase mb-2">Rubbish Artifact</p>
+        <div className="w-[1px] h-10 bg-black opacity-20" />
+      </header>
+
+      <div className="pb-64">
         <div className="flex flex-col space-y-24">
           {allCards.map(main => (
             <div key={main.id} className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar outline-none items-start">
               <Card item={main} isMain={true} />
               {(sideCells[main.id] || []).map(side => <Card key={side.id} item={side} isMain={false} />)}
-              <div className="flex-shrink-0 w-screen snap-center flex items-center justify-center">
-                <label className="w-[300px] h-[485px] flex items-center justify-center cursor-pointer rounded-[28px] border-2 border-dashed border-black/5 hover:bg-black/5 transition-all">
-                  <span className="text-2xl opacity-5 font-serif italic">○</span>
+              <div className="flex-shrink-0 w-screen snap-center flex items-center justify-center h-full pt-12">
+                <label className="w-[300px] h-[485px] flex items-center justify-center cursor-pointer rounded-[28px] border border-black/5 bg-black/5 active:scale-95 transition-all">
+                  <span className="text-2xl opacity-10 font-serif italic">○</span>
                   <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadFile(e, main.id)} />
                 </label>
               </div>
@@ -220,13 +185,13 @@ export default function Page() {
 
       <nav className="fixed bottom-12 left-0 right-0 flex flex-col items-center z-50">
         <label className="w-16 h-16 flex items-center justify-center cursor-pointer bg-[#F5F2E9] rounded-full shadow-xl border border-black/5 active:scale-90 transition-transform">
-          <span className="text-2xl opacity-60 font-serif">◎</span>
+          <span className="text-2xl opacity-60">◎</span>
           <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadFile(e)} />
         </label>
-        <p className="mt-4 text-[9px] opacity-20 tracking-[0.4em] font-bold font-serif uppercase">recta . 2026</p>
+        <p className="mt-4 text-[9px] opacity-20 tracking-[0.4em] font-bold">© 1992 RUBBISH</p>
       </nav>
 
-      {isUploading && <div className="fixed inset-0 bg-[#EBE8DB]/60 backdrop-blur-sm z-[100] flex items-center justify-center"><div className="w-8 h-[1px] bg-black opacity-30 animate-pulse" /></div>}
+      {isUploading && <div className="fixed inset-0 bg-[#EBE8DB]/60 backdrop-blur-sm z-[100] flex items-center justify-center animate-pulse">Processing...</div>}
     </div>
   );
 }

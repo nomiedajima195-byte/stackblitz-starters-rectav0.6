@@ -10,22 +10,16 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 const LIFESPAN_MS = 168 * 60 * 60 * 1000;
 
 const CardBack = ({ item }: any) => {
-  const serial = item.id.split('.')[0].slice(-6).toUpperCase();
   return (
-    <div className="w-full h-full bg-[#FCF9F2] flex flex-col items-center justify-between p-8 text-[#1A1A1A] border-[0.5px] border-black/10 shadow-inner overflow-hidden">
-      <div className="w-full flex justify-between items-start font-serif">
-        <div className="flex flex-col text-left">
-          <span className="text-[6px] tracking-[0.2em] opacity-40 uppercase font-sans font-bold">Statement</span>
-          <span className="text-[10px] opacity-60 italic tracking-tighter">No. {serial}</span>
-        </div>
-      </div>
-      <div className="flex flex-col items-center text-center px-2">
-        <p className="text-[11px] tracking-[0.4em] font-serif italic opacity-70 uppercase leading-[2.2]">
-          Human<br/>is<br/>Rubbish
+    <div className="w-full h-full bg-[#F7F5ED] flex flex-col items-center justify-center p-6 text-[#2D2D2D] border-[0.5px] border-black/5 shadow-inner overflow-hidden">
+      <div className="flex flex-col items-center text-center space-y-2">
+        <p className="text-[10px] font-serif opacity-30 italic mb-4 uppercase tracking-[0.2em]">Presslie Action</p>
+        <p className="text-[28px] font-serif leading-tight opacity-80">
+          User<br/>is<br/>Rubbish
         </p>
       </div>
-      <div className="w-full flex justify-end">
-        <span className="text-[5px] font-mono opacity-10 tracking-[0.1em] uppercase">© 2026 RECTA</span>
+      <div className="absolute bottom-6 w-full text-center">
+        <span className="text-[6px] font-mono opacity-10 tracking-[0.3em] uppercase">RECTA ARTIFACT SYSTEM</span>
       </div>
     </div>
   );
@@ -91,17 +85,18 @@ export default function Page() {
       canvas.width = targetW; canvas.height = targetH;
       const ctx = canvas.getContext('2d');
       if (ctx) {
-        ctx.fillStyle = "white"; ctx.fillRect(0, 0, targetW, targetH);
+        ctx.fillStyle = "#F7F5ED"; ctx.fillRect(0, 0, targetW, targetH);
         const imgRatio = img.width / img.height;
-        if (imgRatio >= 0.8 && imgRatio <= 1.2) {
-          ctx.drawImage(img, 20, 20, targetW-40, targetW-40);
-        } else {
-          const targetRatio = targetW / targetH;
-          let dW, dH, dX, dY;
-          if (imgRatio > targetRatio) { dH = targetH; dW = targetH * imgRatio; dX = (targetW - dW) / 2; dY = 0; }
-          else { dW = targetW; dH = targetW / imgRatio; dX = 0; dY = (targetH - dH) / 2; }
-          ctx.drawImage(img, dX, dY, dW, dH);
-        }
+        // 画像のデザイン通りの余白感
+        const padding = 24;
+        const drawW = targetW - (padding * 2);
+        const drawH = drawW; // 正方形で切り抜き
+        ctx.save();
+        ctx.beginPath();
+        ctx.roundRect(padding, 40, drawW, drawH, 12);
+        ctx.clip();
+        ctx.drawImage(img, padding, 40, drawW, drawH);
+        ctx.restore();
       }
       canvas.toBlob(async (blob) => {
         if (blob) {
@@ -167,30 +162,37 @@ export default function Page() {
     return (
       <div id={item.id} className="flex-shrink-0 w-screen snap-center relative flex flex-col items-center py-12">
         <div 
-          className="relative w-full max-w-[280px] select-none z-20"
+          className="relative w-full max-w-[280px] select-none z-20 cursor-pointer"
           style={{ perspective: '1200px', aspectRatio: '1 / 1.618' }}
           onClick={() => handleFlipRequest(item.id)}
         >
           <div className={`relative w-full h-full transition-transform duration-700 [transform-style:preserve-3d] ${isFlipped ? '[transform:rotateY(180deg)]' : ''}`}>
-            <div className="absolute inset-0 bg-white p-[8px] rounded-[18px] border border-black/5 overflow-hidden [backface-visibility:hidden] 
-              shadow-[0_20px_50px_rgba(0,0,0,0.1),0_10px_20px_rgba(0,0,0,0.08)]">
-              <div className="w-full h-full rounded-[12px] relative overflow-hidden bg-[#F9F9F9]" style={{ backgroundImage: `url(${item.image_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
-                <span className="absolute bottom-3 left-3 text-[7px] font-mono text-white/50 tracking-[0.2em] pointer-events-none mix-blend-difference uppercase">
-                  No.{serial}
-                </span>
+            {/* Front: Artifact Style */}
+            <div className="absolute inset-0 bg-[#F7F5ED] p-4 rounded-[28px] border border-black/[0.03] [backface-visibility:hidden] 
+              shadow-[0_15px_40px_rgba(0,0,0,0.12),0_5px_15px_rgba(0,0,0,0.08)] flex flex-col">
+              <div className="w-full mb-3 px-1">
+                <p className="text-[8px] font-serif opacity-40 leading-tight">Statement</p>
+                <p className="text-[8px] font-serif opacity-30 italic">No. {serial}</p>
+              </div>
+              <div className="flex-grow w-full rounded-[14px] overflow-hidden bg-[#EAE7D9]/50" 
+                style={{ backgroundImage: `url(${item.image_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
+              </div>
+              <div className="w-full mt-auto pt-3 px-1 text-center">
+                <p className="text-[7px] font-serif opacity-20 tracking-widest uppercase italic truncate">No./{item.id}</p>
               </div>
             </div>
-            <div className="absolute inset-0 [transform:rotateY(180deg)] [backface-visibility:hidden] rounded-[18px] border border-black/5 overflow-hidden
-              shadow-[0_20px_50px_rgba(0,0,0,0.1),0_10px_20px_rgba(0,0,0,0.08)]">
+            {/* Back: Artifact Style */}
+            <div className="absolute inset-0 [transform:rotateY(180deg)] [backface-visibility:hidden] rounded-[28px] border border-black/[0.03] overflow-hidden
+              shadow-[0_15px_40px_rgba(0,0,0,0.12),0_5px_15px_rgba(0,0,0,0.08)]">
               <CardBack item={item} />
             </div>
           </div>
         </div>
 
-        <div className="h-16 mt-6 flex items-center justify-center space-x-14 z-10">
+        <div className="h-16 mt-8 flex items-center justify-center space-x-16 z-10">
           {isFlipped ? (
             <>
-              <button onClick={(e) => { e.stopPropagation(); generateLink(item.id); }} className="text-[16px] opacity-30 hover:opacity-100 px-4 active:scale-75 transition-all text-black">▲</button>
+              <button onClick={(e) => { e.stopPropagation(); generateLink(item.id); }} className="text-[16px] opacity-20 hover:opacity-100 px-4 active:scale-75 transition-all text-black">▲</button>
               {isOwner && (
                 <button onClick={(e) => { e.stopPropagation(); deleteCard(item, isMain); }} className="text-[18px] opacity-10 hover:opacity-100 px-4 active:scale-75 transition-all text-black">×</button>
               )}
@@ -204,43 +206,43 @@ export default function Page() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F2F2F2] text-black overflow-x-hidden font-sans select-none">
-      {/* スクロールバー消去用スタイル */}
+    <div className="min-h-screen bg-[#EAE7D9] text-[#2D2D2D] overflow-x-hidden font-serif select-none">
       <style jsx global>{`
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
 
       <header className="fixed top-0 left-0 right-0 h-24 flex flex-col justify-center items-center z-50 pointer-events-none">
-        <div className="w-[1px] h-10 bg-black/80" />
+        <div className="w-[1px] h-10 bg-black/20" />
       </header>
 
       <div className="pt-28 pb-64 min-h-screen">
-        <div className="flex flex-col space-y-24">
+        <div className="flex flex-col space-y-20">
           {allCards.map(main => (
             <div key={main.id} className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar outline-none items-start">
               <Card item={main} isMain={true} />
               {(sideCells[main.id] || []).map(side => <Card key={side.id} item={side} isMain={false} />)}
               <div className="flex-shrink-0 w-screen snap-center flex flex-col items-center py-12 h-full justify-center">
                 <label className="w-[280px] h-[453px] flex items-center justify-center cursor-pointer group">
-                  <div className="text-[24px] opacity-5 group-hover:opacity-40 transition-opacity">○</div>
+                  <div className="text-[20px] opacity-5 group-hover:opacity-30 transition-opacity font-serif italic">○</div>
                   <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadFile(e, main.id)} />
                 </label>
               </div>
             </div>
           ))}
-          {allCards.length === 0 && <div className="h-[60vh] flex items-center justify-center opacity-5 text-[12px] tracking-[0.5em] uppercase font-mono">The Street is Quiet</div>}
+          {allCards.length === 0 && <div className="h-[60vh] flex items-center justify-center opacity-10 text-[10px] tracking-[0.4em] uppercase font-serif italic">Quiet artifacts on the street</div>}
         </div>
       </div>
 
-      <nav className="fixed bottom-12 left-0 right-0 flex justify-center items-center z-50">
-        <label className="w-14 h-14 flex items-center justify-center cursor-pointer transition-all active:scale-75 hover:scale-110">
-          <span className="text-[28px] opacity-80 leading-none">◎</span>
+      <nav className="fixed bottom-12 left-0 right-0 flex flex-col items-center z-50">
+        <label className="w-16 h-16 flex items-center justify-center cursor-pointer transition-all active:scale-75 hover:scale-105 bg-[#F7F5ED]/50 backdrop-blur-sm rounded-full shadow-lg border border-white/20">
+          <span className="text-[24px] opacity-60 leading-none">◎</span>
           <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadFile(e)} />
         </label>
+        <div className="mt-4 text-[8px] opacity-20 tracking-[0.3em] font-serif uppercase">© 2026 RECTA</div>
       </nav>
 
-      {isUploading && <div className="fixed inset-0 bg-[#F2F2F2]/40 backdrop-blur-sm z-[60] flex items-center justify-center"><div className="w-4 h-[1px] bg-black animate-pulse" /></div>}
+      {isUploading && <div className="fixed inset-0 bg-[#EAE7D9]/60 backdrop-blur-sm z-[60] flex items-center justify-center"><div className="w-4 h-[1px] bg-black opacity-30 animate-pulse" /></div>}
     </div>
   );
 }

@@ -10,7 +10,7 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const LIFESPAN_MS = 168 * 60 * 60 * 1000; 
 const CARD_BG = "#F5F2E9";
-const MAX_PIXEL = 320; // 320pxまで落として「軽さ」と「味」を両立
+const MAX_PIXEL = 320; 
 
 // --- Components ---
 
@@ -44,7 +44,8 @@ export default function Page() {
     fetchData();
   }, []);
 
-  const fetchData = useCallback(async () => {
+  // fetchDataにscrollToId引数を追加
+  const fetchData = useCallback(async (scrollToId?: string) => {
     const now = new Date().getTime();
     const { data: m } = await supabase.from('mainline').select('*');
     const { data: s } = await supabase.from('side_cells').select('*');
@@ -63,6 +64,16 @@ export default function Page() {
     };
 
     const shuffledMain = shuffle(activeMain);
+    
+    // もし特定のIDへのジャンプ要求がある場合、そのIDを配列の先頭に持ってくる（強制最前面）
+    if (scrollToId) {
+      const index = shuffledMain.findIndex(c => c.id === scrollToId);
+      if (index !== -1) {
+        const [target] = shuffledMain.splice(index, 1);
+        shuffledMain.unshift(target);
+      }
+    }
+
     const groupedSides: {[key: string]: any[]} = {};
     activeSide.forEach(item => {
       if (!groupedSides[item.parent_id]) groupedSides[item.parent_id] = [];
@@ -72,14 +83,15 @@ export default function Page() {
     setAllCards(shuffledMain);
     setSideCells(groupedSides);
 
-    const hash = window.location.hash;
-    if (hash) {
+    // 描画後にスクロール
+    const targetId = scrollToId || window.location.hash.replace('#', '');
+    if (targetId) {
       setTimeout(() => {
-        const target = document.getElementById(hash.replace('#', ''));
+        const target = document.getElementById(targetId);
         if (target) {
           target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
         }
-      }, 500);
+      }, 600);
     }
   }, []);
 
@@ -93,7 +105,6 @@ export default function Page() {
     img.onload = async () => {
       let w = img.width;
       let h = img.height;
-      // 320pxの極小リミット
       if (w > h && w > MAX_PIXEL) { h *= MAX_PIXEL / w; w = MAX_PIXEL; }
       else if (h > MAX_PIXEL) { w *= MAX_PIXEL / h; h = MAX_PIXEL; }
 
@@ -114,10 +125,13 @@ export default function Page() {
           
           if (!parentId) {
             await supabase.from('mainline').insert([{ id: fileName, image_url: publicUrl, owner_id: pocketId, is_public: true }]);
+            // メイン追加時は、そのファイルを先頭にして再描画
+            await fetchData(fileName);
           } else {
             await supabase.from('side_cells').insert([{ id: fileName, image_url: publicUrl, owner_id: pocketId, parent_id: parentId }]);
+            // 横丁追加時は、親のメインカードの場所へスクロール
+            await fetchData(parentId);
           }
-          await fetchData();
         }
         setIsUploading(false);
       }, 'image/png');
@@ -156,7 +170,6 @@ export default function Page() {
           }}
         >
           <div className={`relative w-full h-full transition-transform duration-[800ms] [transform-style:preserve-3d] ${isFlipped ? '[transform:rotateY(180deg)]' : ''}`}>
-            {/* Front */}
             <div className="absolute inset-0 bg-[#F5F2E9] rounded-[28px] border border-black/[0.04] [backface-visibility:hidden] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.15)] flex flex-col items-center overflow-hidden">
               <div className="w-full pt-10 px-8 shrink-0">
                 <p className="tracking-[0.2em] uppercase text-[9px] mb-1 opacity-30 font-bold">Statement</p>
@@ -164,12 +177,7 @@ export default function Page() {
               </div>
               <div className="w-full flex-grow flex items-center justify-center px-6">
                 <div className={`w-full ${aspectRatio} relative flex items-center justify-center`}>
-                   <img 
-                    src={item.image_url} 
-                    alt="" 
-                    className="w-full h-full object-contain opacity-95 image-pixelated transition-opacity duration-300" 
-                    loading="lazy"
-                  />
+                   <img src={item.image_url} alt="" className="w-full h-full object-contain opacity-95 image-pixelated transition-opacity duration-300" loading="lazy" />
                 </div>
               </div>
               <div className="w-full pb-10 px-8 flex items-center justify-between text-[9px] font-bold opacity-20 italic shrink-0">
@@ -177,7 +185,6 @@ export default function Page() {
                 <span className="tracking-[0.1em]">RUBBISH</span>
               </div>
             </div>
-            {/* Back */}
             <div className="absolute inset-0 [transform:rotateY(180deg)] [backface-visibility:hidden] rounded-[28px] border border-black/[0.04] overflow-hidden shadow-[0_25px_50px_-12px_rgba(0,0,0,0.15)]">
               <CardBack />
             </div>
@@ -187,7 +194,7 @@ export default function Page() {
           <button onClick={() => {
             const baseUrl = window.location.origin + window.location.pathname;
             navigator.clipboard.writeText(`${baseUrl}#${item.id}`);
-            alert(`No. ${serial} のリンクを保存しました`);
+            alert(`No. ${serial} のリンクをコピーしました`);
           }} className="text-xl opacity-20 hover:opacity-100 p-2">▲</button>
           <button onClick={async () => {
             if (window.confirm("Delete?")) {

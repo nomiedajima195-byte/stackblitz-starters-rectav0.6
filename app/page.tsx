@@ -15,15 +15,15 @@ const CARD_BG = "#F5F2E9";
 
 const CardBack = () => (
   <div className="w-full h-full bg-[#F5F2E9] flex flex-col items-center justify-center p-10 text-[#2D2D2D] border-[0.5px] border-black/5 shadow-inner overflow-hidden font-serif">
-    <div className="absolute top-8 left-8 text-left opacity-60">
-      <p className="text-[10px] leading-tight font-serif font-bold">Presslie Action</p>
+    <div className="absolute top-10 left-10 text-left opacity-60">
+      <p className="text-[11px] leading-tight font-serif font-bold">Presslie Action</p>
     </div>
     <div className="flex flex-col items-center text-center">
-      <p className="text-[30px] leading-[1.1] font-bold tracking-tighter opacity-95">
+      <p className="text-[34px] leading-[1.1] font-bold tracking-tighter opacity-95">
         User<br/>is<br/>Rubbish
       </p>
     </div>
-    <div className="absolute bottom-8 w-full text-center opacity-20">
+    <div className="absolute bottom-10 w-full text-center opacity-20">
       <span className="text-[8px] font-mono tracking-[0.5em] uppercase font-bold">1992 RUBBISH</span>
     </div>
   </div>
@@ -146,36 +146,35 @@ export default function Page() {
     return (
       <div id={item.id} className="flex-shrink-0 w-screen snap-center relative flex flex-col items-center py-10 font-serif group">
         <div 
-          className="relative w-full max-w-[300px] select-none z-20 cursor-pointer"
-          style={{ perspective: '1500px', aspectRatio: '1 / 1.45' }}
+          className="relative w-full max-w-[310px] select-none z-20 cursor-pointer"
+          style={{ perspective: '1500px', aspectRatio: '1 / 1.618' }}
           onClick={() => handleFlipRequest(item.id)}
         >
           <div className={`relative w-full h-full transition-transform duration-[800ms] [transform-style:preserve-3d] ${isFlipped ? '[transform:rotateY(180deg)]' : ''}`}>
             
             {/* Front */}
-            <div className="absolute inset-0 bg-[#F5F2E9] rounded-[24px] border border-black/[0.03] [backface-visibility:hidden] shadow-[0_20px_40px_-10px_rgba(0,0,0,0.12)] flex flex-col overflow-hidden">
+            <div className="absolute inset-0 bg-[#F5F2E9] rounded-[28px] border border-black/[0.04] [backface-visibility:hidden] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.15)] flex flex-col items-center overflow-hidden">
               
-              {/* Header: 固定高さで安定させる */}
-              <div className="h-24 flex flex-col justify-end px-8 pb-2 shrink-0">
+              <div className="w-full pt-10 px-9 shrink-0">
                 <p className="tracking-[0.2em] uppercase text-[9px] mb-1 opacity-30 font-bold">Statement</p>
-                <p className="italic font-serif text-[13px] opacity-80">No. {serial} ... (s8d7)</p>
+                <p className="italic font-serif text-[13px] opacity-80 leading-tight">No. {serial} ... (s8d7)</p>
               </div>
 
-              {/* Main Image: px-10にして画像を少し小さくし、中央に余白を持って配置 */}
-              <div className="flex-grow flex items-center justify-center px-10">
-                <div className="w-full aspect-square relative overflow-hidden rounded-[1px] bg-[#EAE7DC] shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
-                  <img 
-                    src={item.image_url} 
-                    alt="" 
-                    className="w-full h-full object-cover mix-blend-multiply opacity-90" 
-                  />
-                  <div className="absolute inset-0 pointer-events-none" 
-                       style={{ background: 'linear-gradient(180deg, transparent 85%, rgba(0,0,0,0.015) 100%)' }} />
+              <div className="w-full flex-grow flex items-center justify-center px-8">
+                <div className="w-full aspect-[3/4] flex items-center justify-center relative">
+                  <div className="w-full aspect-square relative overflow-hidden rounded-[1px] bg-[#EAE7DC] shadow-[0_2px_15px_rgba(0,0,0,0.03)]">
+                    <img 
+                      src={item.image_url} 
+                      alt="" 
+                      className="w-full h-full object-cover mix-blend-multiply opacity-90" 
+                    />
+                    <div className="absolute inset-0 pointer-events-none" 
+                         style={{ background: 'linear-gradient(180deg, transparent 80%, rgba(0,0,0,0.01) 100%)' }} />
+                  </div>
                 </div>
               </div>
 
-              {/* Footer: 固定高さ */}
-              <div className="h-20 flex items-start justify-between px-8 pt-4 text-[9px] font-bold opacity-20 italic shrink-0">
+              <div className="w-full pb-10 px-9 flex items-center justify-between text-[9px] font-bold opacity-20 italic shrink-0">
                 <span className="tracking-[0.05em]">No. / Artifact / {serial}</span>
                 <span className="tracking-[0.1em]">RUBBISH</span>
               </div>
@@ -183,7 +182,7 @@ export default function Page() {
             </div>
 
             {/* Back */}
-            <div className="absolute inset-0 [transform:rotateY(180deg)] [backface-visibility:hidden] rounded-[24px] border border-black/[0.03] overflow-hidden shadow-[0_20px_40px_-10px_rgba(0,0,0,0.12)]">
+            <div className="absolute inset-0 [transform:rotateY(180deg)] [backface-visibility:hidden] rounded-[28px] border border-black/[0.04] overflow-hidden shadow-[0_25px_50px_-12px_rgba(0,0,0,0.15)]">
               <CardBack />
             </div>
           </div>
@@ -215,8 +214,10 @@ export default function Page() {
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
 
-      <header className="w-full h-24 flex flex-col items-center justify-end opacity-20">
-        <div className="w-[1px] h-10 bg-black opacity-30" />
+      {/* ヘッダーの表記を変更 */}
+      <header className="w-full h-32 flex flex-col items-center justify-center opacity-40">
+        <p className="text-[10px] tracking-[0.5em] font-bold uppercase mb-2">Rubbish Artifact</p>
+        <div className="w-[1px] h-10 bg-black opacity-20" />
       </header>
 
       <div className="pb-64 pt-6">
@@ -227,7 +228,7 @@ export default function Page() {
               {(sideCells[main.id] || []).map(side => <Card key={side.id} item={side} isMain={false} />)}
               
               <div className="flex-shrink-0 w-screen snap-center flex items-center justify-center h-full pt-10">
-                <label className="w-[300px] h-[435px] flex items-center justify-center cursor-pointer rounded-[24px] border border-black/5 bg-black/[0.01] hover:bg-black/[0.03] active:scale-95 transition-all">
+                <label className="w-[310px] h-[502px] flex items-center justify-center cursor-pointer rounded-[28px] border border-black/5 bg-black/[0.01] hover:bg-black/[0.03] active:scale-95 transition-all">
                   <span className="text-xl opacity-10 font-serif italic">＋</span>
                   <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadFile(e, main.id)} />
                 </label>

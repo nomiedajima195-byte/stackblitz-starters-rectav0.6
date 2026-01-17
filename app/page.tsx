@@ -10,7 +10,7 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const LIFESPAN_MS = 168 * 60 * 60 * 1000; 
 const CARD_BG = "#F5F2E9";
-const MAX_PIXEL = 512; 
+const MAX_PIXEL = 320; // 320pxまで落として「軽さ」と「味」を両立
 
 // --- Components ---
 
@@ -53,7 +53,6 @@ export default function Page() {
     const activeMain = m.filter(card => (now - new Date(card.created_at).getTime()) < LIFESPAN_MS);
     const activeSide = s.filter(card => (now - new Date(card.created_at).getTime()) < LIFESPAN_MS);
 
-    // ランダムシャッフル（復活）
     const shuffle = (array: any[]) => {
       const arr = [...array];
       for (let i = arr.length - 1; i > 0; i--) {
@@ -73,16 +72,14 @@ export default function Page() {
     setAllCards(shuffledMain);
     setSideCells(groupedSides);
 
-    // データ反映後、ハッシュがあればその№の場所へジャンプ
     const hash = window.location.hash;
     if (hash) {
       setTimeout(() => {
-        // IDに含まれる特殊文字を考慮してエスケープして取得
         const target = document.getElementById(hash.replace('#', ''));
         if (target) {
           target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
         }
-      }, 600);
+      }, 500);
     }
   }, []);
 
@@ -96,6 +93,7 @@ export default function Page() {
     img.onload = async () => {
       let w = img.width;
       let h = img.height;
+      // 320pxの極小リミット
       if (w > h && w > MAX_PIXEL) { h *= MAX_PIXEL / w; w = MAX_PIXEL; }
       else if (h > MAX_PIXEL) { w *= MAX_PIXEL / h; h = MAX_PIXEL; }
 
@@ -110,7 +108,6 @@ export default function Page() {
 
       canvas.toBlob(async (blob) => {
         if (blob) {
-          // ID自体をリンクのアンカーとして利用
           const fileName = `${Date.now()}-${Math.random().toString(36).slice(2,7)}.png`;
           await supabase.storage.from('images').upload(fileName, blob, { contentType: 'image/png' });
           const { data: { publicUrl } } = supabase.storage.from('images').getPublicUrl(fileName);
@@ -130,7 +127,6 @@ export default function Page() {
   const Card = ({ item, isMain }: { item: any, isMain: boolean }) => {
     const [aspectRatio, setAspectRatio] = useState<'aspect-square' | 'aspect-[3/4]'>('aspect-[3/4]');
     const isFlipped = flippedIds.has(item.id);
-    // №はこのID（ファイル名）の末尾から生成される
     const serial = item.id.split('-')[0].slice(-6).toUpperCase();
 
     useEffect(() => {
@@ -138,7 +134,7 @@ export default function Page() {
       img.src = item.image_url;
       img.onload = () => {
         const ratio = img.width / img.height;
-        setAspectRatio(ratio > 0.85 && ratio < 1.15 ? 'aspect-square' : 'aspect-[3/4]');
+        setAspectRatio(ratio > 0.8 && ratio < 1.2 ? 'aspect-square' : 'aspect-[3/4]');
       };
     }, [item.image_url]);
 
@@ -160,14 +156,20 @@ export default function Page() {
           }}
         >
           <div className={`relative w-full h-full transition-transform duration-[800ms] [transform-style:preserve-3d] ${isFlipped ? '[transform:rotateY(180deg)]' : ''}`}>
+            {/* Front */}
             <div className="absolute inset-0 bg-[#F5F2E9] rounded-[28px] border border-black/[0.04] [backface-visibility:hidden] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.15)] flex flex-col items-center overflow-hidden">
               <div className="w-full pt-10 px-8 shrink-0">
                 <p className="tracking-[0.2em] uppercase text-[9px] mb-1 opacity-30 font-bold">Statement</p>
                 <p className="italic font-serif text-[13px] opacity-80 leading-tight">No. {serial}</p>
               </div>
-              <div className="w-full flex-grow flex items-center justify-center px-4">
-                <div className={`w-full ${aspectRatio} relative flex items-center justify-center overflow-hidden`}>
-                   <img src={item.image_url} alt="" className="w-full h-full object-contain mix-blend-multiply opacity-95 image-pixelated scale-[1.05]" />
+              <div className="w-full flex-grow flex items-center justify-center px-6">
+                <div className={`w-full ${aspectRatio} relative flex items-center justify-center`}>
+                   <img 
+                    src={item.image_url} 
+                    alt="" 
+                    className="w-full h-full object-contain opacity-95 image-pixelated transition-opacity duration-300" 
+                    loading="lazy"
+                  />
                 </div>
               </div>
               <div className="w-full pb-10 px-8 flex items-center justify-between text-[9px] font-bold opacity-20 italic shrink-0">
@@ -175,6 +177,7 @@ export default function Page() {
                 <span className="tracking-[0.1em]">RUBBISH</span>
               </div>
             </div>
+            {/* Back */}
             <div className="absolute inset-0 [transform:rotateY(180deg)] [backface-visibility:hidden] rounded-[28px] border border-black/[0.04] overflow-hidden shadow-[0_25px_50px_-12px_rgba(0,0,0,0.15)]">
               <CardBack />
             </div>

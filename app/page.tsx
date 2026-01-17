@@ -146,59 +146,60 @@ export default function Page() {
     return (
       <div id={item.id} className="flex-shrink-0 w-screen snap-center relative flex flex-col items-center py-10 font-serif group">
         <div 
-          className="relative w-full max-w-[310px] select-none z-20 cursor-pointer"
-          style={{ perspective: '1500px', aspectRatio: '1 / 1.52' }}
+          className="relative w-full max-w-[300px] select-none z-20 cursor-pointer"
+          style={{ perspective: '1500px', aspectRatio: '1 / 1.45' }}
           onClick={() => handleFlipRequest(item.id)}
         >
           <div className={`relative w-full h-full transition-transform duration-[800ms] [transform-style:preserve-3d] ${isFlipped ? '[transform:rotateY(180deg)]' : ''}`}>
             
             {/* Front */}
-            <div className="absolute inset-0 bg-[#F5F2E9] rounded-[30px] border border-black/[0.03] [backface-visibility:hidden] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.12)] flex flex-col justify-between overflow-hidden">
+            <div className="absolute inset-0 bg-[#F5F2E9] rounded-[24px] border border-black/[0.03] [backface-visibility:hidden] shadow-[0_20px_40px_-10px_rgba(0,0,0,0.12)] flex flex-col overflow-hidden">
               
-              {/* Top Section */}
-              <div className="pt-9 px-9 text-[11px] font-bold opacity-70 leading-tight shrink-0">
-                <p className="tracking-[0.2em] uppercase text-[9px] mb-1 opacity-40">Statement</p>
-                <p className="italic font-serif text-[13px]">No. {serial} ... (s8d7)</p>
+              {/* Header: 固定高さで安定させる */}
+              <div className="h-24 flex flex-col justify-end px-8 pb-2 shrink-0">
+                <p className="tracking-[0.2em] uppercase text-[9px] mb-1 opacity-30 font-bold">Statement</p>
+                <p className="italic font-serif text-[13px] opacity-80">No. {serial} ... (s8d7)</p>
               </div>
 
-              {/* Image Section: Center focused */}
-              <div className="flex-grow flex items-center justify-center px-8">
-                <div className="w-full aspect-square relative overflow-hidden rounded-[2px] bg-[#EAE7DC] shadow-[0_2px_15px_rgba(0,0,0,0.03)]">
+              {/* Main Image: px-10にして画像を少し小さくし、中央に余白を持って配置 */}
+              <div className="flex-grow flex items-center justify-center px-10">
+                <div className="w-full aspect-square relative overflow-hidden rounded-[1px] bg-[#EAE7DC] shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
                   <img 
                     src={item.image_url} 
                     alt="" 
                     className="w-full h-full object-cover mix-blend-multiply opacity-90" 
                   />
                   <div className="absolute inset-0 pointer-events-none" 
-                       style={{ background: 'linear-gradient(180deg, transparent 80%, rgba(0,0,0,0.02) 100%)' }} />
+                       style={{ background: 'linear-gradient(180deg, transparent 85%, rgba(0,0,0,0.015) 100%)' }} />
                 </div>
               </div>
 
-              {/* Bottom Section */}
-              <div className="pb-9 px-9 text-[10px] font-bold opacity-25 italic tracking-[0.05em] flex justify-between items-center shrink-0">
-                <span>No. / Artifact / {serial}</span>
+              {/* Footer: 固定高さ */}
+              <div className="h-20 flex items-start justify-between px-8 pt-4 text-[9px] font-bold opacity-20 italic shrink-0">
+                <span className="tracking-[0.05em]">No. / Artifact / {serial}</span>
                 <span className="tracking-[0.1em]">RUBBISH</span>
               </div>
+
             </div>
 
             {/* Back */}
-            <div className="absolute inset-0 [transform:rotateY(180deg)] [backface-visibility:hidden] rounded-[30px] border border-black/[0.03] overflow-hidden shadow-[0_25px_50px_-12px_rgba(0,0,0,0.12)]">
+            <div className="absolute inset-0 [transform:rotateY(180deg)] [backface-visibility:hidden] rounded-[24px] border border-black/[0.03] overflow-hidden shadow-[0_20px_40px_-10px_rgba(0,0,0,0.12)]">
               <CardBack />
             </div>
           </div>
         </div>
 
         {/* --- Actions --- */}
-        <div className="mt-6 flex items-center space-x-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+        <div className="mt-8 flex items-center space-x-12 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
           <button 
             onClick={(e) => { e.stopPropagation(); copyCardLink(item.id); }}
-            className="text-lg opacity-20 hover:opacity-100 transition-all hover:scale-125 p-2"
+            className="text-xl opacity-20 hover:opacity-100 transition-all hover:scale-125 p-2"
           >
             ▲
           </button>
           <button 
             onClick={(e) => { e.stopPropagation(); deleteCard(item.id, isMain); }}
-            className="text-lg opacity-20 hover:opacity-100 transition-all hover:scale-125 p-2 text-red-900"
+            className="text-xl opacity-20 hover:opacity-100 transition-all hover:scale-125 p-2 text-red-900"
           >
             ✕
           </button>
@@ -218,16 +219,16 @@ export default function Page() {
         <div className="w-[1px] h-10 bg-black opacity-30" />
       </header>
 
-      <div className="pb-64 pt-10">
-        <div className="flex flex-col space-y-24">
+      <div className="pb-64 pt-6">
+        <div className="flex flex-col space-y-20">
           {allCards.map(main => (
             <div key={main.id} className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar outline-none items-start">
               <Card item={main} isMain={true} />
               {(sideCells[main.id] || []).map(side => <Card key={side.id} item={side} isMain={false} />)}
               
               <div className="flex-shrink-0 w-screen snap-center flex items-center justify-center h-full pt-10">
-                <label className="w-[310px] h-[470px] flex items-center justify-center cursor-pointer rounded-[30px] border-2 border-dashed border-black/5 bg-black/[0.01] hover:bg-black/[0.03] active:scale-95 transition-all">
-                  <span className="text-2xl opacity-10 font-serif italic">＋</span>
+                <label className="w-[300px] h-[435px] flex items-center justify-center cursor-pointer rounded-[24px] border border-black/5 bg-black/[0.01] hover:bg-black/[0.03] active:scale-95 transition-all">
+                  <span className="text-xl opacity-10 font-serif italic">＋</span>
                   <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadFile(e, main.id)} />
                 </label>
               </div>
@@ -245,8 +246,8 @@ export default function Page() {
       </nav>
 
       {isUploading && (
-        <div className="fixed inset-0 bg-[#EBE8DB]/80 backdrop-blur-md z-[100] flex flex-col items-center justify-center animate-pulse">
-          <p className="text-[10px] tracking-[0.3em] opacity-40 italic font-bold">ARCHIVING...</p>
+        <div className="fixed inset-0 bg-[#EBE8DB]/80 backdrop-blur-md z-[100] flex flex-col items-center justify-center">
+          <p className="text-[10px] tracking-[0.3em] opacity-40 italic font-bold animate-pulse">ARCHIVING...</p>
         </div>
       )}
     </div>

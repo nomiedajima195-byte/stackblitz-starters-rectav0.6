@@ -44,6 +44,7 @@ export default function Page() {
     fetchData();
   }, []);
 
+  // fetchDataにscrollToId引数を追加
   const fetchData = useCallback(async (scrollToId?: string) => {
     const now = new Date().getTime();
     const { data: m } = await supabase.from('mainline').select('*');
@@ -64,6 +65,7 @@ export default function Page() {
 
     const shuffledMain = shuffle(activeMain);
     
+    // もし特定のIDへのジャンプ要求がある場合、そのIDを配列の先頭に持ってくる（強制最前面）
     if (scrollToId) {
       const index = shuffledMain.findIndex(c => c.id === scrollToId);
       if (index !== -1) {
@@ -81,6 +83,7 @@ export default function Page() {
     setAllCards(shuffledMain);
     setSideCells(groupedSides);
 
+    // 描画後にスクロール
     const targetId = scrollToId || window.location.hash.replace('#', '');
     if (targetId) {
       setTimeout(() => {
@@ -122,9 +125,11 @@ export default function Page() {
           
           if (!parentId) {
             await supabase.from('mainline').insert([{ id: fileName, image_url: publicUrl, owner_id: pocketId, is_public: true }]);
+            // メイン追加時は、そのファイルを先頭にして再描画
             await fetchData(fileName);
           } else {
             await supabase.from('side_cells').insert([{ id: fileName, image_url: publicUrl, owner_id: pocketId, parent_id: parentId }]);
+            // 横丁追加時は、親のメインカードの場所へスクロール
             await fetchData(parentId);
           }
         }
@@ -165,36 +170,26 @@ export default function Page() {
           }}
         >
           <div className={`relative w-full h-full transition-transform duration-[800ms] [transform-style:preserve-3d] ${isFlipped ? '[transform:rotateY(180deg)]' : ''}`}>
-            {/* Front */}
             <div className="absolute inset-0 bg-[#F5F2E9] rounded-[28px] border border-black/[0.04] [backface-visibility:hidden] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.15)] flex flex-col items-center overflow-hidden">
               <div className="w-full pt-10 px-8 shrink-0">
                 <p className="tracking-[0.2em] uppercase text-[9px] mb-1 opacity-30 font-bold">Statement</p>
                 <p className="italic font-serif text-[13px] opacity-80 leading-tight">No. {serial}</p>
               </div>
-              
               <div className="w-full flex-grow flex items-center justify-center px-6">
-                <div className={`w-full ${aspectRatio} relative flex items-center justify-center overflow-hidden rounded-sm`}>
-                   {/* Image */}
+                <div className={`w-full ${aspectRatio} relative flex items-center justify-center`}>
                    <img src={item.image_url} alt="" className="w-full h-full object-contain opacity-95 image-pixelated transition-opacity duration-300" loading="lazy" />
-                   
-                   {/* Toy Camera Vignette Filter */}
-                   <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle,transparent_40%,rgba(0,0,0,0.35)_100%)] mix-blend-multiply" />
                 </div>
               </div>
-
               <div className="w-full pb-10 px-8 flex items-center justify-between text-[9px] font-bold opacity-20 italic shrink-0">
                 <span className="tracking-[0.05em]">No. / Artifact / {serial}</span>
                 <span className="tracking-[0.1em]">RUBBISH</span>
               </div>
             </div>
-            {/* Back */}
             <div className="absolute inset-0 [transform:rotateY(180deg)] [backface-visibility:hidden] rounded-[28px] border border-black/[0.04] overflow-hidden shadow-[0_25px_50px_-12px_rgba(0,0,0,0.15)]">
               <CardBack />
             </div>
           </div>
         </div>
-        
-        {/* Actions */}
         <div className="mt-8 flex items-center space-x-12 opacity-0 group-hover:opacity-100 transition-opacity">
           <button onClick={() => {
             const baseUrl = window.location.origin + window.location.pathname;

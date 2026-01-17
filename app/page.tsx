@@ -10,17 +10,16 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const LIFESPAN_MS = 168 * 60 * 60 * 1000;
 const CARD_BG = "#F5F2E9";
+const MAX_PIXEL = 512; // 512pxの制約こそがアイデンティティ
 
 // --- Components ---
 
 const CardBack = () => (
-  <div className="w-full h-full bg-[#F5F2E9] flex flex-col items-center justify-center p-10 text-[#2D2D2D] border-[0.5px] border-black/5 shadow-inner overflow-hidden font-serif">
+  <div className="w-full h-full bg-[#F5F2E9] flex flex-col items-center justify-center p-10 text-[#2D2D2D] border-[0.5px] border-black/5 shadow-inner overflow-hidden font-serif text-center">
     <div className="absolute top-10 left-10 text-left opacity-60">
       <p className="text-[11px] leading-tight font-serif font-bold">Presslie Action</p>
     </div>
-    <div className="flex flex-col items-center text-center">
-      <p className="text-[34px] leading-[1.1] font-bold tracking-tighter opacity-95">User<br/>is<br/>Rubbish</p>
-    </div>
+    <p className="text-[34px] leading-[1.1] font-bold tracking-tighter opacity-95">User<br/>is<br/>Rubbish</p>
     <div className="absolute bottom-10 w-full text-center opacity-20">
       <span className="text-[8px] font-mono tracking-[0.5em] uppercase font-bold">1992 RUBBISH</span>
     </div>
@@ -63,14 +62,12 @@ export default function Page() {
       return arr;
     };
 
-    const shuffledMain = shuffle(activeMain);
+    setAllCards(shuffle(activeMain));
     const groupedSides: {[key: string]: any[]} = {};
     activeSide.forEach(item => {
       if (!groupedSides[item.parent_id]) groupedSides[item.parent_id] = [];
       groupedSides[item.parent_id].push(item);
     });
-
-    setAllCards(shuffledMain);
     setSideCells(groupedSides);
   }, []);
 
@@ -79,17 +76,14 @@ export default function Page() {
     if (!file || isUploading || !pocketId) return;
     setIsUploading(true);
 
-    // キャンバスでの強制スクエアをやめ、比率を維持してリサイズ
     const img = new Image();
     img.src = URL.createObjectURL(file);
     img.onload = async () => {
-      const maxW = 1200;
-      const maxH = 1600; // 3:4まで許容
+      // コンセプト通りの 512px 制約
       let w = img.width;
       let h = img.height;
-
-      if (w > maxW) { h = h * (maxW / w); w = maxW; }
-      if (h > maxH) { w = w * (maxH / h); h = maxH; }
+      if (w > h && w > MAX_PIXEL) { h *= MAX_PIXEL / w; w = MAX_PIXEL; }
+      else if (h > MAX_PIXEL) { w *= MAX_PIXEL / h; h = MAX_PIXEL; }
 
       const canvas = document.createElement('canvas');
       canvas.width = w; canvas.height = h;
@@ -123,17 +117,12 @@ export default function Page() {
     const isFlipped = flippedIds.has(item.id);
     const serial = item.id.split('-')[0].slice(-6).toUpperCase();
 
-    // 画像の比率を判定
     useEffect(() => {
       const img = new Image();
       img.src = item.image_url;
       img.onload = () => {
         const ratio = img.width / img.height;
-        if (ratio > 0.9 && ratio < 1.1) {
-          setAspectRatio('aspect-square');
-        } else {
-          setAspectRatio('aspect-[3/4]');
-        }
+        setAspectRatio(ratio > 0.85 && ratio < 1.15 ? 'aspect-square' : 'aspect-[3/4]');
       };
     }, [item.image_url]);
 
@@ -155,44 +144,36 @@ export default function Page() {
           }}
         >
           <div className={`relative w-full h-full transition-transform duration-[800ms] [transform-style:preserve-3d] ${isFlipped ? '[transform:rotateY(180deg)]' : ''}`}>
-            {/* Front */}
             <div className="absolute inset-0 bg-[#F5F2E9] rounded-[28px] border border-black/[0.04] [backface-visibility:hidden] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.15)] flex flex-col items-center overflow-hidden">
-              <div className="w-full pt-10 px-9 shrink-0">
+              <div className="w-full pt-10 px-8 shrink-0">
                 <p className="tracking-[0.2em] uppercase text-[9px] mb-1 opacity-30 font-bold">Statement</p>
                 <p className="italic font-serif text-[13px] opacity-80 leading-tight">No. {serial}</p>
               </div>
 
-              {/* 動的キャンバスエリア */}
-              <div className="w-full flex-grow flex items-center justify-center px-10">
-                <div className={`w-full ${aspectRatio} relative flex items-center justify-center overflow-hidden transition-all duration-500`}>
+              <div className="w-full flex-grow flex items-center justify-center px-4">
+                <div className={`w-full ${aspectRatio} relative flex items-center justify-center overflow-hidden`}>
                    <img 
                     src={item.image_url} 
                     alt="" 
-                    className="max-w-full max-h-full object-contain mix-blend-multiply opacity-95" 
+                    className="w-full h-full object-contain mix-blend-multiply opacity-95 image-pixelated" 
                   />
-                  <div className="absolute inset-0 pointer-events-none border border-black/[0.01]" />
                 </div>
               </div>
 
-              <div className="w-full pb-10 px-9 flex items-center justify-between text-[9px] font-bold opacity-20 italic shrink-0">
+              <div className="w-full pb-10 px-8 flex items-center justify-between text-[9px] font-bold opacity-20 italic shrink-0">
                 <span className="tracking-[0.05em]">No. / Artifact / {serial}</span>
                 <span className="tracking-[0.1em]">RUBBISH</span>
               </div>
             </div>
-
-            {/* Back */}
             <div className="absolute inset-0 [transform:rotateY(180deg)] [backface-visibility:hidden] rounded-[28px] border border-black/[0.04] overflow-hidden shadow-[0_25px_50px_-12px_rgba(0,0,0,0.15)]">
               <CardBack />
             </div>
           </div>
         </div>
-
-        {/* Actions */}
         <div className="mt-8 flex items-center space-x-12 opacity-0 group-hover:opacity-100 transition-opacity">
           <button onClick={() => {
-            const url = `${window.location.origin}${window.location.pathname}#${item.id}`;
-            navigator.clipboard.writeText(url);
-            alert("Copied");
+            navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}#${item.id}`);
+            alert("Link Copied");
           }} className="text-xl opacity-20 hover:opacity-100 p-2">▲</button>
           <button onClick={async () => {
             if (window.confirm("Delete?")) {
@@ -207,7 +188,10 @@ export default function Page() {
 
   return (
     <div className="min-h-screen bg-[#EBE8DB] text-[#2D2D2D] overflow-x-hidden select-none font-serif">
-      <style jsx global>{`.no-scrollbar::-webkit-scrollbar { display: none; }`}</style>
+      <style jsx global>{`
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .image-pixelated { image-rendering: pixelated; }
+      `}</style>
       <header className="w-full h-32 flex flex-col items-center justify-center opacity-40">
         <p className="text-[10px] tracking-[0.5em] font-bold uppercase mb-2">Rubbish Artifact</p>
         <div className="w-[1px] h-10 bg-black opacity-20" />

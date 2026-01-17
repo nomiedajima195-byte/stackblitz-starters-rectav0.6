@@ -15,15 +15,15 @@ const CARD_BG = "#F5F2E9";
 
 const CardBack = () => (
   <div className="w-full h-full bg-[#F5F2E9] flex flex-col items-center justify-center p-10 text-[#2D2D2D] border-[0.5px] border-black/5 shadow-inner overflow-hidden font-serif">
-    <div className="absolute top-10 left-10 text-left opacity-60">
-      <p className="text-[11px] leading-tight font-serif font-bold">Presslie Action</p>
+    <div className="absolute top-8 left-8 text-left opacity-60">
+      <p className="text-[10px] leading-tight font-serif font-bold">Presslie Action</p>
     </div>
     <div className="flex flex-col items-center text-center">
-      <p className="text-[34px] leading-[1.1] font-bold tracking-tighter opacity-95">
+      <p className="text-[30px] leading-[1.1] font-bold tracking-tighter opacity-95">
         User<br/>is<br/>Rubbish
       </p>
     </div>
-    <div className="absolute bottom-10 w-full text-center opacity-20">
+    <div className="absolute bottom-8 w-full text-center opacity-20">
       <span className="text-[8px] font-mono tracking-[0.5em] uppercase font-bold">1992 RUBBISH</span>
     </div>
   </div>
@@ -46,13 +46,12 @@ export default function Page() {
     setPocketId(id);
     fetchData();
 
-    // URLのハッシュ（#id）がある場合、その要素へスクロール
     const hash = window.location.hash;
     if (hash) {
       setTimeout(() => {
         const el = document.querySelector(hash);
         el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }, 1000);
+      }, 800);
     }
   }, []);
 
@@ -63,7 +62,6 @@ export default function Page() {
 
     if (!m || !s) return;
 
-    // 168時間の寿命フィルタリング
     const activeMain = m.filter(card => (now - new Date(card.created_at).getTime()) < LIFESPAN_MS);
     const activeSide = s.filter(card => (now - new Date(card.created_at).getTime()) < LIFESPAN_MS);
 
@@ -99,7 +97,7 @@ export default function Page() {
     img.src = URL.createObjectURL(file);
     img.onload = async () => {
       const canvas = document.createElement('canvas');
-      canvas.width = 1200; canvas.height = 1200;
+      canvas.width = 1000; canvas.height = 1000;
       const ctx = canvas.getContext('2d');
       if (ctx) {
         const scale = Math.max(canvas.width / img.width, canvas.height / img.height);
@@ -146,51 +144,61 @@ export default function Page() {
     const serial = item.id.split('-')[0].slice(-6).toUpperCase();
 
     return (
-      <div id={item.id} className="flex-shrink-0 w-screen snap-center relative flex flex-col items-center py-12 font-serif group">
+      <div id={item.id} className="flex-shrink-0 w-screen snap-center relative flex flex-col items-center py-10 font-serif group">
         <div 
-          className="relative w-full max-w-[320px] select-none z-20 cursor-pointer"
-          style={{ perspective: '1500px', aspectRatio: '1 / 1.618' }}
+          className="relative w-full max-w-[310px] select-none z-20 cursor-pointer"
+          style={{ perspective: '1500px', aspectRatio: '1 / 1.52' }}
           onClick={() => handleFlipRequest(item.id)}
         >
           <div className={`relative w-full h-full transition-transform duration-[800ms] [transform-style:preserve-3d] ${isFlipped ? '[transform:rotateY(180deg)]' : ''}`}>
+            
             {/* Front */}
-            <div className="absolute inset-0 bg-[#F5F2E9] rounded-[32px] border border-black/[0.04] [backface-visibility:hidden] shadow-[0_30px_60px_-12px_rgba(0,0,0,0.15)] flex flex-col justify-between overflow-hidden">
-              <div className="p-10 pb-0 text-[12px] font-bold opacity-80 leading-tight">
-                <p className="tracking-widest uppercase text-[10px] mb-1 opacity-40">Statement</p>
+            <div className="absolute inset-0 bg-[#F5F2E9] rounded-[30px] border border-black/[0.03] [backface-visibility:hidden] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.12)] flex flex-col justify-between overflow-hidden">
+              
+              {/* Top Section */}
+              <div className="pt-9 px-9 text-[11px] font-bold opacity-70 leading-tight shrink-0">
+                <p className="tracking-[0.2em] uppercase text-[9px] mb-1 opacity-40">Statement</p>
                 <p className="italic font-serif text-[13px]">No. {serial} ... (s8d7)</p>
               </div>
-              <div className="relative flex-grow flex items-center justify-center px-8">
-                <div className="w-full aspect-[4/5] relative overflow-hidden rounded-sm bg-[#EAE7DC] shadow-[inset_0_0_15px_rgba(0,0,0,0.03)]">
-                  <img src={item.image_url} alt="" className="w-full h-full object-cover mix-blend-multiply opacity-90" />
-                  <div className="absolute inset-0 pointer-events-none border border-black/[0.02]" 
-                       style={{ background: 'linear-gradient(180deg, transparent 60%, rgba(0,0,0,0.02) 100%)' }} />
+
+              {/* Image Section: Center focused */}
+              <div className="flex-grow flex items-center justify-center px-8">
+                <div className="w-full aspect-square relative overflow-hidden rounded-[2px] bg-[#EAE7DC] shadow-[0_2px_15px_rgba(0,0,0,0.03)]">
+                  <img 
+                    src={item.image_url} 
+                    alt="" 
+                    className="w-full h-full object-cover mix-blend-multiply opacity-90" 
+                  />
+                  <div className="absolute inset-0 pointer-events-none" 
+                       style={{ background: 'linear-gradient(180deg, transparent 80%, rgba(0,0,0,0.02) 100%)' }} />
                 </div>
               </div>
-              <div className="p-10 pt-0 text-[10px] font-bold opacity-30 italic tracking-[0.1em] flex justify-between items-center">
+
+              {/* Bottom Section */}
+              <div className="pb-9 px-9 text-[10px] font-bold opacity-25 italic tracking-[0.05em] flex justify-between items-center shrink-0">
                 <span>No. / Artifact / {serial}</span>
-                <span>RUBBISH</span>
+                <span className="tracking-[0.1em]">RUBBISH</span>
               </div>
             </div>
+
             {/* Back */}
-            <div className="absolute inset-0 [transform:rotateY(180deg)] [backface-visibility:hidden] rounded-[32px] border border-black/[0.04] overflow-hidden shadow-[0_30px_60px_-12px_rgba(0,0,0,0.15)]">
+            <div className="absolute inset-0 [transform:rotateY(180deg)] [backface-visibility:hidden] rounded-[30px] border border-black/[0.03] overflow-hidden shadow-[0_25px_50px_-12px_rgba(0,0,0,0.12)]">
               <CardBack />
             </div>
           </div>
         </div>
 
-        {/* --- Card Actions (Link & Delete) --- */}
-        <div className="mt-8 flex items-center space-x-12 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+        {/* --- Actions --- */}
+        <div className="mt-6 flex items-center space-x-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
           <button 
             onClick={(e) => { e.stopPropagation(); copyCardLink(item.id); }}
-            className="text-xl opacity-20 hover:opacity-100 transition-all hover:scale-125 p-2"
-            title="Copy Direct Link"
+            className="text-lg opacity-20 hover:opacity-100 transition-all hover:scale-125 p-2"
           >
             ▲
           </button>
           <button 
             onClick={(e) => { e.stopPropagation(); deleteCard(item.id, isMain); }}
-            className="text-xl opacity-20 hover:opacity-100 transition-all hover:scale-125 p-2 text-red-900"
-            title="Delete Card"
+            className="text-lg opacity-20 hover:opacity-100 transition-all hover:scale-125 p-2 text-red-900"
           >
             ✕
           </button>
@@ -206,21 +214,20 @@ export default function Page() {
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
 
-      <header className="w-full h-32 flex flex-col items-center justify-center opacity-30">
-        <p className="text-[10px] tracking-[0.6em] font-bold uppercase mb-2">Artifact Collector</p>
-        <div className="w-[1px] h-8 bg-black opacity-20" />
+      <header className="w-full h-24 flex flex-col items-center justify-end opacity-20">
+        <div className="w-[1px] h-10 bg-black opacity-30" />
       </header>
 
-      <div className="pb-64">
-        <div className="flex flex-col space-y-32">
+      <div className="pb-64 pt-10">
+        <div className="flex flex-col space-y-24">
           {allCards.map(main => (
             <div key={main.id} className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar outline-none items-start">
               <Card item={main} isMain={true} />
               {(sideCells[main.id] || []).map(side => <Card key={side.id} item={side} isMain={false} />)}
               
-              <div className="flex-shrink-0 w-screen snap-center flex items-center justify-center h-full pt-12">
-                <label className="w-[320px] h-[517px] flex items-center justify-center cursor-pointer rounded-[32px] border-2 border-dashed border-black/5 bg-black/[0.02] hover:bg-black/[0.04] active:scale-95 transition-all">
-                  <span className="text-3xl opacity-10 font-serif italic">＋</span>
+              <div className="flex-shrink-0 w-screen snap-center flex items-center justify-center h-full pt-10">
+                <label className="w-[310px] h-[470px] flex items-center justify-center cursor-pointer rounded-[30px] border-2 border-dashed border-black/5 bg-black/[0.01] hover:bg-black/[0.03] active:scale-95 transition-all">
+                  <span className="text-2xl opacity-10 font-serif italic">＋</span>
                   <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadFile(e, main.id)} />
                 </label>
               </div>
@@ -230,17 +237,16 @@ export default function Page() {
       </div>
 
       <nav className="fixed bottom-12 left-0 right-0 flex flex-col items-center z-50">
-        <label className="w-16 h-16 flex items-center justify-center cursor-pointer bg-[#F5F2E9] rounded-full shadow-2xl border border-black/5 active:scale-90 transition-transform">
-          <span className="text-2xl opacity-40">◎</span>
+        <label className="w-14 h-14 flex items-center justify-center cursor-pointer bg-[#F5F2E9] rounded-full shadow-xl border border-black/5 active:scale-90 transition-transform">
+          <span className="text-xl opacity-40">◎</span>
           <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadFile(e)} />
         </label>
-        <p className="mt-4 text-[9px] opacity-20 tracking-[0.5em] font-bold">© 1992 RUBBISH</p>
+        <p className="mt-4 text-[8px] opacity-20 tracking-[0.5em] font-bold">© 1992 RUBBISH</p>
       </nav>
 
       {isUploading && (
-        <div className="fixed inset-0 bg-[#EBE8DB]/80 backdrop-blur-md z-[100] flex flex-col items-center justify-center">
-          <div className="w-12 h-12 border-2 border-black/10 border-t-black/40 rounded-full animate-spin mb-4" />
-          <p className="text-[11px] tracking-widest opacity-40 italic">ARCHIVING...</p>
+        <div className="fixed inset-0 bg-[#EBE8DB]/80 backdrop-blur-md z-[100] flex flex-col items-center justify-center animate-pulse">
+          <p className="text-[10px] tracking-[0.3em] opacity-40 italic font-bold">ARCHIVING...</p>
         </div>
       )}
     </div>

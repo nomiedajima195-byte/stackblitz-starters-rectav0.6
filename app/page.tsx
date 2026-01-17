@@ -8,9 +8,9 @@ const supabaseUrl = 'https://pfxwhcgdbavycddapqmz.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmeHdoY2dkYmF2eWNkZGFwcW16Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxNjQ0NzUsImV4cCI6MjA4Mjc0MDQ3NX0.YNQlbyocg2olS6-1WxTnbr5N2z52XcVIpI1XR-XrDtM';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-const LIFESPAN_MS = 168 * 60 * 60 * 1000;
+const LIFESPAN_MS = 168 * 60 * 60 * 1000; // 168時間（7日間）
 const CARD_BG = "#F5F2E9";
-const MAX_PIXEL = 512; // 512pxの制約こそがアイデンティティ
+const MAX_PIXEL = 512; // 512pxの質感をアイデンティティとする
 
 // --- Components ---
 
@@ -50,9 +50,11 @@ export default function Page() {
     const { data: s } = await supabase.from('side_cells').select('*');
     if (!m || !s) return;
 
+    // 168時間以内のデータのみ
     const activeMain = m.filter(card => (now - new Date(card.created_at).getTime()) < LIFESPAN_MS);
     const activeSide = s.filter(card => (now - new Date(card.created_at).getTime()) < LIFESPAN_MS);
 
+    // ランダムシャッフル
     const shuffle = (array: any[]) => {
       const arr = [...array];
       for (let i = arr.length - 1; i > 0; i--) {
@@ -63,6 +65,7 @@ export default function Page() {
     };
 
     setAllCards(shuffle(activeMain));
+    
     const groupedSides: {[key: string]: any[]} = {};
     activeSide.forEach(item => {
       if (!groupedSides[item.parent_id]) groupedSides[item.parent_id] = [];
@@ -79,9 +82,10 @@ export default function Page() {
     const img = new Image();
     img.src = URL.createObjectURL(file);
     img.onload = async () => {
-      // コンセプト通りの 512px 制約
       let w = img.width;
       let h = img.height;
+      
+      // 512px制限の強制適用
       if (w > h && w > MAX_PIXEL) { h *= MAX_PIXEL / w; w = MAX_PIXEL; }
       else if (h > MAX_PIXEL) { w *= MAX_PIXEL / h; h = MAX_PIXEL; }
 
@@ -122,6 +126,7 @@ export default function Page() {
       img.src = item.image_url;
       img.onload = () => {
         const ratio = img.width / img.height;
+        // スクエア判定
         setAspectRatio(ratio > 0.85 && ratio < 1.15 ? 'aspect-square' : 'aspect-[3/4]');
       };
     }, [item.image_url]);
@@ -144,6 +149,7 @@ export default function Page() {
           }}
         >
           <div className={`relative w-full h-full transition-transform duration-[800ms] [transform-style:preserve-3d] ${isFlipped ? '[transform:rotateY(180deg)]' : ''}`}>
+            {/* Front */}
             <div className="absolute inset-0 bg-[#F5F2E9] rounded-[28px] border border-black/[0.04] [backface-visibility:hidden] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.15)] flex flex-col items-center overflow-hidden">
               <div className="w-full pt-10 px-8 shrink-0">
                 <p className="tracking-[0.2em] uppercase text-[9px] mb-1 opacity-30 font-bold">Statement</p>
@@ -155,7 +161,7 @@ export default function Page() {
                    <img 
                     src={item.image_url} 
                     alt="" 
-                    className="w-full h-full object-contain mix-blend-multiply opacity-95 image-pixelated" 
+                    className="w-full h-full object-contain mix-blend-multiply opacity-95 image-pixelated scale-[1.05]" 
                   />
                 </div>
               </div>
@@ -165,11 +171,15 @@ export default function Page() {
                 <span className="tracking-[0.1em]">RUBBISH</span>
               </div>
             </div>
+
+            {/* Back */}
             <div className="absolute inset-0 [transform:rotateY(180deg)] [backface-visibility:hidden] rounded-[28px] border border-black/[0.04] overflow-hidden shadow-[0_25px_50px_-12px_rgba(0,0,0,0.15)]">
               <CardBack />
             </div>
           </div>
         </div>
+
+        {/* Actions */}
         <div className="mt-8 flex items-center space-x-12 opacity-0 group-hover:opacity-100 transition-opacity">
           <button onClick={() => {
             navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}#${item.id}`);
@@ -192,16 +202,19 @@ export default function Page() {
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .image-pixelated { image-rendering: pixelated; }
       `}</style>
+      
       <header className="w-full h-32 flex flex-col items-center justify-center opacity-40">
-        <p className="text-[10px] tracking-[0.5em] font-bold uppercase mb-2">Rubbish Artifact</p>
+        <p className="text-[10px] tracking-[0.5em] font-bold uppercase mb-2">Rubbish</p>
         <div className="w-[1px] h-10 bg-black opacity-20" />
       </header>
+
       <div className="pb-64 pt-6">
         <div className="flex flex-col space-y-20">
           {allCards.map(main => (
             <div key={main.id} className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar items-start">
               <Card item={main} isMain={true} />
               {(sideCells[main.id] || []).map(side => <Card key={side.id} item={side} isMain={false} />)}
+              
               <div className="flex-shrink-0 w-screen snap-center flex items-center justify-center h-full pt-10">
                 <label className="w-[310px] h-[502px] flex items-center justify-center cursor-pointer rounded-[28px] border border-black/5 bg-black/[0.01] hover:bg-black/[0.03]">
                   <span className="text-xl opacity-10 font-serif italic">＋</span>
@@ -212,13 +225,15 @@ export default function Page() {
           ))}
         </div>
       </div>
+
       <nav className="fixed bottom-12 left-0 right-0 flex flex-col items-center z-50">
-        <label className="w-14 h-14 flex items-center justify-center cursor-pointer bg-[#F5F2E9] rounded-full shadow-xl border border-black/5">
+        <label className="w-14 h-14 flex items-center justify-center cursor-pointer bg-[#F5F2E9] rounded-full shadow-xl border border-black/5 active:scale-90 transition-transform">
           <span className="text-xl opacity-40">◎</span>
           <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadFile(e)} />
         </label>
         <p className="mt-4 text-[8px] opacity-20 tracking-[0.5em] font-bold">© 1992 RUBBISH</p>
       </nav>
+
       {isUploading && (
         <div className="fixed inset-0 bg-[#EBE8DB]/80 backdrop-blur-md z-[100] flex flex-col items-center justify-center">
           <p className="text-[10px] tracking-[0.3em] opacity-40 italic font-bold animate-pulse">ARCHIVING...</p>

@@ -57,21 +57,36 @@ export default function Page() {
 
   const fetchData = useCallback(async () => {
     const now = new Date().getTime();
-    const { data: m } = await supabase.from('mainline').select('*').order('created_at', { ascending: false });
-    const { data: s } = await supabase.from('side_cells').select('*').order('created_at', { ascending: true });
+    const { data: m } = await supabase.from('mainline').select('*');
+    const { data: s } = await supabase.from('side_cells').select('*');
 
     if (!m || !s) return;
 
     const activeMain = m.filter(card => (now - new Date(card.created_at).getTime()) < LIFESPAN_MS);
     const activeSide = s.filter(card => (now - new Date(card.created_at).getTime()) < LIFESPAN_MS);
 
+    // Fisher-Yates shuffle
+    const shuffle = (array: any[]) => {
+      const arr = [...array];
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    };
+
+    const shuffledMain = shuffle(activeMain);
     const groupedSides: {[key: string]: any[]} = {};
     activeSide.forEach(item => {
       if (!groupedSides[item.parent_id]) groupedSides[item.parent_id] = [];
       groupedSides[item.parent_id].push(item);
     });
 
-    setAllCards(activeMain);
+    Object.keys(groupedSides).forEach(key => {
+      groupedSides[key] = shuffle(groupedSides[key]);
+    });
+
+    setAllCards(shuffledMain);
     setSideCells(groupedSides);
   }, []);
 
@@ -97,9 +112,10 @@ export default function Page() {
     img.src = URL.createObjectURL(file);
     img.onload = async () => {
       const canvas = document.createElement('canvas');
-      canvas.width = 1000; canvas.height = 1000;
+      canvas.width = 1200; canvas.height = 1200;
       const ctx = canvas.getContext('2d');
       if (ctx) {
+        // スクエアで保存するロジックを維持
         const scale = Math.max(canvas.width / img.width, canvas.height / img.height);
         const x = (canvas.width / 2) - (img.width / 2) * scale;
         const y = (canvas.height / 2) - (img.height / 2) * scale;
@@ -160,17 +176,17 @@ export default function Page() {
                 <p className="italic font-serif text-[13px] opacity-80 leading-tight">No. {serial} ... (s8d7)</p>
               </div>
 
-              <div className="w-full flex-grow flex items-center justify-center px-8">
-                <div className="w-full aspect-[3/4] flex items-center justify-center relative">
-                  <div className="w-full aspect-square relative overflow-hidden rounded-[1px] bg-[#EAE7DC] shadow-[0_2px_15px_rgba(0,0,0,0.03)]">
-                    <img 
-                      src={item.image_url} 
-                      alt="" 
-                      className="w-full h-full object-cover mix-blend-multiply opacity-90" 
-                    />
-                    <div className="absolute inset-0 pointer-events-none" 
-                         style={{ background: 'linear-gradient(180deg, transparent 80%, rgba(0,0,0,0.01) 100%)' }} />
-                  </div>
+              {/* ここが 3:4 キャンバス */}
+              <div className="w-full flex-grow flex items-center justify-center px-10">
+                <div className="w-full aspect-[3/4] relative flex items-center justify-center overflow-hidden">
+                   {/* 正方形画像をその中に配置。object-contain にして絶対に切れないようにする */}
+                   <img 
+                    src={item.image_url} 
+                    alt="" 
+                    className="w-full h-auto aspect-square object-contain mix-blend-multiply opacity-95" 
+                  />
+                  {/* 装飾的なテクスチャ */}
+                  <div className="absolute inset-0 pointer-events-none border border-black/[0.02]" />
                 </div>
               </div>
 
@@ -214,7 +230,6 @@ export default function Page() {
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
 
-      {/* ヘッダーの表記を変更 */}
       <header className="w-full h-32 flex flex-col items-center justify-center opacity-40">
         <p className="text-[10px] tracking-[0.5em] font-bold uppercase mb-2">Rubbish Artifact</p>
         <div className="w-[1px] h-10 bg-black opacity-20" />

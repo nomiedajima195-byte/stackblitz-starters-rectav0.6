@@ -217,16 +217,19 @@ export default function Page() {
         <div className="flex flex-col space-y-20">
           {allCards.map(main => (
             <div key={main.id} className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar items-center">
+              {/* カードとドットの並びをネガティブマージンで調整 */}
               <Card item={main} isMain={true} />
               
-              {/* カード間の接続ドット */}
-              <div className="flex-shrink-0 flex items-center opacity-20 text-[10px] px-2 leading-none">・</div>
+              <div className="flex-shrink-0 flex items-center justify-center -ml-4 z-30">
+                <span className="text-lg text-black font-bold opacity-40 translate-y-[-20px]">・</span>
+              </div>
 
-              {(sideCells[main.id] || []).map((side, idx, arr) => (
+              {(sideCells[main.id] || []).map((side) => (
                 <React.Fragment key={side.id}>
                   <Card item={side} isMain={false} />
-                  {/* 次のサイドカードがある場合、または投稿ボタンがある場合にドットを表示 */}
-                  <div className="flex-shrink-0 flex items-center opacity-20 text-[10px] px-2 leading-none">・</div>
+                  <div className="flex-shrink-0 flex items-center justify-center -ml-4 z-30">
+                    <span className="text-lg text-black font-bold opacity-40 translate-y-[-20px]">・</span>
+                  </div>
                 </React.Fragment>
               ))}
               

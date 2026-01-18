@@ -19,7 +19,7 @@ const CardBack = () => (
     <div className="absolute top-10 left-10 text-left opacity-60">
       <p className="text-[11px] leading-tight font-serif font-bold">Presslie Action</p>
     </div>
-    <p className="text-[28px] leading-[1.1] font-bold tracking-tighter opacity-95">User<br/>is<br/>Rubbish</p>
+    <p className="text-[34px] leading-[1.1] font-bold tracking-tighter opacity-95">User<br/>is<br/>Rubbish</p>
     <div className="absolute bottom-10 w-full text-center opacity-20">
       <span className="text-[8px] font-mono tracking-[0.5em] uppercase font-bold">1992 RUBBISH</span>
     </div>
@@ -115,7 +115,7 @@ export default function Page() {
   };
 
   const Card = ({ item, isMain }: { item: any, isMain: boolean }) => {
-    const [cardType, setCardType] = useState<'vertical' | 'square'>('vertical');
+    const [isSquare, setIsSquare] = useState(false);
     const isFlipped = flippedIds.has(item.id);
     const serial = item.id.split('-')[0].slice(-6).toUpperCase();
 
@@ -124,16 +124,15 @@ export default function Page() {
       img.src = item.image_url;
       img.onload = () => {
         const r = img.width / img.height;
-        // 1:1に近い（0.8〜1.2）ならスクエア型
-        setCardType(r > 0.8 && r < 1.2 ? 'square' : 'vertical');
+        // 0.8〜1.2の範囲ならスクエア判定
+        setIsSquare(r > 0.8 && r < 1.2);
       };
     }, [item.image_url]);
 
     return (
       <div id={item.id} className="flex-shrink-0 w-screen snap-center relative flex flex-col items-center py-10 font-serif group">
         <div 
-          className={`relative w-full transition-all duration-700 select-none z-20 cursor-pointer
-            ${cardType === 'square' ? 'max-w-[310px] aspect-square' : 'max-w-[310px] aspect-[1/1.618]'}`}
+          className="relative w-full max-w-[310px] aspect-[1/1.618] select-none z-20 cursor-pointer"
           style={{ perspective: '1500px' }}
           onClick={() => {
             const now = Date.now();
@@ -150,28 +149,36 @@ export default function Page() {
           <div className={`relative w-full h-full transition-transform duration-[800ms] [transform-style:preserve-3d] ${isFlipped ? '[transform:rotateY(180deg)]' : ''}`}>
             {/* Front */}
             <div className="absolute inset-0 bg-[#F5F2E9] rounded-[28px] border border-black/[0.04] [backface-visibility:hidden] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.15)] flex flex-col items-center overflow-hidden">
-              <div className="w-full pt-6 px-8 shrink-0 text-black">
-                <p className="tracking-[0.2em] uppercase text-[8px] mb-1 opacity-30 font-bold">Statement</p>
-                <p className="italic font-serif text-[11px] opacity-80">No. {serial}</p>
+              <div className="w-full pt-8 px-8 shrink-0 text-black">
+                <p className="tracking-[0.2em] uppercase text-[9px] mb-1 opacity-30 font-bold">Statement</p>
+                <p className="italic font-serif text-[13px] opacity-80 leading-tight">No. {serial}</p>
               </div>
               
-              <div className={`w-full flex-grow flex items-center justify-center px-6 ${cardType === 'square' ? 'pb-2' : 'py-4'}`}>
-                <div className={`w-full relative flex items-center justify-center overflow-hidden rounded-sm bg-black/5 shadow-inner
-                  ${cardType === 'square' ? 'aspect-square' : 'aspect-[3/4]'}`}>
+              <div className={`w-full flex-grow flex flex-col items-center px-6 ${isSquare ? 'justify-start pt-4' : 'justify-center py-4'}`}>
+                <div className={`w-full relative overflow-hidden rounded-sm bg-black/5 shadow-inner transition-all duration-500
+                  ${isSquare ? 'aspect-square' : 'aspect-[3/4]'}`}>
                    <img 
                       src={item.image_url} 
-                      className="w-full h-full object-fill opacity-95 image-pixelated" 
+                      className={`w-full h-full image-pixelated ${isSquare ? 'object-fill' : 'object-cover'}`} 
                       style={{ imageRendering: 'pixelated' }}
+                      loading="lazy"
                    />
-                   <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle,transparent_30%,rgba(0,0,0,0.4)_100%)] mix-blend-multiply" />
+                   <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle,transparent_40%,rgba(0,0,0,0.35)_100%)] mix-blend-multiply" />
                 </div>
+                
+                {isSquare && (
+                  <div className="w-full mt-auto mb-12 opacity-10 text-[7px] tracking-[0.2em] text-center font-bold italic text-black">
+                    FULL FRAME ARTIFACT
+                  </div>
+                )}
               </div>
 
-              <div className="w-full pb-6 px-8 flex items-center justify-between text-[8px] font-bold opacity-20 italic shrink-0 text-black">
-                <span className="tracking-[0.05em]">No. {serial}</span>
+              <div className="w-full pb-10 px-8 flex items-center justify-between text-[9px] font-bold opacity-20 italic shrink-0 text-black">
+                <span className="tracking-[0.05em]">No. / Artifact / {serial}</span>
                 <span className="tracking-[0.1em]">RUBBISH</span>
               </div>
             </div>
+            
             {/* Back */}
             <div className="absolute inset-0 [transform:rotateY(180deg)] [backface-visibility:hidden] rounded-[28px] border border-black/[0.04] overflow-hidden">
               <CardBack />

@@ -44,7 +44,6 @@ export default function Page() {
     fetchData();
   }, []);
 
-  // fetchDataにscrollToId引数を追加
   const fetchData = useCallback(async (scrollToId?: string) => {
     const now = new Date().getTime();
     const { data: m } = await supabase.from('mainline').select('*');
@@ -65,7 +64,6 @@ export default function Page() {
 
     const shuffledMain = shuffle(activeMain);
     
-    // もし特定のIDへのジャンプ要求がある場合、そのIDを配列の先頭に持ってくる（強制最前面）
     if (scrollToId) {
       const index = shuffledMain.findIndex(c => c.id === scrollToId);
       if (index !== -1) {
@@ -83,7 +81,6 @@ export default function Page() {
     setAllCards(shuffledMain);
     setSideCells(groupedSides);
 
-    // 描画後にスクロール
     const targetId = scrollToId || window.location.hash.replace('#', '');
     if (targetId) {
       setTimeout(() => {
@@ -125,11 +122,9 @@ export default function Page() {
           
           if (!parentId) {
             await supabase.from('mainline').insert([{ id: fileName, image_url: publicUrl, owner_id: pocketId, is_public: true }]);
-            // メイン追加時は、そのファイルを先頭にして再描画
             await fetchData(fileName);
           } else {
             await supabase.from('side_cells').insert([{ id: fileName, image_url: publicUrl, owner_id: pocketId, parent_id: parentId }]);
-            // 横丁追加時は、親のメインカードの場所へスクロール
             await fetchData(parentId);
           }
         }
@@ -176,8 +171,9 @@ export default function Page() {
                 <p className="italic font-serif text-[13px] opacity-80 leading-tight">No. {serial}</p>
               </div>
               <div className="w-full flex-grow flex items-center justify-center px-6">
-                <div className={`w-full ${aspectRatio} relative flex items-center justify-center`}>
+                <div className={`w-full ${aspectRatio} relative flex items-center justify-center overflow-hidden rounded-sm`}>
                    <img src={item.image_url} alt="" className="w-full h-full object-contain opacity-95 image-pixelated transition-opacity duration-300" loading="lazy" />
+                   <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle,transparent_40%,rgba(0,0,0,0.35)_100%)] mix-blend-multiply" />
                 </div>
               </div>
               <div className="w-full pb-10 px-8 flex items-center justify-between text-[9px] font-bold opacity-20 italic shrink-0">
@@ -220,10 +216,21 @@ export default function Page() {
       <div className="pb-64 pt-6">
         <div className="flex flex-col space-y-20">
           {allCards.map(main => (
-            <div key={main.id} className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar items-start">
+            <div key={main.id} className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar items-center">
               <Card item={main} isMain={true} />
-              {(sideCells[main.id] || []).map(side => <Card key={side.id} item={side} isMain={false} />)}
-              <div className="flex-shrink-0 w-screen snap-center flex items-center justify-center h-full pt-10">
+              
+              {/* カード間の接続ドット */}
+              <div className="flex-shrink-0 flex items-center opacity-20 text-[10px] px-2 leading-none">・</div>
+
+              {(sideCells[main.id] || []).map((side, idx, arr) => (
+                <React.Fragment key={side.id}>
+                  <Card item={side} isMain={false} />
+                  {/* 次のサイドカードがある場合、または投稿ボタンがある場合にドットを表示 */}
+                  <div className="flex-shrink-0 flex items-center opacity-20 text-[10px] px-2 leading-none">・</div>
+                </React.Fragment>
+              ))}
+              
+              <div className="flex-shrink-0 w-screen snap-center flex items-center justify-center h-full py-10">
                 <label className="w-[310px] h-[502px] flex items-center justify-center cursor-pointer rounded-[28px] border border-black/5 bg-black/[0.01] hover:bg-black/[0.03]">
                   <span className="text-xl opacity-10 font-serif italic">＋</span>
                   <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadFile(e, main.id)} />

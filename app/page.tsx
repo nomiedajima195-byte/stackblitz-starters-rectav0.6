@@ -151,17 +151,16 @@ export default function Page() {
                 <p className="italic font-serif text-[13px] opacity-80 leading-tight">No. {serial}</p>
               </div>
               
-              {/* Image & Space Adjustment */}
+              {/* 設計された重力 */}
               <div className={`w-full flex flex-col items-center px-6 ${isSquare ? 'pt-4' : 'flex-grow justify-center py-4'}`}>
                 {isSquare ? (
                   <>
-                    <div className="w-full aspect-square relative overflow-hidden rounded-sm bg-black/5 shadow-inner">
+                    <div className="w-full aspect-square relative overflow-hidden rounded-sm shadow-[0_4px_12px_rgba(0,0,0,0.08)] bg-black/[0.02]">
                       <img 
                         src={item.image_url} 
                         className="w-full h-full object-fill opacity-95 image-pixelated" 
                         style={{ imageRendering: 'pixelated' }}
                       />
-                      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle,transparent_40%,rgba(0,0,0,0.35)_100%)] mix-blend-multiply" />
                     </div>
                     {/* 意志を持った紙の余白 */}
                     <div className="w-full mt-10 mb-12 opacity-10 text-[7px] tracking-[0.2em] text-center font-bold italic text-black uppercase">
@@ -223,7 +222,7 @@ export default function Page() {
         .image-pixelated { image-rendering: pixelated; }
       `}</style>
       <header className="w-full h-32 flex flex-col items-center justify-center opacity-40">
-        <p className="text-[10px] tracking-[0.5em] font-bold uppercase mb-2 text-black font-serif">Rubbish</p>
+        <p className="text-[10px] tracking-[0.5em] font-bold uppercase mb-2 text-black font-serif uppercase">Rubbish</p>
         <div className="w-[1px] h-10 bg-black opacity-20" />
       </header>
       <div className="pb-64 pt-6">

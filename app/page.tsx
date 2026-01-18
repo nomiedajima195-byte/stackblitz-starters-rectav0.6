@@ -12,6 +12,16 @@ const LIFESPAN_MS = 168 * 60 * 60 * 1000;
 const CARD_BG = "#F5F2E9";
 const MAX_PIXEL = 320; 
 
+// 型定義を明示してエラーを回避
+interface CardData {
+  id: string;
+  image_url: string;
+  created_at: string;
+  owner_id: string;
+  parent_id?: string;
+  is_public?: boolean;
+}
+
 const CardBack = () => (
   <div className="w-full h-full bg-[#F5F2E9] flex flex-col items-center justify-center p-10 text-[#2D2D2D] border-[0.5px] border-black/5 shadow-inner overflow-hidden font-serif text-center">
     <div className="absolute top-10 left-10 text-left opacity-60">
@@ -25,8 +35,8 @@ const CardBack = () => (
 );
 
 export default function Page() {
-  const [allCards, setAllCards] = useState<any[]>([]);
-  const [sideCells, setSideCells] = useState<{[key: string]: any[]}>({});
+  const [allCards, setAllCards] = useState<CardData[]>([]);
+  const [sideCells, setSideCells] = useState<{[key: string]: CardData[]}>({});
   const [flippedIds, setFlippedIds] = useState<Set<string>>(new Set());
   const [isUploading, setIsUploading] = useState(false);
   const [pocketId, setPocketId] = useState<string | null>(null);
@@ -44,14 +54,14 @@ export default function Page() {
 
   const fetchData = useCallback(async () => {
     const now = new Date().getTime();
-    const { data: m } = await supabase.from('mainline').select('*');
-    const { data: s } = await supabase.from('side_cells').select('*');
+    const { data: m } = await supabase.from('mainline').select('*').order('created_at', { ascending: false });
+    const { data: s } = await supabase.from('side_cells').select('*').order('created_at', { ascending: false });
     if (!m || !s) return;
 
-    const activeMain = m.filter(card => (now - new Date(card.created_at).getTime()) < LIFESPAN_MS);
-    const activeSide = s.filter(card => (now - new Date(card.created_at).getTime()) < LIFESPAN_MS);
+    const activeMain = (m as CardData[]).filter(card => (now - new Date(card.created_at).getTime()) < LIFESPAN_MS);
+    const activeSide = (s as CardData[]).filter(card => (now - new Date(card.created_at).getTime()) < LIFESPAN_MS);
 
-    const shuffle = (array: any[]) => {
+    const shuffle = (array: CardData[]) => {
       const arr = [...array];
       for (let i = arr.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -60,18 +70,26 @@ export default function Page() {
       return arr;
     };
 
-    const shuffledMain = shuffle(activeMain);
-    const groupedSides: {[key: string]: any[]} = {};
+    // 最新固定ロジック & 型エラー修正
+    let finalMain: CardData[] = [];
+    if (activeMain.length > 0) {
+      const [latest, ...others] = activeMain;
+      finalMain = [latest, ...shuffle(others)];
+    }
+
+    const groupedSides: {[key: string]: CardData[]} = {};
     activeSide.forEach(item => {
-      if (!groupedSides[item.parent_id]) groupedSides[item.parent_id] = [];
-      groupedSides[item.parent_id].push(item);
+      if (item.parent_id) {
+        if (!groupedSides[item.parent_id]) groupedSides[item.parent_id] = [];
+        groupedSides[item.parent_id].push(item);
+      }
     });
 
-    setAllCards(shuffledMain);
+    setAllCards(finalMain);
     setSideCells(groupedSides);
   }, []);
 
-  const uploadFile = async (e: any, parentId: string | null = null) => {
+  const uploadFile = async (e: React.ChangeEvent<HTMLInputElement>, parentId: string | null = null) => {
     const file = e.target.files?.[0];
     if (!file || isUploading || !pocketId) return;
     setIsUploading(true);
@@ -101,18 +119,17 @@ export default function Page() {
           
           if (!parentId) {
             await supabase.from('mainline').insert([{ id: fileName, image_url: publicUrl, owner_id: pocketId, is_public: true }]);
-            await fetchData();
           } else {
             await supabase.from('side_cells').insert([{ id: fileName, image_url: publicUrl, owner_id: pocketId, parent_id: parentId }]);
-            await fetchData();
           }
+          await fetchData();
         }
         setIsUploading(false);
       }, 'image/png');
     };
   };
 
-  const Card = ({ item, isMain }: { item: any, isMain: boolean }) => {
+  const Card = ({ item, isMain }: { item: CardData, isMain: boolean }) => {
     const [isSquare, setIsSquare] = useState(false);
     const isFlipped = flippedIds.has(item.id);
     const serial = item.id.split('-')[0].slice(-6).toUpperCase();
@@ -122,7 +139,6 @@ export default function Page() {
       img.src = item.image_url;
       img.onload = () => {
         const r = img.width / img.height;
-        // 判定を広げる (0.7〜1.3)。これで微妙な長方形もスクエア扱いにして「紙」を守る
         setIsSquare(r > 0.7 && r < 1.3);
       };
     }, [item.image_url]);
@@ -152,7 +168,6 @@ export default function Page() {
                 <p className="italic font-serif text-[13px] opacity-80 leading-tight">No. {serial}</p>
               </div>
               
-              {/* 設計された余白 */}
               <div className={`w-full flex flex-col items-center px-6 ${isSquare ? 'pt-4' : 'flex-grow justify-center py-4'}`}>
                 {isSquare ? (
                   <>
@@ -162,7 +177,6 @@ export default function Page() {
                         className="w-full h-full object-fill opacity-95 image-pixelated" 
                         style={{ imageRendering: 'pixelated' }}
                       />
-                      {/* スクエア時は一切の影レイヤーを排除 */}
                     </div>
                     <div className="w-full mt-10 mb-12 opacity-10 text-[7px] tracking-[0.2em] text-center font-bold italic text-black uppercase">
                       Full Frame Artifact
@@ -197,7 +211,7 @@ export default function Page() {
             const baseUrl = window.location.origin + window.location.pathname;
             navigator.clipboard.writeText(`${baseUrl}#${item.id}`);
             alert(`No. ${serial} のリンクをコピーしました`);
-          }} className="text-xl opacity-20 hover:opacity-100 p-2 text-black">▲</button>
+          }} className="text-xl opacity-20 hover:opacity-100 p-2 text-black font-serif">▲</button>
           {!isMain ? (
             <div className="flex space-x-2 text-[6px] text-black opacity-40 self-center">
               <span>●</span><span>●</span><span>●</span>
@@ -208,7 +222,7 @@ export default function Page() {
               await supabase.from(isMain ? 'mainline' : 'side_cells').delete().eq('id', item.id);
               fetchData();
             }
-          }} className="text-xl opacity-20 hover:opacity-100 p-2 text-red-900">✕</button>
+          }} className="text-xl opacity-20 hover:opacity-100 p-2 text-red-900 font-serif">✕</button>
         </div>
       </div>
     );
@@ -221,7 +235,7 @@ export default function Page() {
         .image-pixelated { image-rendering: pixelated; }
       `}</style>
       <header className="w-full h-32 flex flex-col items-center justify-center opacity-40">
-        <p className="text-[10px] tracking-[0.5em] font-bold uppercase mb-2 text-black">Rubbish</p>
+        <p className="text-[10px] tracking-[0.5em] font-bold uppercase mb-2 text-black font-serif">Rubbish</p>
         <div className="w-[1px] h-10 bg-black opacity-20" />
       </header>
       <div className="pb-64 pt-6">
@@ -232,7 +246,7 @@ export default function Page() {
               {(sideCells[main.id] || []).map(side => <Card key={side.id} item={side} isMain={false} />)}
               <div className="flex-shrink-0 w-screen snap-center flex items-center justify-center h-full pt-10">
                 <label className="w-[310px] h-[502px] flex items-center justify-center cursor-pointer rounded-[28px] border border-black/5 bg-black/[0.01] hover:bg-black/[0.03]">
-                  <span className="text-xl opacity-10 font-serif italic text-black">＋</span>
+                  <span className="text-xl opacity-10 font-serif italic text-black font-serif">＋</span>
                   <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadFile(e, main.id)} />
                 </label>
               </div>
@@ -242,7 +256,7 @@ export default function Page() {
       </div>
       <nav className="fixed bottom-12 left-0 right-0 flex flex-col items-center z-50">
         <label className="w-14 h-14 flex items-center justify-center cursor-pointer bg-[#F5F2E9] rounded-full shadow-xl border border-black/5">
-          <span className="text-xl opacity-40 text-black">◎</span>
+          <span className="text-xl opacity-40 text-black font-serif">◎</span>
           <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadFile(e)} />
         </label>
         <p className="mt-4 text-[8px] opacity-20 tracking-[0.5em] font-bold text-black font-serif uppercase">© 1992 Rubbish</p>

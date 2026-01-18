@@ -11,7 +11,6 @@ const LIFESPAN_MS = 168 * 60 * 60 * 1000;
 const CARD_BG = "#F5F2E9";
 const MAX_PIXEL = 320; 
 
-// 出鱈目な文字列生成（意味を剥奪する）
 const getRandomStr = (len: number) => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   return Array.from({length: len}, () => chars[Math.floor(Math.random() * chars.length)]).join('');
@@ -51,7 +50,6 @@ export default function Page() {
 
   const fetchData = useCallback(async () => {
     const now = new Date().getTime();
-    // created_at の降順で取得し、最新がトップに来るようにする
     const { data: m } = await supabase.from('mainline').select('*').order('created_at', { ascending: false });
     const { data: s } = await supabase.from('side_cells').select('*').order('created_at', { ascending: true });
     if (!m || !s) return;
@@ -65,7 +63,7 @@ export default function Page() {
       groupedSides[item.parent_id].push(item);
     });
 
-    setAllCards(activeMain); // シャッフルを廃止し、降順（最新順）を維持
+    setAllCards(activeMain);
     setSideCells(groupedSides);
   }, []);
 
@@ -119,7 +117,8 @@ export default function Page() {
       img.src = item.image_url;
       img.onload = () => {
         const r = img.width / img.height;
-        setIsSquare(r > 0.7 && r < 1.3);
+        // 判定を厳格化: 0.75(3:4) を拾わないように 0.85 以上にする
+        setIsSquare(r > 0.85 && r < 1.15);
       };
     }, [item.image_url]);
 
@@ -142,7 +141,6 @@ export default function Page() {
             }}
           >
             <div className={`relative w-full h-full transition-transform duration-[800ms] [transform-style:preserve-3d] ${isFlipped ? '[transform:rotateY(180deg)]' : ''}`}>
-              {/* Front */}
               <div className="absolute inset-0 bg-[#F5F2E9] rounded-[28px] border border-black/[0.04] [backface-visibility:hidden] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.15)] flex flex-col items-center overflow-hidden">
                 <div className="w-full pt-8 px-8 shrink-0 text-black">
                   <p className="tracking-[0.2em] uppercase text-[9px] mb-1 opacity-30 font-bold">{getRandomStr(9)}</p>
@@ -170,14 +168,12 @@ export default function Page() {
                   <span className="tracking-[0.1em]">Rubbish</span>
                 </div>
               </div>
-              {/* Back */}
               <div className="absolute inset-0 [transform:rotateY(180deg)] [backface-visibility:hidden] rounded-[28px] border border-black/[0.04] overflow-hidden">
                 <CardBack />
               </div>
             </div>
           </div>
 
-          {/* 右横のドット: サイドセル（横丁）があるメインカードのみ脈打つ */}
           {isMain && hasSides && (
             <div className="absolute -right-8 w-2 h-2 bg-black rounded-full opacity-40 shadow-sm animate-pulse" />
           )}

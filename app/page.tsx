@@ -12,8 +12,8 @@ const LIFESPAN_MS = 168 * 60 * 60 * 1000;
 const CARD_BG = "#F5F2E9";
 const MAX_PIXEL = 320; 
 
-const CardBack = () => (
-  <div className="w-full h-full bg-[#F5F2E9] flex flex-col items-center justify-center p-10 text-[#2D2D2D] border-[0.5px] border-black/5 shadow-inner overflow-hidden font-serif text-center">
+const CardBack = ({ aspect }: { aspect: string }) => (
+  <div className={`w-full h-full bg-[#F5F2E9] flex flex-col items-center justify-center p-10 text-[#2D2D2D] border-[0.5px] border-black/5 shadow-inner overflow-hidden font-serif text-center`}>
     <div className="absolute top-10 left-10 text-left opacity-60">
       <p className="text-[11px] leading-tight font-serif font-bold">Presslie Action</p>
     </div>
@@ -78,16 +78,6 @@ export default function Page() {
 
     setAllCards(shuffledMain);
     setSideCells(groupedSides);
-
-    const targetId = scrollToId || window.location.hash.replace('#', '');
-    if (targetId) {
-      setTimeout(() => {
-        const target = document.getElementById(targetId);
-        if (target) {
-          target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
-        }
-      }, 600);
-    }
   }, []);
 
   const uploadFile = async (e: any, parentId: string | null = null) => {
@@ -134,12 +124,29 @@ export default function Page() {
   const Card = ({ item, isMain }: { item: any, isMain: boolean }) => {
     const isFlipped = flippedIds.has(item.id);
     const serial = item.id.split('-')[0].slice(-6).toUpperCase();
+    const [aspect, setAspect] = useState('aspect-[1/1.618]'); // デフォルトの黄金比
+    const [imgAspect, setImgAspect] = useState('aspect-[3/4]');
+
+    useEffect(() => {
+      const img = new Image();
+      img.src = item.image_url;
+      img.onload = () => {
+        const r = img.width / img.height;
+        if (r > 0.9 && r < 1.1) {
+          setAspect('aspect-square'); // 外枠を正方形に
+          setImgAspect('aspect-square');
+        } else {
+          setAspect('aspect-[1/1.618]'); // 外枠を縦長に
+          setImgAspect('aspect-[3/4]');
+        }
+      };
+    }, [item.image_url]);
 
     return (
       <div id={item.id} className="flex-shrink-0 w-screen snap-center relative flex flex-col items-center py-10 font-serif group">
         <div 
-          className="relative w-full max-w-[310px] select-none z-20 cursor-pointer"
-          style={{ perspective: '1500px', aspectRatio: '1 / 1.618' }}
+          className={`relative w-full max-w-[310px] select-none z-20 cursor-pointer transition-all duration-500 ${aspect}`}
+          style={{ perspective: '1500px' }}
           onClick={() => {
             const now = Date.now();
             if (now - (lastClickTime.current[item.id] || 0) < 300) {
@@ -154,30 +161,29 @@ export default function Page() {
         >
           <div className={`relative w-full h-full transition-transform duration-[800ms] [transform-style:preserve-3d] ${isFlipped ? '[transform:rotateY(180deg)]' : ''}`}>
             <div className="absolute inset-0 bg-[#F5F2E9] rounded-[28px] border border-black/[0.04] [backface-visibility:hidden] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.15)] flex flex-col items-center overflow-hidden">
-              <div className="w-full pt-10 px-8 shrink-0 text-black">
+              <div className="w-full pt-8 px-8 shrink-0 text-black">
                 <p className="tracking-[0.2em] uppercase text-[9px] mb-1 opacity-30 font-bold">Statement</p>
                 <p className="italic font-serif text-[13px] opacity-80 leading-tight">No. {serial}</p>
               </div>
               
-              <div className="w-full flex-grow flex items-center justify-center px-6">
-                <div className="w-full aspect-[3/4] relative flex items-center justify-center overflow-hidden rounded-sm bg-black/5">
+              <div className="w-full flex-grow flex items-center justify-center px-6 py-4">
+                <div className={`w-full ${imgAspect} relative flex items-center justify-center overflow-hidden rounded-sm bg-black/5 shadow-inner`}>
                    <img 
                       src={item.image_url} 
-                      className="w-full h-full object-cover scale-[1.05] opacity-95 image-pixelated transition-opacity duration-300" 
+                      className="w-full h-full object-fill opacity-95 image-pixelated" 
                       style={{ imageRendering: 'pixelated' }}
-                      loading="lazy" 
                    />
                    <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle,transparent_30%,rgba(0,0,0,0.45)_100%)] mix-blend-multiply" />
                 </div>
               </div>
 
-              <div className="w-full pb-10 px-8 flex items-center justify-between text-[9px] font-bold opacity-20 italic shrink-0 text-black">
+              <div className="w-full pb-8 px-8 flex items-center justify-between text-[9px] font-bold opacity-20 italic shrink-0 text-black">
                 <span className="tracking-[0.05em]">No. / Artifact / {serial}</span>
                 <span className="tracking-[0.1em]">RUBBISH</span>
               </div>
             </div>
             <div className="absolute inset-0 [transform:rotateY(180deg)] [backface-visibility:hidden] rounded-[28px] border border-black/[0.04] overflow-hidden shadow-[0_25px_50px_-12px_rgba(0,0,0,0.15)]">
-              <CardBack />
+              <CardBack aspect={aspect} />
             </div>
           </div>
         </div>

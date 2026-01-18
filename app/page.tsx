@@ -122,7 +122,8 @@ export default function Page() {
       img.src = item.image_url;
       img.onload = () => {
         const r = img.width / img.height;
-        setIsSquare(r > 0.8 && r < 1.2);
+        // 判定を広げる (0.7〜1.3)。これで微妙な長方形もスクエア扱いにして「紙」を守る
+        setIsSquare(r > 0.7 && r < 1.3);
       };
     }, [item.image_url]);
 
@@ -151,18 +152,18 @@ export default function Page() {
                 <p className="italic font-serif text-[13px] opacity-80 leading-tight">No. {serial}</p>
               </div>
               
-              {/* 設計された重力 */}
+              {/* 設計された余白 */}
               <div className={`w-full flex flex-col items-center px-6 ${isSquare ? 'pt-4' : 'flex-grow justify-center py-4'}`}>
                 {isSquare ? (
                   <>
-                    <div className="w-full aspect-square relative overflow-hidden rounded-sm shadow-[0_4px_12px_rgba(0,0,0,0.08)] bg-black/[0.02]">
+                    <div className="w-full aspect-square relative overflow-hidden rounded-sm">
                       <img 
                         src={item.image_url} 
                         className="w-full h-full object-fill opacity-95 image-pixelated" 
                         style={{ imageRendering: 'pixelated' }}
                       />
+                      {/* スクエア時は一切の影レイヤーを排除 */}
                     </div>
-                    {/* 意志を持った紙の余白 */}
                     <div className="w-full mt-10 mb-12 opacity-10 text-[7px] tracking-[0.2em] text-center font-bold italic text-black uppercase">
                       Full Frame Artifact
                     </div>
@@ -179,7 +180,6 @@ export default function Page() {
                 )}
               </div>
 
-              {/* Footer */}
               <div className="w-full pb-10 px-8 flex items-center justify-between text-[9px] font-bold opacity-20 italic shrink-0 text-black">
                 <span className="tracking-[0.05em]">No. / Artifact / {serial}</span>
                 <span className="tracking-[0.1em]">RUBBISH</span>
@@ -192,7 +192,6 @@ export default function Page() {
           </div>
         </div>
         
-        {/* Actions Area */}
         <div className="mt-8 flex items-center space-x-6 opacity-0 group-hover:opacity-100 transition-opacity min-h-[40px]">
           <button onClick={() => {
             const baseUrl = window.location.origin + window.location.pathname;
@@ -222,7 +221,7 @@ export default function Page() {
         .image-pixelated { image-rendering: pixelated; }
       `}</style>
       <header className="w-full h-32 flex flex-col items-center justify-center opacity-40">
-        <p className="text-[10px] tracking-[0.5em] font-bold uppercase mb-2 text-black font-serif uppercase">Rubbish</p>
+        <p className="text-[10px] tracking-[0.5em] font-bold uppercase mb-2 text-black">Rubbish</p>
         <div className="w-[1px] h-10 bg-black opacity-20" />
       </header>
       <div className="pb-64 pt-6">

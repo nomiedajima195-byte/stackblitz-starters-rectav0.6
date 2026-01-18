@@ -12,8 +12,6 @@ const LIFESPAN_MS = 168 * 60 * 60 * 1000;
 const CARD_BG = "#F5F2E9";
 const MAX_PIXEL = 320; 
 
-// --- Components ---
-
 const CardBack = () => (
   <div className="w-full h-full bg-[#F5F2E9] flex flex-col items-center justify-center p-10 text-[#2D2D2D] border-[0.5px] border-black/5 shadow-inner overflow-hidden font-serif text-center">
     <div className="absolute top-10 left-10 text-left opacity-60">
@@ -44,7 +42,7 @@ export default function Page() {
     fetchData();
   }, []);
 
-  const fetchData = useCallback(async (scrollToId?: string) => {
+  const fetchData = useCallback(async () => {
     const now = new Date().getTime();
     const { data: m } = await supabase.from('mainline').select('*');
     const { data: s } = await supabase.from('side_cells').select('*');
@@ -124,7 +122,6 @@ export default function Page() {
       img.src = item.image_url;
       img.onload = () => {
         const r = img.width / img.height;
-        // 0.8〜1.2の範囲ならスクエア判定
         setIsSquare(r > 0.8 && r < 1.2);
       };
     }, [item.image_url]);
@@ -154,31 +151,41 @@ export default function Page() {
                 <p className="italic font-serif text-[13px] opacity-80 leading-tight">No. {serial}</p>
               </div>
               
-              <div className={`w-full flex-grow flex flex-col items-center px-6 ${isSquare ? 'justify-start pt-4' : 'justify-center py-4'}`}>
-                <div className={`w-full relative overflow-hidden rounded-sm bg-black/5 shadow-inner transition-all duration-500
-                  ${isSquare ? 'aspect-square' : 'aspect-[3/4]'}`}>
-                   <img 
+              {/* Image & Space Adjustment */}
+              <div className={`w-full flex flex-col items-center px-6 ${isSquare ? 'pt-4' : 'flex-grow justify-center py-4'}`}>
+                {isSquare ? (
+                  <>
+                    <div className="w-full aspect-square relative overflow-hidden rounded-sm bg-black/5 shadow-inner">
+                      <img 
+                        src={item.image_url} 
+                        className="w-full h-full object-fill opacity-95 image-pixelated" 
+                        style={{ imageRendering: 'pixelated' }}
+                      />
+                      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle,transparent_40%,rgba(0,0,0,0.35)_100%)] mix-blend-multiply" />
+                    </div>
+                    {/* 意志を持った紙の余白 */}
+                    <div className="w-full mt-10 mb-12 opacity-10 text-[7px] tracking-[0.2em] text-center font-bold italic text-black uppercase">
+                      Full Frame Artifact
+                    </div>
+                  </>
+                ) : (
+                  <div className="w-full aspect-[3/4] relative overflow-hidden rounded-sm bg-black/5 shadow-inner">
+                    <img 
                       src={item.image_url} 
-                      className={`w-full h-full image-pixelated ${isSquare ? 'object-fill' : 'object-cover'}`} 
+                      className="w-full h-full object-cover opacity-95 image-pixelated" 
                       style={{ imageRendering: 'pixelated' }}
-                      loading="lazy"
-                   />
-                   <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle,transparent_40%,rgba(0,0,0,0.35)_100%)] mix-blend-multiply" />
-                </div>
-                
-                {isSquare && (
-                  <div className="w-full mt-auto mb-12 opacity-10 text-[7px] tracking-[0.2em] text-center font-bold italic text-black">
-                    FULL FRAME ARTIFACT
+                    />
+                    <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle,transparent_40%,rgba(0,0,0,0.35)_100%)] mix-blend-multiply" />
                   </div>
                 )}
               </div>
 
+              {/* Footer */}
               <div className="w-full pb-10 px-8 flex items-center justify-between text-[9px] font-bold opacity-20 italic shrink-0 text-black">
                 <span className="tracking-[0.05em]">No. / Artifact / {serial}</span>
                 <span className="tracking-[0.1em]">RUBBISH</span>
               </div>
             </div>
-            
             {/* Back */}
             <div className="absolute inset-0 [transform:rotateY(180deg)] [backface-visibility:hidden] rounded-[28px] border border-black/[0.04] overflow-hidden">
               <CardBack />
@@ -193,15 +200,11 @@ export default function Page() {
             navigator.clipboard.writeText(`${baseUrl}#${item.id}`);
             alert(`No. ${serial} のリンクをコピーしました`);
           }} className="text-xl opacity-20 hover:opacity-100 p-2 text-black">▲</button>
-          
           {!isMain ? (
             <div className="flex space-x-2 text-[6px] text-black opacity-40 self-center">
               <span>●</span><span>●</span><span>●</span>
             </div>
-          ) : (
-            <div className="w-[42px]" />
-          )}
-
+          ) : ( <div className="w-[42px]" /> )}
           <button onClick={async () => {
             if (window.confirm("Delete?")) {
               await supabase.from(isMain ? 'mainline' : 'side_cells').delete().eq('id', item.id);
@@ -220,7 +223,7 @@ export default function Page() {
         .image-pixelated { image-rendering: pixelated; }
       `}</style>
       <header className="w-full h-32 flex flex-col items-center justify-center opacity-40">
-        <p className="text-[10px] tracking-[0.5em] font-bold uppercase mb-2 text-black">Rubbish</p>
+        <p className="text-[10px] tracking-[0.5em] font-bold uppercase mb-2 text-black font-serif">Rubbish</p>
         <div className="w-[1px] h-10 bg-black opacity-20" />
       </header>
       <div className="pb-64 pt-6">
@@ -244,11 +247,11 @@ export default function Page() {
           <span className="text-xl opacity-40 text-black">◎</span>
           <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadFile(e)} />
         </label>
-        <p className="mt-4 text-[8px] opacity-20 tracking-[0.5em] font-bold text-black">© 1992 RUBBISH</p>
+        <p className="mt-4 text-[8px] opacity-20 tracking-[0.5em] font-bold text-black font-serif uppercase">© 1992 Rubbish</p>
       </nav>
       {isUploading && (
         <div className="fixed inset-0 bg-[#EBE8DB]/80 backdrop-blur-md z-[100] flex flex-col items-center justify-center">
-          <p className="text-[10px] tracking-[0.3em] opacity-40 italic font-bold animate-pulse text-black">ARCHIVING...</p>
+          <p className="text-[10px] tracking-[0.3em] opacity-40 italic font-bold animate-pulse text-black font-serif uppercase">Archiving...</p>
         </div>
       )}
     </div>

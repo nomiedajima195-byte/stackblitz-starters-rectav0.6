@@ -12,8 +12,6 @@ const LIFESPAN_MS = 168 * 60 * 60 * 1000;
 const CARD_BG = "#F5F2E9";
 const MAX_PIXEL = 320; 
 
-// --- Components ---
-
 const CardBack = () => (
   <div className="w-full h-full bg-[#F5F2E9] flex flex-col items-center justify-center p-10 text-[#2D2D2D] border-[0.5px] border-black/5 shadow-inner overflow-hidden font-serif text-center">
     <div className="absolute top-10 left-10 text-left opacity-60">
@@ -155,43 +153,35 @@ export default function Page() {
           }}
         >
           <div className={`relative w-full h-full transition-transform duration-[800ms] [transform-style:preserve-3d] ${isFlipped ? '[transform:rotateY(180deg)]' : ''}`}>
-            {/* Front */}
-            <div className="absolute inset-0 bg-[#F5F2E9] rounded-[28px] border border-black/[0.04] [backface-visibility:hidden] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.15)] flex flex-col items-center overflow-hidden text-black">
-              <div className="w-full pt-10 px-8 shrink-0">
+            <div className="absolute inset-0 bg-[#F5F2E9] rounded-[28px] border border-black/[0.04] [backface-visibility:hidden] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.15)] flex flex-col items-center overflow-hidden">
+              <div className="w-full pt-10 px-8 shrink-0 text-black">
                 <p className="tracking-[0.2em] uppercase text-[9px] mb-1 opacity-30 font-bold">Statement</p>
                 <p className="italic font-serif text-[13px] opacity-80 leading-tight">No. {serial}</p>
               </div>
               
               <div className="w-full flex-grow flex items-center justify-center px-6">
-                {/* 拡大を強制するコンテナ */}
-                <div className="w-full aspect-[3/4] relative flex items-center justify-center overflow-hidden rounded-sm bg-black/5 shadow-inner">
-                   {/* 320pxの低画質を「object-cover」で枠いっぱいに拡大 */}
+                <div className="w-full aspect-[3/4] relative flex items-center justify-center overflow-hidden rounded-sm bg-black/5">
                    <img 
                       src={item.image_url} 
-                      alt="" 
-                      className="w-full h-full object-cover opacity-95 image-pixelated transition-opacity duration-300" 
+                      className="w-full h-full object-cover scale-[1.05] opacity-95 image-pixelated transition-opacity duration-300" 
                       style={{ imageRendering: 'pixelated' }}
                       loading="lazy" 
                    />
-                   
-                   {/* Toy Camera Vignette Filter */}
                    <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle,transparent_30%,rgba(0,0,0,0.45)_100%)] mix-blend-multiply" />
                 </div>
               </div>
 
-              <div className="w-full pb-10 px-8 flex items-center justify-between text-[9px] font-bold opacity-20 italic shrink-0">
+              <div className="w-full pb-10 px-8 flex items-center justify-between text-[9px] font-bold opacity-20 italic shrink-0 text-black">
                 <span className="tracking-[0.05em]">No. / Artifact / {serial}</span>
                 <span className="tracking-[0.1em]">RUBBISH</span>
               </div>
             </div>
-            {/* Back */}
             <div className="absolute inset-0 [transform:rotateY(180deg)] [backface-visibility:hidden] rounded-[28px] border border-black/[0.04] overflow-hidden shadow-[0_25px_50px_-12px_rgba(0,0,0,0.15)]">
               <CardBack />
             </div>
           </div>
         </div>
         
-        {/* Actions Area */}
         <div className="mt-8 flex items-center space-x-6 opacity-0 group-hover:opacity-100 transition-opacity min-h-[40px]">
           <button onClick={() => {
             const baseUrl = window.location.origin + window.location.pathname;
@@ -201,9 +191,7 @@ export default function Page() {
           
           {!isMain ? (
             <div className="flex space-x-2 text-[6px] text-black opacity-40 self-center">
-              <span>●</span>
-              <span>●</span>
-              <span>●</span>
+              <span>●</span><span>●</span><span>●</span>
             </div>
           ) : (
             <div className="w-[42px]" />
@@ -227,7 +215,7 @@ export default function Page() {
         .image-pixelated { image-rendering: pixelated; }
       `}</style>
       <header className="w-full h-32 flex flex-col items-center justify-center opacity-40">
-        <p className="text-[10px] tracking-[0.5em] font-bold uppercase mb-2">Rubbish</p>
+        <p className="text-[10px] tracking-[0.5em] font-bold uppercase mb-2 text-black">Rubbish</p>
         <div className="w-[1px] h-10 bg-black opacity-20" />
       </header>
       <div className="pb-64 pt-6">

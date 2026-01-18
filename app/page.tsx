@@ -11,7 +11,7 @@ const LIFESPAN_MS = 168 * 60 * 60 * 1000;
 const CARD_BG = "#F5F2E9";
 const MAX_PIXEL = 320; 
 
-// 出鱈目な文字列生成
+// 出鱈目な文字列生成（意味を剥奪する）
 const getRandomStr = (len: number) => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   return Array.from({length: len}, () => chars[Math.floor(Math.random() * chars.length)]).join('');
@@ -51,30 +51,21 @@ export default function Page() {
 
   const fetchData = useCallback(async () => {
     const now = new Date().getTime();
-    const { data: m } = await supabase.from('mainline').select('*');
-    const { data: s } = await supabase.from('side_cells').select('*');
+    // created_at の降順で取得し、最新がトップに来るようにする
+    const { data: m } = await supabase.from('mainline').select('*').order('created_at', { ascending: false });
+    const { data: s } = await supabase.from('side_cells').select('*').order('created_at', { ascending: true });
     if (!m || !s) return;
 
     const activeMain = m.filter(card => (now - new Date(card.created_at).getTime()) < LIFESPAN_MS);
     const activeSide = s.filter(card => (now - new Date(card.created_at).getTime()) < LIFESPAN_MS);
 
-    const shuffle = (array: any[]) => {
-      const arr = [...array];
-      for (let i = arr.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [arr[i], arr[j]] = [arr[j], arr[i]];
-      }
-      return arr;
-    };
-
-    const shuffledMain = shuffle(activeMain);
     const groupedSides: {[key: string]: any[]} = {};
     activeSide.forEach(item => {
       if (!groupedSides[item.parent_id]) groupedSides[item.parent_id] = [];
       groupedSides[item.parent_id].push(item);
     });
 
-    setAllCards(shuffledMain);
+    setAllCards(activeMain); // シャッフルを廃止し、降順（最新順）を維持
     setSideCells(groupedSides);
   }, []);
 
@@ -135,7 +126,6 @@ export default function Page() {
     return (
       <div id={item.id} className="flex-shrink-0 w-screen snap-center relative flex flex-col items-center py-10 font-serif group">
         <div className="relative flex items-center">
-          {/* Card Body */}
           <div 
             className="relative w-[310px] aspect-[1/1.618] select-none z-20 cursor-pointer"
             style={{ perspective: '1500px' }}
@@ -187,13 +177,12 @@ export default function Page() {
             </div>
           </div>
 
-          {/* 右横のドット: サイドセル（横丁）があるメインカードのみ表示 */}
+          {/* 右横のドット: サイドセル（横丁）があるメインカードのみ脈打つ */}
           {isMain && hasSides && (
             <div className="absolute -right-8 w-2 h-2 bg-black rounded-full opacity-40 shadow-sm animate-pulse" />
           )}
         </div>
         
-        {/* Actions Area */}
         <div className="mt-8 flex items-center space-x-6 opacity-0 group-hover:opacity-100 transition-opacity min-h-[40px]">
           <button onClick={() => {
             navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}#${item.id}`);
@@ -227,7 +216,6 @@ export default function Page() {
         <div className="flex flex-col space-y-20">
           {allCards.map(main => (
             <div key={main.id} className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar items-start">
-              {/* メインカードに hasSides フラグを渡す */}
               <Card item={main} isMain={true} hasSides={sideCells[main.id]?.length > 0} />
               {(sideCells[main.id] || []).map(side => <Card key={side.id} item={side} isMain={false} />)}
               <div className="flex-shrink-0 w-screen snap-center flex items-center justify-center h-full pt-10">

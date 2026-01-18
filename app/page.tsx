@@ -186,12 +186,26 @@ export default function Page() {
             </div>
           </div>
         </div>
-        <div className="mt-8 flex items-center space-x-12 opacity-0 group-hover:opacity-100 transition-opacity">
+        
+        {/* Actions Area */}
+        <div className="mt-8 flex items-center space-x-6 opacity-0 group-hover:opacity-100 transition-opacity min-h-[40px]">
           <button onClick={() => {
             const baseUrl = window.location.origin + window.location.pathname;
             navigator.clipboard.writeText(`${baseUrl}#${item.id}`);
             alert(`No. ${serial} のリンクをコピーしました`);
           }} className="text-xl opacity-20 hover:opacity-100 p-2">▲</button>
+          
+          {/* コラージュカード（isMain=false）の時だけ三連ドットを表示 */}
+          {!isMain ? (
+            <div className="flex space-x-2 text-[6px] text-black opacity-40 self-center">
+              <span>●</span>
+              <span>●</span>
+              <span>●</span>
+            </div>
+          ) : (
+            <div className="w-[42px]" /> /* メインの時はスペースだけ確保してガタつきを防ぐ */
+          )}
+
           <button onClick={async () => {
             if (window.confirm("Delete?")) {
               await supabase.from(isMain ? 'mainline' : 'side_cells').delete().eq('id', item.id);
@@ -216,24 +230,10 @@ export default function Page() {
       <div className="pb-64 pt-6">
         <div className="flex flex-col space-y-20">
           {allCards.map(main => (
-            <div key={main.id} className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar items-center">
-              {/* カードとドットの並びをネガティブマージンで調整 */}
+            <div key={main.id} className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar items-start">
               <Card item={main} isMain={true} />
-              
-              <div className="flex-shrink-0 flex items-center justify-center -ml-4 z-30">
-                <span className="text-lg text-black font-bold opacity-40 translate-y-[-20px]">・</span>
-              </div>
-
-              {(sideCells[main.id] || []).map((side) => (
-                <React.Fragment key={side.id}>
-                  <Card item={side} isMain={false} />
-                  <div className="flex-shrink-0 flex items-center justify-center -ml-4 z-30">
-                    <span className="text-lg text-black font-bold opacity-40 translate-y-[-20px]">・</span>
-                  </div>
-                </React.Fragment>
-              ))}
-              
-              <div className="flex-shrink-0 w-screen snap-center flex items-center justify-center h-full py-10">
+              {(sideCells[main.id] || []).map(side => <Card key={side.id} item={side} isMain={false} />)}
+              <div className="flex-shrink-0 w-screen snap-center flex items-center justify-center h-full pt-10">
                 <label className="w-[310px] h-[502px] flex items-center justify-center cursor-pointer rounded-[28px] border border-black/5 bg-black/[0.01] hover:bg-black/[0.03]">
                   <span className="text-xl opacity-10 font-serif italic">＋</span>
                   <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadFile(e, main.id)} />

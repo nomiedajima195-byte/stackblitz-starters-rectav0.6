@@ -12,6 +12,8 @@ const LIFESPAN_MS = 168 * 60 * 60 * 1000;
 const CARD_BG = "#F5F2E9";
 const MAX_PIXEL = 320; 
 
+// --- Components ---
+
 const CardBack = () => (
   <div className="w-full h-full bg-[#F5F2E9] flex flex-col items-center justify-center p-10 text-[#2D2D2D] border-[0.5px] border-black/5 shadow-inner overflow-hidden font-serif text-center">
     <div className="absolute top-10 left-10 text-left opacity-60">
@@ -132,8 +134,18 @@ export default function Page() {
   };
 
   const Card = ({ item, isMain }: { item: any, isMain: boolean }) => {
+    const [aspectRatio, setAspectRatio] = useState<'aspect-square' | 'aspect-[3/4]'>('aspect-[3/4]');
     const isFlipped = flippedIds.has(item.id);
     const serial = item.id.split('-')[0].slice(-6).toUpperCase();
+
+    useEffect(() => {
+      const img = new Image();
+      img.src = item.image_url;
+      img.onload = () => {
+        const ratio = img.width / img.height;
+        setAspectRatio(ratio > 0.8 && ratio < 1.2 ? 'aspect-square' : 'aspect-[3/4]');
+      };
+    }, [item.image_url]);
 
     return (
       <div id={item.id} className="flex-shrink-0 w-screen snap-center relative flex flex-col items-center py-10 font-serif group">
@@ -154,24 +166,17 @@ export default function Page() {
         >
           <div className={`relative w-full h-full transition-transform duration-[800ms] [transform-style:preserve-3d] ${isFlipped ? '[transform:rotateY(180deg)]' : ''}`}>
             <div className="absolute inset-0 bg-[#F5F2E9] rounded-[28px] border border-black/[0.04] [backface-visibility:hidden] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.15)] flex flex-col items-center overflow-hidden">
-              <div className="w-full pt-10 px-8 shrink-0 text-black">
+              <div className="w-full pt-10 px-8 shrink-0">
                 <p className="tracking-[0.2em] uppercase text-[9px] mb-1 opacity-30 font-bold">Statement</p>
                 <p className="italic font-serif text-[13px] opacity-80 leading-tight">No. {serial}</p>
               </div>
-              
               <div className="w-full flex-grow flex items-center justify-center px-6">
-                <div className="w-full aspect-[3/4] relative flex items-center justify-center overflow-hidden rounded-sm bg-black/5">
-                   <img 
-                      src={item.image_url} 
-                      className="w-full h-full object-cover scale-[1.05] opacity-95 image-pixelated transition-opacity duration-300" 
-                      style={{ imageRendering: 'pixelated' }}
-                      loading="lazy" 
-                   />
-                   <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle,transparent_30%,rgba(0,0,0,0.45)_100%)] mix-blend-multiply" />
+                <div className={`w-full ${aspectRatio} relative flex items-center justify-center overflow-hidden rounded-sm`}>
+                   <img src={item.image_url} alt="" className="w-full h-full object-contain opacity-95 image-pixelated transition-opacity duration-300" loading="lazy" />
+                   <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle,transparent_40%,rgba(0,0,0,0.35)_100%)] mix-blend-multiply" />
                 </div>
               </div>
-
-              <div className="w-full pb-10 px-8 flex items-center justify-between text-[9px] font-bold opacity-20 italic shrink-0 text-black">
+              <div className="w-full pb-10 px-8 flex items-center justify-between text-[9px] font-bold opacity-20 italic shrink-0">
                 <span className="tracking-[0.05em]">No. / Artifact / {serial}</span>
                 <span className="tracking-[0.1em]">RUBBISH</span>
               </div>
@@ -181,22 +186,12 @@ export default function Page() {
             </div>
           </div>
         </div>
-        
-        <div className="mt-8 flex items-center space-x-6 opacity-0 group-hover:opacity-100 transition-opacity min-h-[40px]">
+        <div className="mt-8 flex items-center space-x-12 opacity-0 group-hover:opacity-100 transition-opacity">
           <button onClick={() => {
             const baseUrl = window.location.origin + window.location.pathname;
             navigator.clipboard.writeText(`${baseUrl}#${item.id}`);
             alert(`No. ${serial} のリンクをコピーしました`);
-          }} className="text-xl opacity-20 hover:opacity-100 p-2 text-black">▲</button>
-          
-          {!isMain ? (
-            <div className="flex space-x-2 text-[6px] text-black opacity-40 self-center">
-              <span>●</span><span>●</span><span>●</span>
-            </div>
-          ) : (
-            <div className="w-[42px]" />
-          )}
-
+          }} className="text-xl opacity-20 hover:opacity-100 p-2">▲</button>
           <button onClick={async () => {
             if (window.confirm("Delete?")) {
               await supabase.from(isMain ? 'mainline' : 'side_cells').delete().eq('id', item.id);
@@ -215,18 +210,29 @@ export default function Page() {
         .image-pixelated { image-rendering: pixelated; }
       `}</style>
       <header className="w-full h-32 flex flex-col items-center justify-center opacity-40">
-        <p className="text-[10px] tracking-[0.5em] font-bold uppercase mb-2 text-black">Rubbish</p>
+        <p className="text-[10px] tracking-[0.5em] font-bold uppercase mb-2">Rubbish</p>
         <div className="w-[1px] h-10 bg-black opacity-20" />
       </header>
       <div className="pb-64 pt-6">
         <div className="flex flex-col space-y-20">
           {allCards.map(main => (
-            <div key={main.id} className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar items-start">
+            <div key={main.id} className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar items-center">
               <Card item={main} isMain={true} />
-              {(sideCells[main.id] || []).map(side => <Card key={side.id} item={side} isMain={false} />)}
-              <div className="flex-shrink-0 w-screen snap-center flex items-center justify-center h-full pt-10">
+              
+              {/* カード間の接続ドット */}
+              <div className="flex-shrink-0 flex items-center opacity-20 text-[10px] px-2 leading-none">・</div>
+
+              {(sideCells[main.id] || []).map((side, idx, arr) => (
+                <React.Fragment key={side.id}>
+                  <Card item={side} isMain={false} />
+                  {/* 次のサイドカードがある場合、または投稿ボタンがある場合にドットを表示 */}
+                  <div className="flex-shrink-0 flex items-center opacity-20 text-[10px] px-2 leading-none">・</div>
+                </React.Fragment>
+              ))}
+              
+              <div className="flex-shrink-0 w-screen snap-center flex items-center justify-center h-full py-10">
                 <label className="w-[310px] h-[502px] flex items-center justify-center cursor-pointer rounded-[28px] border border-black/5 bg-black/[0.01] hover:bg-black/[0.03]">
-                  <span className="text-xl opacity-10 font-serif italic text-black">＋</span>
+                  <span className="text-xl opacity-10 font-serif italic">＋</span>
                   <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadFile(e, main.id)} />
                 </label>
               </div>
@@ -236,14 +242,14 @@ export default function Page() {
       </div>
       <nav className="fixed bottom-12 left-0 right-0 flex flex-col items-center z-50">
         <label className="w-14 h-14 flex items-center justify-center cursor-pointer bg-[#F5F2E9] rounded-full shadow-xl border border-black/5">
-          <span className="text-xl opacity-40 text-black">◎</span>
+          <span className="text-xl opacity-40">◎</span>
           <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadFile(e)} />
         </label>
-        <p className="mt-4 text-[8px] opacity-20 tracking-[0.5em] font-bold text-black">© 1992 RUBBISH</p>
+        <p className="mt-4 text-[8px] opacity-20 tracking-[0.5em] font-bold">© 1992 RUBBISH</p>
       </nav>
       {isUploading && (
         <div className="fixed inset-0 bg-[#EBE8DB]/80 backdrop-blur-md z-[100] flex flex-col items-center justify-center">
-          <p className="text-[10px] tracking-[0.3em] opacity-40 italic font-bold animate-pulse text-black">ARCHIVING...</p>
+          <p className="text-[10px] tracking-[0.3em] opacity-40 italic font-bold animate-pulse">ARCHIVING...</p>
         </div>
       )}
     </div>

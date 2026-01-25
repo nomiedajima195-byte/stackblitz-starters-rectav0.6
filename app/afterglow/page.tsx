@@ -7,7 +7,6 @@ const supabaseUrl = 'https://pfxwhcgdbavycddapqmz.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmeHdoY2dkYmF2eWNkZGFwcW16Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxNjQ0NzUsImV4cCI6MjA4Mjc0MDQ3NX0.YNQlbyocg2olS6-1WxTnbr5N2z52XcVIpI1XR-XrDtM';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-const LIFESPAN_MS = 168 * 60 * 60 * 1000; 
 const CARD_BG = "#F5F2E9";
 const MAX_PIXEL = 320; 
 
@@ -18,12 +17,7 @@ const getRandomStr = (len: number) => {
 
 const CardBack = () => (
   <div className="w-full h-full bg-[#F5F2E9] flex flex-col items-center justify-center p-10 text-[#2D2D2D] border-[0.5px] border-black/5 shadow-inner overflow-hidden font-serif text-center">
-    <div className="absolute top-10 left-10 text-left opacity-60">
-      <p className="text-[11px] leading-tight font-serif font-bold tracking-tighter">{getRandomStr(8)}</p>
-    </div>
-    <p className="text-[34px] leading-[1.1] font-bold tracking-tighter opacity-95">
-      AFTER<br/>GLOW<br/>{getRandomStr(4)}
-    </p>
+    <p className="text-[34px] leading-[1.1] font-bold tracking-tighter opacity-95">AFTER<br/>GLOW</p>
     <div className="absolute bottom-10 w-full text-center opacity-20">
       <span className="text-[8px] font-mono tracking-[0.5em] uppercase font-bold">STIGMERGY SEDIMENT</span>
     </div>
@@ -54,34 +48,15 @@ export default function AfterglowPage() {
   const fetchData = useCallback(async () => {
     if (!pairId) return;
 
+    // 時間制限なしで、このペアのデータをすべて取得
     const { data, error } = await supabase
       .from('afterglow_scraps')
       .select('*')
       .eq('pair_id', pairId)
       .order('created_at', { ascending: false });
 
-    if (error || !data) {
-      console.error("Fetch Error:", error);
-      return;
-    }
-
-    const now = new Date();
-    // 判定基準：昨日の 23:59:59 (今日の0時0分0秒より前)
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-
-    const visibleCards = data.filter(card => {
-      const createdAt = new Date(card.created_at).getTime();
-      const age = now.getTime() - createdAt;
-      
-      // 1. 今日の0時より前に作られている (＝昨日以前の投稿)
-      // 2. 寿命 (168時間) 以内である
-      const isYesterdayOrOlder = createdAt < todayStart;
-      const isNotExpired = age < LIFESPAN_MS;
-
-      return isYesterdayOrOlder && isNotExpired;
-    });
-
-    setAllCards(visibleCards);
+    if (error || !data) return;
+    setAllCards(data); 
   }, [pairId]);
 
   useEffect(() => {
@@ -113,8 +88,8 @@ export default function AfterglowPage() {
 
       canvas.toBlob(async (blob) => {
         if (blob) {
-          const fileName = `afterglow/${Date.now()}-${getRandomStr(5)}.png`;
-          await supabase.storage.from('images').upload(fileName, blob, { contentType: 'image/png' });
+          const fileName = `afterglow/${Date.now()}.png`;
+          await supabase.storage.from('images').upload(fileName, blob);
           const { data: { publicUrl } } = supabase.storage.from('images').getPublicUrl(fileName);
           
           await supabase.from('afterglow_scraps').insert([{
@@ -125,7 +100,6 @@ export default function AfterglowPage() {
           }]);
           
           setNote('');
-          alert("地層に沈みました。日付が変わると浮上します。");
           fetchData();
         }
         setIsUploading(false);
@@ -138,7 +112,7 @@ export default function AfterglowPage() {
     const serial = useRef(getRandomStr(6)).current;
 
     return (
-      <div className="flex-shrink-0 relative flex flex-col items-center py-6 font-serif group">
+      <div className="flex-shrink-0 relative flex flex-col items-center py-6 font-serif">
         <div 
           className="relative w-[280px] aspect-[1/1.4] select-none cursor-pointer"
           style={{ perspective: '1500px' }}
@@ -161,7 +135,7 @@ export default function AfterglowPage() {
               </div>
               <div className="w-full flex-grow flex flex-col items-center px-5 justify-center">
                 <div className="w-full aspect-square relative overflow-hidden rounded-sm bg-black/5 shadow-inner">
-                  <img src={item.image_url} className="w-full h-full object-cover opacity-90 grayscale-[0.2]" style={{ imageRendering: 'pixelated' }} />
+                  <img src={item.image_url} className="w-full h-full object-cover opacity-90 grayscale-[0.2]" />
                 </div>
                 <p className="mt-4 text-[13px] italic opacity-70 w-full text-left px-1 leading-tight min-h-[3em]">
                   {item.keyword || "..."}
@@ -190,12 +164,14 @@ export default function AfterglowPage() {
         {allCards.length > 0 ? (
           allCards.map(item => <Card key={item.id} item={item} />)
         ) : (
-          <div className="mt-40 opacity-10 italic text-sm tracking-widest animate-pulse text-black">Waiting for the sediment...</div>
+          <div className="mt-40 opacity-10 italic text-sm tracking-widest text-black">Waiting for the sediment...</div>
         )}
       </main>
       <nav className="fixed bottom-10 left-0 right-0 flex flex-col items-center z-50">
         <div className="bg-[#F5F2E9] p-4 rounded-full shadow-2xl border border-black/5 flex items-center space-x-4 px-6">
           <input 
+            id="afterglow-note"
+            name="afterglow-note"
             type="text" 
             value={note}
             onChange={(e) => setNote(e.target.value.slice(0, 20))}

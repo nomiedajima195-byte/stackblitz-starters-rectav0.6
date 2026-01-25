@@ -7,7 +7,7 @@ const supabaseUrl = 'https://pfxwhcgdbavycddapqmz.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmeHdoY2dkYmF2eWNkZGFwcW16Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxNjQ0NzUsImV4cCI6MjA4Mjc0MDQ3NX0.YNQlbyocg2olS6-1WxTnbr5N2z52XcVIpI1XR-XrDtM';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-const LIFESPAN_MS = 168 * 60 * 60 * 1000; // 7日間
+const LIFESPAN_MS = 168 * 60 * 60 * 1000; 
 const CARD_BG = "#F5F2E9";
 const MAX_PIXEL = 320; 
 
@@ -53,10 +53,6 @@ export default function AfterglowPage() {
 
   const fetchData = useCallback(async () => {
     if (!pairId) return;
-    const now = new Date();
-    
-    // 今日の「0時0分0秒」のタイムスタンプ
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
 
     const { data, error } = await supabase
       .from('afterglow_scraps')
@@ -64,12 +60,25 @@ export default function AfterglowPage() {
       .eq('pair_id', pairId)
       .order('created_at', { ascending: false });
 
-    if (error || !data) return;
+    if (error || !data) {
+      console.error("Fetch Error:", error);
+      return;
+    }
+
+    const now = new Date();
+    // 判定基準：昨日の 23:59:59 (今日の0時0分0秒より前)
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
 
     const visibleCards = data.filter(card => {
       const createdAt = new Date(card.created_at).getTime();
-      // 今日の0時より前に作られたものだけを表示（＝昨日以前の投稿）
-      return createdAt < todayStart && (now.getTime() - createdAt) < LIFESPAN_MS;
+      const age = now.getTime() - createdAt;
+      
+      // 1. 今日の0時より前に作られている (＝昨日以前の投稿)
+      // 2. 寿命 (168時間) 以内である
+      const isYesterdayOrOlder = createdAt < todayStart;
+      const isNotExpired = age < LIFESPAN_MS;
+
+      return isYesterdayOrOlder && isNotExpired;
     });
 
     setAllCards(visibleCards);
@@ -175,13 +184,13 @@ export default function AfterglowPage() {
   return (
     <div className="min-h-screen bg-[#EBE8DB] text-[#2D2D2D] font-serif overflow-x-hidden">
       <header className="fixed top-8 left-0 right-0 flex flex-col items-center z-10 opacity-30">
-        <p className="text-[10px] tracking-[1em] font-bold uppercase">Rubbish / Afterglow</p>
+        <p className="text-[10px] tracking-[1em] font-bold uppercase text-black">Rubbish / Afterglow</p>
       </header>
       <main className="pt-32 pb-64 px-10 flex flex-wrap justify-center gap-10">
         {allCards.length > 0 ? (
           allCards.map(item => <Card key={item.id} item={item} />)
         ) : (
-          <div className="mt-40 opacity-10 italic text-sm tracking-widest animate-pulse">Waiting for the sediment...</div>
+          <div className="mt-40 opacity-10 italic text-sm tracking-widest animate-pulse text-black">Waiting for the sediment...</div>
         )}
       </main>
       <nav className="fixed bottom-10 left-0 right-0 flex flex-col items-center z-50">
@@ -191,7 +200,7 @@ export default function AfterglowPage() {
             value={note}
             onChange={(e) => setNote(e.target.value.slice(0, 20))}
             placeholder="Note"
-            className="bg-transparent border-b border-black/10 outline-none text-[12px] italic w-32 pb-1 focus:border-black/30 transition-all text-black"
+            className="bg-transparent border-b border-black/10 outline-none text-[12px] italic w-32 pb-1 focus:border-black/30 transition-all text-black placeholder:text-black/20"
           />
           <label className="w-10 h-10 flex items-center justify-center cursor-pointer hover:scale-110 transition-transform">
             <span className="text-xl opacity-40 text-black">◎</span>

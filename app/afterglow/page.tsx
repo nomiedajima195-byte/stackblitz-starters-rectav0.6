@@ -1,220 +1,109 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = 'https://pfxwhcgdbavycddapqmz.supabase.co';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmeHdoY2dkYmF2eWNkZGFwcW16Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxNjQ0NzUsImV4cCI6MjA4Mjc0MDQ3NX0.YNQlbyocg2olS6-1WxTnbr5N2z52XcVIpI1XR-XrDtM';
+const supabaseUrl = 'https://tnwtmuvtpbklcwwsenvc.supabase.co';
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRud3RtdXZ0cGJrbGN3d3NlbnZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk1ODA2OTgsImV4cCI6MjA4NTE1NjY5OH0.V1Dy5SL8pFvWWa2gD7R8xkq4XEuxdMFbp9t_Zri0Yds'; 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-const LIFESPAN_MS = 168 * 60 * 60 * 1000; // 168時間（7日間）
-const CARD_BG = "#F5F2E9";
-const MAX_PIXEL = 400; 
-
-const getRandomStr = (len: number) => {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  return Array.from({length: len}, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-};
-
-const CardBack = () => (
-  <div className="w-full h-full bg-[#F5F2E9] flex flex-col items-center justify-center p-10 text-[#2D2D2D] border-[0.5px] border-black/5 shadow-inner overflow-hidden font-serif text-center">
-    <div className="absolute top-10 left-10 text-left opacity-60">
-      <p className="text-[11px] leading-tight font-serif font-bold tracking-tighter">{getRandomStr(8)}</p>
-    </div>
-    <p className="text-[34px] leading-[1.1] font-bold tracking-tighter opacity-95">AFTER<br/>GLOW</p>
-    <div className="absolute bottom-10 w-full text-center opacity-20">
-      <span className="text-[8px] font-mono tracking-[0.5em] uppercase font-bold">STIGMERGY SEDIMENT</span>
-    </div>
-  </div>
-);
-
-export default function AfterglowPage() {
-  const [allCards, setAllCards] = useState<any[]>([]);
-  const [flippedIds, setFlippedIds] = useState<Set<string>>(new Set());
-  const [isUploading, setIsUploading] = useState(false);
-  const [pocketId, setPocketId] = useState<string | null>(null);
-  const [note, setNote] = useState('');
-  const [pairId, setPairId] = useState<string | null>(null);
-  const lastClickTime = useRef<{ [key: string]: number }>({});
+export default function ScrapbookPage() {
+  const [groupedMasters, setGroupedMasters] = useState<Record<string, any[]>>({});
+  const [myId, setMyId] = useState('');
 
   useEffect(() => {
-    let id = localStorage.getItem('recta_pocket_id');
-    if (!id) {
-      id = `PKT-${getRandomStr(9)}`;
-      localStorage.setItem('recta_pocket_id', id);
-    }
-    setPocketId(id);
-
-    const params = new URLSearchParams(window.location.search);
-    setPairId(params.get('pair') || 'public-afterglow');
+    const id = localStorage.getItem('jd_my_id') || 'GUEST';
+    setMyId(id);
+    fetchAndGroupCards();
   }, []);
 
-  const fetchData = useCallback(async () => {
-    if (!pairId) return;
-
-    const { data, error } = await supabase
-      .from('afterglow_scraps')
-      .select('*')
-      .eq('pair_id', pairId)
+  const fetchAndGroupCards = async () => {
+    const { data } = await supabase
+      .from('jd_masters')
+      .select('*, jd_instances(*)')
       .order('created_at', { ascending: false });
 
-    if (error || !data) return;
-
-    const now = new Date();
-    // 今日の 0:00:00 のタイムスタンプを取得
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-
-    const visibleCards = data.filter(card => {
-      const createdAt = new Date(card.created_at).getTime();
-      const age = now.getTime() - createdAt;
-      
-      // 【本番ロジック】
-      // 1. 今日の0時より前に投稿されたもの（＝昨日以前の断片）
-      // 2. 寿命（168時間）以内であること
-      return createdAt < todayStart && age < LIFESPAN_MS;
-    });
-
-    setAllCards(visibleCards);
-  }, [pairId]);
-
-  useEffect(() => {
-    fetchData();
-    const timer = setInterval(fetchData, 60000);
-    return () => clearInterval(timer);
-  }, [fetchData]);
-
-  const uploadFile = async (e: any) => {
-    const file = e.target.files?.[0];
-    if (!file || isUploading || !pocketId || !pairId) return;
-    setIsUploading(true);
-
-    const img = new Image();
-    img.src = URL.createObjectURL(file);
-    img.onload = async () => {
-      let w = img.width; let h = img.height;
-      if (w > h && w > MAX_PIXEL) { h *= MAX_PIXEL / w; w = MAX_PIXEL; }
-      else if (h > MAX_PIXEL) { w *= MAX_PIXEL / h; h = MAX_PIXEL; }
-
-      const canvas = document.createElement('canvas');
-      canvas.width = w; canvas.height = h;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.fillStyle = CARD_BG;
-        ctx.fillRect(0, 0, w, h);
-        ctx.drawImage(img, 0, 0, w, h);
-      }
-
-      canvas.toBlob(async (blob) => {
-        if (blob) {
-          const fileName = `afterglow/${Date.now()}.png`;
-          await supabase.storage.from('images').upload(fileName, blob);
-          const { data: { publicUrl } } = supabase.storage.from('images').getPublicUrl(fileName);
-          
-          await supabase.from('afterglow_scraps').insert([{
-            image_url: publicUrl,
-            keyword: note,
-            pair_id: pairId,
-            owner_id: pocketId
-          }]);
-          
-          setNote('');
-          alert("地層に沈みました。日付が変わると浮上します。");
-          fetchData();
-        }
-        setIsUploading(false);
-      }, 'image/png');
-    };
-  };
-
-  const Card = ({ item }: { item: any }) => {
-    const isFlipped = flippedIds.has(item.id);
-    const serial = useRef(getRandomStr(6)).current;
-
-    return (
-      <div className="flex-shrink-0 relative flex flex-col items-center py-6 group">
-        <div 
-          className="relative w-[280px] aspect-[1/1.4] select-none cursor-pointer"
-          style={{ perspective: '1500px' }}
-          onClick={() => {
-            const now = Date.now();
-            if (now - (lastClickTime.current[item.id] || 0) < 300) {
-              setFlippedIds(prev => {
-                const next = new Set(prev);
-                if (next.has(item.id)) next.delete(item.id); else next.add(item.id);
-                return next;
-              });
-            }
-            lastClickTime.current[item.id] = now;
-          }}
-        >
-          <div className={`relative w-full h-full transition-transform duration-[800ms] [transform-style:preserve-3d] ${isFlipped ? '[transform:rotateY(180deg)]' : ''}`}>
-            <div className="absolute inset-0 bg-[#F5F2E9] rounded-[20px] border border-black/[0.04] [backface-visibility:hidden] shadow-xl flex flex-col items-center overflow-hidden">
-              <div className="w-full pt-6 px-6 shrink-0 opacity-40">
-                <p className="text-[8px] uppercase font-bold tracking-widest text-black">{pairId}</p>
-              </div>
-              <div className="w-full flex-grow flex flex-col items-center px-5 justify-center">
-                <div className="w-full aspect-square relative overflow-hidden rounded-sm bg-black/5 shadow-inner">
-                  <img src={item.image_url} className="w-full h-full object-cover opacity-90 grayscale-[0.2]" />
-                </div>
-                <p className="mt-4 text-[13px] italic opacity-70 w-full text-left px-1 leading-tight min-h-[3em] text-black">
-                  {item.keyword || "..."}
-                </p>
-              </div>
-              <div className="w-full pb-6 px-6 flex justify-between text-[7px] opacity-20 font-bold uppercase text-black">
-                <span>{new Date(item.created_at).toLocaleDateString()}</span>
-                <span>No. {serial}</span>
-              </div>
-            </div>
-            <div className="absolute inset-0 [transform:rotateY(180deg)] [backface-visibility:hidden] rounded-[20px] overflow-hidden shadow-xl">
-              <CardBack />
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+    if (data) {
+      // 日付ごとにグループ化
+      const groups = data.reduce((acc: any, item: any) => {
+        const date = new Date(item.created_at).toLocaleDateString('ja-JP', {
+          year: 'numeric', month: '2-digit', day: '2-digit'
+        });
+        if (!acc[date]) acc[date] = [];
+        acc[date].push(item);
+        return acc;
+      }, {});
+      setGroupedMasters(groups);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-[#EBE8DB] text-[#2D2D2D] font-serif overflow-x-hidden">
-      <header className="fixed top-8 left-0 right-0 flex flex-col items-center z-10 opacity-30">
-        <p className="text-[10px] tracking-[1em] font-bold uppercase text-black">Rubbish / Afterglow</p>
+    <div className="min-h-screen bg-[#0a0a0a] text-white/90 font-serif pb-32">
+      <header className="p-8 border-b border-white/5 sticky top-0 bg-[#0a0a0a]/80 backdrop-blur-md z-[100] flex justify-between items-baseline">
+        <h1 className="text-3xl font-black italic tracking-tighter">John.D</h1>
+        <div className="text-[10px] tracking-[0.5em] uppercase opacity-30 italic">Time Layered Archive</div>
       </header>
 
-      <main className="pt-32 pb-64 px-10 flex flex-wrap justify-center gap-x-12 gap-y-2">
-        {allCards.length > 0 ? (
-          allCards.map(item => <Card key={item.id} item={item} />)
-        ) : (
-          <div className="mt-40 opacity-10 italic text-sm tracking-widest text-black text-center">
-            Waiting for the sediment...<br/>
-            <span className="text-[10px] not-italic mt-2 block">(Today's fragments will rise at 0:00)</span>
-          </div>
-        )}
+      <main className="flex flex-col">
+        {Object.entries(groupedMasters).map(([date, cards], index) => (
+          <section 
+            key={date} 
+            className="relative border-t border-white/5 pt-6 pb-12 transition-all hover:bg-white/[0.02]"
+            style={{ 
+              zIndex: 50 - index, // 新しい日付ほど上に重なる
+              marginTop: index === 0 ? '0' : '-40px' // 少し重ねる演出
+            }}
+          >
+            {/* 日付ラベル */}
+            <div className="px-8 mb-6 flex items-center gap-4">
+              <span className="text-[11px] font-mono tracking-[0.4em] opacity-40">{date}</span>
+              <div className="h-px flex-1 bg-gradient-to-r from-white/10 to-transparent" />
+            </div>
+
+            {/* 横並びのカード列 */}
+            <div className="flex overflow-x-auto gap-8 px-8 no-scrollbar pb-6 mask-fade-right">
+              {cards.map((m) => (
+                <div key={m.id} className="flex-shrink-0 transition-transform hover:translate-y-[-10px] duration-500">
+                  <CardSurface m={m} myId={myId} />
+                </div>
+              ))}
+            </div>
+          </section>
+        ))}
       </main>
 
-      <nav className="fixed bottom-10 left-0 right-0 flex flex-col items-center z-50">
-        <div className="bg-[#F5F2E9] p-4 rounded-full shadow-2xl border border-black/5 flex items-center space-x-4 px-6">
-          <input 
-            type="text" 
-            value={note}
-            onChange={(e) => setNote(e.target.value.slice(0, 20))}
-            placeholder="Note"
-            className="bg-transparent border-b border-black/10 outline-none text-[12px] italic w-32 pb-1 focus:border-black/30 transition-all text-black placeholder:text-black/20"
-          />
-          <label className="w-10 h-10 flex items-center justify-center cursor-pointer hover:scale-110 transition-transform">
-            <span className="text-xl opacity-40 text-black">◎</span>
-            <input type="file" className="hidden" accept="image/*" onChange={uploadFile} />
-          </label>
-        </div>
-        <p className="mt-4 text-[7px] opacity-10 tracking-[0.6em] font-bold uppercase text-black">Archive to Tomorrow</p>
-      </nav>
+      {/* ナビゲーション等が必要ならここに追加 */}
+    </div>
+  );
+}
 
-      {isUploading && (
-        <div className="fixed inset-0 bg-[#EBE8DB]/90 backdrop-blur-sm z-[100] flex items-center justify-center">
-          <p className="text-[10px] tracking-[0.5em] animate-pulse opacity-40 font-bold uppercase text-black text-center">
-            Transmitting to<br/>the next day...
-          </p>
+function CardSurface({ m, myId }: { m: any, myId: string }) {
+  const cardHue = parseInt(m?.title || '270');
+  const color = `hsl(${cardHue}, 30%, 25%)`;
+  const myInstance = m.jd_instances?.find((i: any) => i.owner_id === myId);
+
+  return (
+    <div className="w-[200px] aspect-[1/1.618] bg-[#FAFAFA] rounded-[8px] p-[6px] shadow-[0_15px_35px_rgba(0,0,0,0.5)] flex flex-col relative overflow-hidden">
+      <div className="absolute inset-[6px] rounded-[3px] bg-[#111]" />
+      <div className="relative z-10 flex flex-col h-full gap-1">
+        <div className="flex gap-0.5 h-8">
+          <div className="bg-[#E5E5DE] text-black w-8 flex items-center justify-center font-black text-[10px] border border-black italic">
+            {myInstance ? `#${String(myInstance.serial_number).padStart(3, '0')}` : '---'}
+          </div>
+          <div className="bg-[#E5E5DE] text-black flex-1 flex items-center px-2 border border-black font-black text-[8px] italic tracking-tighter uppercase">
+            Rubbish
+          </div>
         </div>
-      )}
+        <div className="bg-black p-0.5 border border-black">
+          <img src={m.image_url} className="w-full aspect-[1.2/1] object-cover saturate-90 contrast-110" />
+        </div>
+        <div className="flex-1 border border-black p-2 relative overflow-hidden" style={{ background: `linear-gradient(165deg, ${color} 0%, #000 100%)` }}>
+          <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle, white 0.5px, transparent 0)', backgroundSize: '4px 4px' }}></div>
+          <div className="text-[6px] text-white/40 font-mono space-y-1 uppercase">
+            <p className="truncate">ID: {m.creator_id}</p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

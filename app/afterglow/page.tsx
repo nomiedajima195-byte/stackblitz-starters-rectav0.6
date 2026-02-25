@@ -8,18 +8,23 @@ const SUPABASE_KEY = 'sb_publishable_Sn_NxTgpLdu_ZFZ5-dcriA_Z5NYkr-_';
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const LIFESPAN_MS = 168 * 60 * 60 * 1000;
 
-export default function EngineRecirculation() {
+export default function EngineShredder() {
   const [mode, setMode] = useState('MAIN'); 
   const [streetPost, setStreetPost] = useState<any>(null);
   const [keeps, setKeeps] = useState<any[]>([]);
   const [wikiData, setWikiData] = useState({ title: '', content: '', bites_count: 0 });
   const [isLoading, setIsLoading] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [isBiting, setIsBiting] = useState(false);
-  const [flash, setFlash] = useState(false);
+  const [myPostIds, setMyPostIds] = useState<string[]>([]); // 自分の投稿IDリスト
 
   const [postInput, setPostInput] = useState({ title: '', body: '', image: '' });
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ローカルストレージから自分の投稿IDを復元
+  useEffect(() => {
+    const saved = localStorage.getItem('my_07734_ids');
+    if (saved) setMyPostIds(JSON.parse(saved));
+  }, []);
 
   const getBiteMask = (count: number) => {
     if (!count || count === 0) return {};
@@ -29,33 +34,16 @@ export default function EngineRecirculation() {
     };
   };
 
-  // --- RE-DEPOSIT LOGIC (横丁からストリートへ再放流) ---
-  const handleReDeposit = async (item: any) => {
-    if (!item) return;
+  // --- SHRED LOGIC (証拠隠滅) ---
+  const handleShred = async (id: string) => {
+    if (!confirm("Destroy this evidence?")) return;
     setIsLoading(true);
-    setFlash(true);
-    
-    try {
-      const { error } = await supabase.from('posts').insert([{ 
-        title: item.title, 
-        body: item.body || item.content, 
-        image: item.image || null,
-        bites_count: 0 
-      }]);
-
-      if (!error) {
-        setTimeout(() => {
-          setFlash(false);
-          setMode('MAIN');
-          fetchStreet();
-        }, 300);
-      }
-    } catch (err) {
-      console.error(err);
-      setFlash(false);
-    } finally {
-      setIsLoading(false);
+    const { error } = await supabase.from('posts').delete().eq('id', id);
+    if (!error) {
+      setStreetPost(null);
+      fetchStreet();
     }
+    setIsLoading(false);
   };
 
   const fetchStreet = useCallback(async () => {
@@ -71,10 +59,19 @@ export default function EngineRecirculation() {
   const handlePost = async () => {
     if (!postInput.title && !postInput.body && !postInput.image) return;
     setIsLoading(true);
-    const { error } = await supabase.from('posts').insert([{ 
-      title: postInput.title || 'UNTITLED', body: postInput.body, image: postInput.image || null, bites_count: 0 
-    }]);
-    if (!error) {
+    const { data, error } = await supabase.from('posts').insert([{ 
+      title: postInput.title || 'UNTITLED', 
+      body: postInput.body, 
+      image: postInput.image || null, 
+      bites_count: 0 
+    }]).select();
+
+    if (!error && data) {
+      // 自分の投稿IDを保存
+      const newIds = [...myPostIds, data[0].id];
+      setMyPostIds(newIds);
+      localStorage.setItem('my_07734_ids', JSON.stringify(newIds));
+      
       setPostInput({ title: '', body: '', image: '' });
       setMode('MAIN');
       fetchStreet();
@@ -90,7 +87,7 @@ export default function EngineRecirculation() {
   }, [mode, fetchStreet]);
 
   return (
-    <div className={`bg-[#1a1a1a] text-black font-mono h-[100dvh] flex flex-col overflow-hidden select-none border-x border-black transition-colors duration-200 ${flash ? 'invert bg-white' : ''}`}>
+    <div className="bg-[#1a1a1a] text-black font-mono h-[100dvh] flex flex-col overflow-hidden select-none border-x border-black">
       <header className="h-8 border-b border-black flex items-center justify-between px-4 shrink-0 bg-white z-20">
         <h1 className="text-sm font-black italic tracking-tighter">07734</h1>
         <span className="text-[8px] font-bold uppercase opacity-40">{mode}</span>
@@ -106,18 +103,20 @@ export default function EngineRecirculation() {
               {(mode === 'MAIN' ? streetPost : (mode === 'KEEP' ? (keeps.length > 0 ? keeps[currentIndex % keeps.length] : null) : wikiData)) ? (
                 <article>
                   <div className="flex justify-between items-center mb-6">
-                    <span className="text-[10px] font-black uppercase italic opacity-30">
-                      {mode === 'KEEP' ? 'STOCK' : 'FRAGMENT'}
-                    </span>
-                    {/* 再放流ボタン */}
-                    {mode === 'KEEP' && (
-                      <button 
-                        onClick={() => handleReDeposit(keeps[currentIndex % keeps.length])}
-                        className="text-[9px] font-black border border-black px-2 py-0.5 bg-black text-white active:bg-white active:text-black transition-colors"
-                      >
-                        RE-DEPOSIT
-                      </button>
-                    )}
+                    <div className="flex gap-2 items-center">
+                      <span className="text-[10px] font-black uppercase italic opacity-30">
+                        {mode === 'MAIN' ? 'STREET' : 'ALLEY'}
+                      </span>
+                      {/* 自分の投稿の時だけSHREDボタンを出す */}
+                      {mode === 'MAIN' && streetPost && myPostIds.includes(streetPost.id) && (
+                        <button 
+                          onClick={() => handleShred(streetPost.id)}
+                          className="text-[8px] font-black text-red-600 border border-red-600 px-1 hover:bg-red-600 hover:text-white transition-colors"
+                        >
+                          SHRED
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {(mode === 'MAIN' ? streetPost : (mode === 'KEEP' ? keeps[currentIndex % (keeps.length || 1)] : null))?.image && (
@@ -131,7 +130,7 @@ export default function EngineRecirculation() {
                   </p>
                 </article>
               ) : (
-                <div className="h-full flex items-center justify-center text-[10px] opacity-40">SIGNAL_LOST</div>
+                <div className="h-full flex items-center justify-center text-[10px] opacity-40 uppercase">Void</div>
               )}
             </div>
 
@@ -139,20 +138,20 @@ export default function EngineRecirculation() {
             <div className="absolute bottom-6 left-0 right-0 px-6 flex justify-between items-center pointer-events-none">
               <button 
                 onClick={mode === 'MAIN' ? fetchStreet : (mode === 'WIKI' ? () => {} : () => setCurrentIndex(prev => prev + 1))} 
-                className="pointer-events-auto h-7 px-4 bg-black text-white text-[8px] font-black uppercase active:invert transition-all"
+                className="pointer-events-auto h-7 px-4 bg-black text-white text-[8px] font-black active:invert transition-all"
               >
                 {mode === 'KEEP' ? 'FLIP' : 'NEXT'}
               </button>
               
               <div className="pointer-events-auto flex gap-1">
-                <button onClick={() => setIsBiting(true)} className="h-7 px-3 border border-black bg-white text-[8px] font-black italic active:bg-black active:text-white">BITE</button>
+                <button className="h-7 px-3 border border-black bg-white text-[8px] font-black italic active:bg-black active:text-white">BITE</button>
                 <button 
                   onClick={async () => {
                     const item = mode === 'MAIN' ? streetPost : (mode === 'WIKI' ? wikiData : null);
                     if(!item) return;
                     await supabase.from('keeps').insert([{ title: item.title, body: item.body || item.content, image: item.image || null }]);
                   }} 
-                  className="h-7 px-3 border border-black bg-white text-[8px] font-black uppercase active:bg-black active:text-white"
+                  className="h-7 px-3 border border-black bg-white text-[8px] font-black active:bg-black active:text-white"
                 >
                   KEEP
                 </button>
@@ -163,9 +162,9 @@ export default function EngineRecirculation() {
 
         {/* POST MODE */}
         {mode === 'POST' && (
-          <div className="h-full flex flex-col p-6 bg-white border border-black">
+          <div className="h-full flex flex-col p-6 bg-white border border-black overflow-hidden">
               <input value={postInput.title} onChange={(e) => setPostInput(prev => ({...prev, title: e.target.value}))} placeholder="TITLE..." className="border-b border-black py-2 outline-none font-black text-lg uppercase mb-4" />
-              <textarea value={postInput.body} onChange={(e) => setPostInput(prev => ({...prev, body: e.target.value}))} placeholder="DROP WORDS..." className="flex-grow outline-none text-sm font-bold resize-none" />
+              <textarea value={postInput.body} onChange={(e) => setPostInput(prev => ({...prev, body: e.target.value}))} placeholder="WORDS..." className="flex-grow outline-none text-sm font-bold resize-none" />
               <button onClick={handlePost} className="h-8 bg-black text-white text-[8px] font-black uppercase mt-4">DEPOSIT</button>
           </div>
         )}
@@ -178,6 +177,16 @@ export default function EngineRecirculation() {
           </button>
         ))}
       </footer>
+
+      <style jsx global>{`
+        /* 文章コピー禁止の呪い */
+        article {
+          user-select: none;
+          -webkit-user-select: none;
+        }
+        .custom-scrollbar::-webkit-scrollbar { width: 2px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: black; }
+      `}</style>
     </div>
   );
 }

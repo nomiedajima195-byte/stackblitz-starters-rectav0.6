@@ -3,11 +3,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
+// --- CONNECTION ---
 const SUPABASE_URL = 'https://pfxwhcgdbavycddapqmz.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_Sn_NxTgpLdu_ZFZ5-dcriA_Z5NYkr-_';
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-export default function EngineLightweight() {
+export default function EngineFinalClean() {
   const [mode, setMode] = useState('WIKI'); 
   const [timeLeft, setTimeLeft] = useState(45);
   const [isClosed, setIsClosed] = useState(false);
@@ -19,7 +20,10 @@ export default function EngineLightweight() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [postInput, setPostInput] = useState({ title: '', body: '' });
 
-  // --- WIKIPEDIA (Summary Only - Super Stable) ---
+  // --- UTILS ---
+  const cleanTags = (str: string) => str ? str.replace(/<[^>]*>/g, '').trim() : '';
+
+  // --- WIKIPEDIA (Summary Only - High Stability) ---
   const fetchWikiSummary = async () => {
     setIsLoading(true);
     setWikiData({ title: 'CONNECTING...', content: '' });
@@ -29,8 +33,8 @@ export default function EngineLightweight() {
       const data = await res.json();
 
       setWikiData({ 
-        title: data.titles.display, 
-        content: data.extract 
+        title: cleanTags(data.titles.display), 
+        content: cleanTags(data.extract) 
       });
     } catch (e) {
       setWikiData({ title: 'SIGNAL ERROR', content: '再試行してください。' });
@@ -90,9 +94,9 @@ export default function EngineLightweight() {
   }, []);
 
   if (isClosed) return (
-    <div className="bg-white text-black h-screen flex flex-col items-center justify-center font-mono border-[20px] border-black text-center p-10 select-none uppercase">
+    <div className="bg-white text-black h-screen flex flex-col items-center justify-center font-mono border-[20px] border-black text-center p-10 select-none">
       <h1 className="text-4xl font-black mb-4 italic">07734</h1>
-      <p className="text-xl border-y-2 border-black py-2 px-8">Closed</p>
+      <p className="text-xl border-y-2 border-black py-2 px-8 uppercase font-bold tracking-widest">Closed</p>
     </div>
   );
 
@@ -107,13 +111,13 @@ export default function EngineLightweight() {
       <main className="flex-grow p-4 relative flex flex-col overflow-hidden">
         {mode === 'WIKI' && (
           <div className="flex flex-col h-full animate-in fade-in">
-            <div className={`flex-grow border-4 border-black p-6 flex flex-col overflow-hidden ${isLoading ? 'opacity-20' : 'opacity-100'}`}>
-              <div className="text-[10px] font-black border-2 border-black px-2 self-start mb-4 uppercase">Fragment</div>
+            <div className={`flex-grow border-4 border-black p-6 flex flex-col overflow-hidden bg-white ${isLoading ? 'opacity-20' : 'opacity-100'}`}>
+              <div className="text-[10px] font-black border-2 border-black px-2 self-start mb-4 uppercase">Wiki_Frag</div>
               <h2 className="text-2xl font-black mb-4 underline decoration-4 break-all leading-tight">{wikiData.title}</h2>
               <div className="flex-grow overflow-y-auto text-sm leading-relaxed border-t-2 border-black pt-4 font-bold">{wikiData.content}</div>
             </div>
             <div className="grid grid-cols-4 gap-2 mt-4">
-              <button onClick={fetchWikiSummary} className="col-span-3 border-4 border-black py-6 font-black text-xl active:bg-black active:text-white uppercase" disabled={isLoading}>{isLoading ? "..." : "Next →"}</button>
+              <button onClick={fetchWikiSummary} className="col-span-3 border-4 border-black py-6 font-black text-xl active:bg-black active:text-white uppercase tracking-tighter" disabled={isLoading}>{isLoading ? "..." : "Next →"}</button>
               <button onClick={() => handleKeep(wikiData.title, wikiData.content, 'WIKI')} className="border-4 border-black font-black uppercase text-xs active:invert" disabled={isLoading}>Keep</button>
             </div>
           </div>
@@ -122,7 +126,7 @@ export default function EngineLightweight() {
         {mode === 'MAIN' && (
           <div className="flex flex-col h-full">
             <div className="flex-grow border-4 border-black p-6 flex flex-col overflow-hidden bg-white">
-              <div className="text-[10px] font-black bg-black text-white px-2 self-start mb-4 uppercase">Street</div>
+              <div className="text-[10px] font-black bg-black text-white px-2 self-start mb-4 uppercase tracking-tighter">Street</div>
               {streetPost ? (
                 <>
                   <h2 className="text-2xl font-black mb-4 underline decoration-4 break-all leading-tight">{streetPost.title}</h2>
@@ -133,18 +137,18 @@ export default function EngineLightweight() {
                   </div>
                 </>
               ) : (
-                <div className="flex-grow flex items-center justify-center text-xs italic text-gray-300 uppercase">Empty</div>
+                <div className="flex-grow flex items-center justify-center text-xs italic text-gray-300 uppercase font-black">Signals Empty</div>
               )}
             </div>
-            <button onClick={fetchStreet} className="mt-4 border-4 border-black py-6 font-black text-xl active:bg-black active:text-white uppercase">Refresh →</button>
+            <button onClick={fetchStreet} className="mt-4 border-4 border-black py-6 font-black text-xl active:bg-black active:text-white uppercase tracking-tighter">Next Encounter →</button>
           </div>
         )}
 
         {mode === 'POST' && (
-          <div className="flex flex-col h-full space-y-4">
-            <div className="text-[10px] font-black bg-black text-white px-2 self-start uppercase">Post</div>
-            <input value={postInput.title} onChange={(e) => setPostInput({...postInput, title: e.target.value})} placeholder="TITLE" className="border-b-4 border-black p-2 outline-none font-black text-2xl" />
-            <textarea value={postInput.body} onChange={(e) => setPostInput({...postInput, body: e.target.value})} placeholder="何を捨ててもいい。1000文字以内。" className="flex-grow border-4 border-black p-4 outline-none text-sm resize-none font-bold" />
+          <div className="flex flex-col h-full space-y-4 animate-in slide-in-from-bottom-4">
+            <div className="text-[10px] font-black bg-black text-white px-2 self-start uppercase">Deposit_Fragment</div>
+            <input value={postInput.title} onChange={(e) => setPostInput({...postInput, title: e.target.value})} placeholder="TITLE" className="border-b-4 border-black p-2 outline-none font-black text-2xl uppercase" />
+            <textarea value={postInput.body} onChange={(e) => setPostInput({...postInput, body: e.target.value})} placeholder="捨てる言葉を入力..." className="flex-grow border-4 border-black p-4 outline-none text-sm resize-none font-bold placeholder:text-gray-200" />
             <div className="flex space-x-2">
               <button onClick={() => setMode('MAIN')} className="flex-1 border-4 border-black py-4 font-black text-2xl active:invert">×</button>
               <button onClick={handlePost} className="flex-[3] border-4 border-black py-4 font-black text-2xl uppercase active:bg-black active:text-white">Post</button>
@@ -154,23 +158,23 @@ export default function EngineLightweight() {
 
         {mode === 'KEEP' && (
           <div className="flex flex-col h-full">
-            <div className="text-[10px] font-black bg-black text-white px-2 self-start mb-2 uppercase italic tracking-widest">Keep_Box ({keeps.length})</div>
+            <div className="text-[10px] font-black bg-black text-white px-2 self-start mb-2 uppercase italic tracking-widest">Alleyway ({keeps.length})</div>
             <div className="flex-grow border-4 border-black p-6 flex flex-col overflow-hidden bg-white">
               {keeps.length > 0 ? (
                 <>
                   <h3 className="text-xl font-black mb-4 underline decoration-2">{keeps[currentIndex % keeps.length].title}</h3>
                   <div className="flex-grow overflow-y-auto text-sm whitespace-pre-wrap mb-4 font-bold">{keeps[currentIndex % keeps.length].body}</div>
                   <div className="text-[8px] opacity-40 uppercase border-t border-dotted border-black pt-2 font-black italic">
-                    168H Expires: {new Date(keeps[currentIndex % keeps.length].expires_at).toLocaleString()}
+                    Lifespan: 168 Hours
                   </div>
                 </>
               ) : (
-                <div className="flex-grow flex items-center justify-center text-xs italic text-gray-300 uppercase font-black">Empty</div>
+                <div className="flex-grow flex items-center justify-center text-xs italic text-gray-300 uppercase font-black tracking-widest">Nothing_Kept</div>
               )}
             </div>
             <div className="grid grid-cols-2 gap-2 mt-4">
-              <button onClick={() => setCurrentIndex(prev => prev + 1)} className="border-4 border-black py-4 font-black uppercase active:invert">Next</button>
-              <button className="border-4 border-black py-4 font-black uppercase opacity-20">Share</button>
+              <button onClick={() => setCurrentIndex(prev => prev + 1)} className="border-4 border-black py-4 font-black uppercase active:invert tracking-widest">Next</button>
+              <button className="border-4 border-black py-4 font-black uppercase opacity-20 italic">Share</button>
             </div>
           </div>
         )}

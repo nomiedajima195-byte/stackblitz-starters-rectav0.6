@@ -8,7 +8,7 @@ const SUPABASE_KEY = 'sb_publishable_Sn_NxTgpLdu_ZFZ5-dcriA_Z5NYkr-_';
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const LIFESPAN_MS = 168 * 60 * 60 * 1000;
 
-export default function EngineRoundBite() {
+export default function EnginePureBite() {
   const [mode, setMode] = useState('MAIN'); 
   const [streetPost, setStreetPost] = useState<any>(null);
   const [keeps, setKeeps] = useState<any[]>([]);
@@ -20,10 +20,9 @@ export default function EngineRoundBite() {
   const [postInput, setPostInput] = useState({ title: '', body: '', image: '' });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // --- ROUND BITE STYLE (Masking) ---
+  // --- ROUND BITE MASK ---
   const getBiteMask = (count: number) => {
     if (!count || count === 0) return {};
-    // 右上を半径80pxの円でくり抜く
     return {
       maskImage: 'radial-gradient(circle 80px at calc(100% - 10px) 10px, transparent 100%, black 100%)',
       WebkitMaskImage: 'radial-gradient(circle 80px at calc(100% - 10px) 10px, transparent 100%, black 100%)',
@@ -109,11 +108,14 @@ export default function EngineRoundBite() {
             >
               {(mode === 'MAIN' ? streetPost : (mode === 'WIKI' ? wikiData : keeps[currentIndex % (keeps.length || 1)])) ? (
                 <article className={isBiting ? 'animate-shake' : ''}>
-                  <div className="flex justify-between items-center mb-6 text-[10px] font-black uppercase italic">
-                    {mode === 'MAIN' ? `FRAG / BITES: ${streetPost?.bites_count || 0}` : mode === 'WIKI' ? `WIKI / BITES: ${wikiData.bites_count}` : 'ALLEYWAY'}
+                  {/* ヘッダー情報のシンプル化（回数を削除） */}
+                  <div className="flex justify-between items-center mb-6">
+                    <span className="text-[10px] font-black uppercase italic opacity-50">
+                      {mode === 'MAIN' ? 'STREET_WASTE' : mode === 'WIKI' ? 'WIKI_FRAG' : 'KEEP_STOCK'}
+                    </span>
                   </div>
 
-                  {(mode === 'MAIN' ? streetPost : (mode === 'WIKI' ? null : keeps[currentIndex % keeps.length]))?.image && (
+                  {(mode === 'MAIN' ? streetPost : (mode === 'WIKI' ? null : keeps[currentIndex % (keeps.length || 1)]))?.image && (
                     <img src={(mode === 'MAIN' ? streetPost : keeps[currentIndex % keeps.length]).image} className="w-full h-auto border-4 border-black mb-6" alt="fragment" />
                   )}
                   <h2 className="text-3xl font-black mb-6 underline decoration-4 leading-none italic break-all">
@@ -124,7 +126,7 @@ export default function EngineRoundBite() {
                   </p>
                 </article>
               ) : (
-                <div className="h-full flex items-center justify-center italic text-black font-black">STREET IS EMPTY</div>
+                <div className="h-full flex items-center justify-center italic text-black font-black">VOID</div>
               )}
             </div>
 

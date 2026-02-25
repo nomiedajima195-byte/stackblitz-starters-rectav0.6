@@ -8,7 +8,7 @@ const SUPABASE_URL = 'https://pfxwhcgdbavycddapqmz.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_Sn_NxTgpLdu_ZFZ5-dcriA_Z5NYkr-_';
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-export default function EngineFullConnect() {
+export default function EngineFinalFix() {
   const [mode, setMode] = useState('WIKI'); 
   const [timeLeft, setTimeLeft] = useState(45);
   const [isClosed, setIsClosed] = useState(false);
@@ -36,33 +36,66 @@ export default function EngineFullConnect() {
     return () => clearInterval(timer);
   }, []);
 
-  // --- WIKIPEDIA API (FULL TEXT) ---
+  // --- WIKIPEDIA API (HARDENED) ---
   const fetchWikiFull = async () => {
     setIsLoading(true);
     setWikiData({ title: 'LOADING...', content: '' });
     try {
-      const resR = await fetch(`https://ja.wikipedia.org/api/rest_v1/page/random/title`);
+      // 1. summaryから確実に存在するタイトルを拾う
+      const resR = await fetch(`https://ja.wikipedia.org/api/rest_v1/page/random/summary`);
+      if (!resR.ok) throw new Error("Random API Failed");
       const dataR = await resR.json();
-      const title = dataR.items[0].title;
+      const title = dataR.titles.canonical;
 
+      // 2. mobile-sectionsで全文取得
       const resC = await fetch(`https://ja.wikipedia.org/api/rest_v1/page/mobile-sections/${encodeURIComponent(title)}`);
+      if (!resC.ok) throw new Error("Content API Failed");
       const dataC = await resC.json();
       
-      const clean = (html: string) => html ? html.replace(/<[^>]*>/g, '').trim() : '';
-      const lead = clean(dataC.lead.sections[0].text);
-      const remaining = dataC.remaining ? dataC.remaining.sections.map((s: any) => clean(s.text)).join('\n\n') : '';
+      const clean = (html: string) => {
+        if (!html) return '';
+        return html
+          .replace(/<style.*?<\/style>/g, '') // CSSを削除
+          .replace(/<script.*?<\/script>/g, '') // JSを削除
+          .replace(/<[^>]*>/g, '') // タグ削除
+          .replace(/&nbsp;/g, ' ')
+          .replace(/&quot;/g, '"')
+          .trim();
+      };
 
-      setWikiData({ title: dataC.lead.displaytitle || title, content: lead + '\n\n' + remaining });
+      const lead = clean(dataC.lead.sections[0].text);
+      const remaining = dataC.remaining 
+        ? dataC.remaining.sections.map((s: any) => clean(s.text)).join('\n\n') 
+        : '';
+
+      const fullContent = (lead + '\n\n' + remaining).trim();
+
+      if (!fullContent || fullContent.length < 10) {
+        // 中身が薄すぎる場合は再試行
+        fetchWikiFull();
+        return;
+      }
+
+      setWikiData({ 
+        title: dataC.lead.displaytitle || title, 
+        content: fullContent 
+      });
     } catch (e) {
-      setWikiData({ title: 'ERROR', content: 'データの取得に失敗した。' });
+      console.error(e);
+      setWikiData({ 
+        title: 'FETCH ERROR', 
+        content: 'データの断片を拾い損ねた。NEXT_WIKI を叩いて再試行してくれ。' 
+      });
     }
     setIsLoading(false);
   };
 
   // --- SUPABASE ACTIONS ---
   const fetchStreet = async () => {
-    const { data } = await supabase.from('posts').select('*').limit(10); // 簡易的に10件取得
-    if (data && data.length > 0) setStreetPost(data[Math.floor(Math.random() * data.length)]);
+    const { data } = await supabase.from('posts').select('*').limit(20);
+    if (data && data.length > 0) {
+      setStreetPost(data[Math.floor(Math.random() * data.length)]);
+    }
   };
 
   const handlePost = async () => {
@@ -74,16 +107,21 @@ export default function EngineFullConnect() {
       setPostInput({ title: '', body: '' });
       setMode('MAIN');
       fetchStreet();
+    } else {
+      alert("放流に失敗。DBの権限(RLS)を確認してくれ。");
     }
   };
 
   const handleKeep = async (title: string, body: string, source: string) => {
+    if (!title || title === 'LOADING...') return;
     const { error } = await supabase.from('keeps').insert([
       { title, body, source }
     ]);
     if (!error) {
-      alert("横丁へ運んだ。");
+      alert("横丁に保存。168時間後に消滅する。");
       fetchKeeps();
+    } else {
+      alert("KEEP失敗。SQLでkeepsテーブルを作ったか確認してくれ。");
     }
   };
 
@@ -94,8 +132,8 @@ export default function EngineFullConnect() {
 
   if (isClosed) return (
     <div className="bg-white text-black h-screen flex flex-col items-center justify-center font-mono border-[20px] border-black text-center p-10">
-      <h1 className="text-4xl font-black mb-4 italic italic">07734</h1>
-      <p className="text-xl border-y-2 border-black py-2 px-8 uppercase">閉店</p>
+      <h1 className="text-4xl font-black mb-4 italic">07734</h1>
+      <p className="text-xl border-y-2 border-black py-2 px-8 uppercase font-bold">閉店時間</p>
     </div>
   );
 
@@ -112,32 +150,32 @@ export default function EngineFullConnect() {
         
         {/* STREET (MAIN) */}
         {mode === 'MAIN' && (
-          <div className="flex flex-col h-full animate-in fade-in duration-300">
-            <div className="flex-grow border-4 border-black p-6 flex flex-col overflow-hidden">
-              <div className="text-[10px] font-bold border border-black px-2 self-start mb-4 uppercase">Street_Rubbish</div>
+          <div className="flex flex-col h-full animate-in fade-in">
+            <div className="flex-grow border-4 border-black p-6 flex flex-col overflow-hidden bg-white">
+              <div className="text-[10px] font-bold bg-black text-white px-2 self-start mb-4 uppercase">Street_Rubbish</div>
               {streetPost ? (
                 <>
                   <h2 className="text-2xl font-black mb-4 underline decoration-4 break-words">{streetPost.title}</h2>
                   <div className="flex-grow overflow-y-auto text-sm leading-relaxed whitespace-pre-wrap">{streetPost.body}</div>
-                  <div className="mt-4 flex gap-2">
-                    <button onClick={() => handleKeep(streetPost.title, streetPost.body, 'USER')} className="border-2 border-black px-4 py-1 text-[10px] font-bold active:invert">KEEP</button>
-                    <button className="border-2 border-black px-4 py-1 text-[10px] font-bold active:invert italic">BITE</button>
+                  <div className="mt-4 flex gap-2 pt-2 border-t-2 border-dotted border-black">
+                    <button onClick={() => handleKeep(streetPost.title, streetPost.body, 'USER')} className="border-2 border-black px-4 py-1 text-[10px] font-black active:invert">KEEP</button>
+                    <button className="border-2 border-black px-4 py-1 text-[10px] font-black active:invert italic">BITE</button>
                   </div>
                 </>
               ) : (
                 <div className="flex-grow flex items-center justify-center text-xs italic text-gray-300">STREET IS EMPTY...</div>
               )}
             </div>
-            <button onClick={fetchStreet} className="mt-4 border-4 border-black py-6 font-black text-xl active:bg-black active:text-white uppercase tracking-tighter">Next_Encounter →</button>
+            <button onClick={fetchStreet} className="mt-4 border-4 border-black py-6 font-black text-xl active:bg-black active:text-white uppercase">Next_Encounter →</button>
           </div>
         )}
 
         {/* POST MODE */}
         {mode === 'POST' && (
           <div className="flex flex-col h-full space-y-4 animate-in slide-in-from-bottom-4">
-            <div className="text-[10px] font-bold bg-black text-white px-2 self-start uppercase">New_Post</div>
-            <input value={postInput.title} onChange={(e) => setPostInput({...postInput, title: e.target.value})} placeholder="TITLE" className="border-b-4 border-black p-2 outline-none font-bold text-xl" />
-            <textarea value={postInput.body} onChange={(e) => setPostInput({...postInput, body: e.target.value})} placeholder="1000文字以内で何かを捨てろ..." className="flex-grow border-4 border-black p-4 outline-none text-sm resize-none" />
+            <div className="text-[10px] font-bold bg-black text-white px-2 self-start uppercase font-black">Deposit_Fragment</div>
+            <input value={postInput.title} onChange={(e) => setPostInput({...postInput, title: e.target.value})} placeholder="TITLE" className="border-b-4 border-black p-2 outline-none font-black text-2xl" />
+            <textarea value={postInput.body} onChange={(e) => setPostInput({...postInput, body: e.target.value})} placeholder="何を捨ててもいい。1000文字以内。" className="flex-grow border-4 border-black p-4 outline-none text-sm resize-none font-bold" />
             <div className="flex space-x-2">
               <button onClick={() => setMode('MAIN')} className="flex-1 border-4 border-black py-4 font-black text-2xl active:invert">×</button>
               <button onClick={handlePost} className="flex-[3] border-4 border-black py-4 font-black text-2xl uppercase active:bg-black active:text-white">Post</button>
@@ -149,13 +187,15 @@ export default function EngineFullConnect() {
         {mode === 'WIKI' && (
           <div className="flex flex-col h-full">
             <div className={`flex-grow border-4 border-black p-6 flex flex-col overflow-hidden ${isLoading ? 'opacity-30' : ''}`}>
-              <div className="text-[10px] font-bold bg-black text-white px-2 self-start mb-4 uppercase">Wiki_Fragment</div>
+              <div className="text-[10px] font-bold border-2 border-black px-2 self-start mb-4 uppercase font-black">Wiki_Full_Text</div>
               <h2 className="text-2xl font-black mb-4 underline decoration-4 break-words">{wikiData.title}</h2>
               <div className="flex-grow overflow-y-auto text-sm leading-relaxed border-t-2 border-black pt-4 whitespace-pre-wrap">{wikiData.content}</div>
             </div>
             <div className="grid grid-cols-4 gap-2 mt-4">
-              <button onClick={fetchWikiFull} className="col-span-3 border-4 border-black py-6 font-black text-xl active:invert uppercase">Next_Wiki →</button>
-              <button onClick={() => handleKeep(wikiData.title, wikiData.content, 'WIKI')} className="border-4 border-black font-black uppercase text-xs">Keep</button>
+              <button onClick={fetchWikiFull} className="col-span-3 border-4 border-black py-6 font-black text-xl active:invert uppercase disabled:opacity-50" disabled={isLoading}>
+                {isLoading ? "SEARCHING..." : "Next_Wiki →"}
+              </button>
+              <button onClick={() => handleKeep(wikiData.title, wikiData.content, 'WIKI')} className="border-4 border-black font-black uppercase text-xs active:bg-black active:text-white" disabled={isLoading}>Keep</button>
             </div>
           </div>
         )}
@@ -163,23 +203,23 @@ export default function EngineFullConnect() {
         {/* KEEP MODE (横丁) */}
         {mode === 'KEEP' && (
           <div className="flex flex-col h-full">
-            <div className="text-[10px] font-bold bg-black text-white px-2 self-start mb-2 uppercase italic">Alleyway ({keeps.length})</div>
-            <div className="flex-grow border-4 border-black p-6 flex flex-col overflow-hidden">
+            <div className="text-[10px] font-bold bg-black text-white px-2 self-start mb-2 uppercase italic font-black">The_Alleyway ({keeps.length})</div>
+            <div className="flex-grow border-4 border-black p-6 flex flex-col overflow-hidden bg-white">
               {keeps.length > 0 ? (
                 <>
                   <h3 className="text-xl font-black mb-4 underline decoration-2">{keeps[currentIndex % keeps.length].title}</h3>
-                  <div className="flex-grow overflow-y-auto text-sm whitespace-pre-wrap mb-4">{keeps[currentIndex % keeps.length].body}</div>
-                  <div className="text-[8px] opacity-40 uppercase border-t border-dotted border-black pt-2">
+                  <div className="flex-grow overflow-y-auto text-sm whitespace-pre-wrap mb-4 font-medium">{keeps[currentIndex % keeps.length].body}</div>
+                  <div className="text-[8px] opacity-40 uppercase border-t border-dotted border-black pt-2 font-black">
                     Expires: {new Date(keeps[currentIndex % keeps.length].expires_at).toLocaleString()}
                   </div>
                 </>
               ) : (
-                <div className="flex-grow flex items-center justify-center text-xs italic text-gray-300 uppercase">Empty_Alleyway</div>
+                <div className="flex-grow flex items-center justify-center text-xs italic text-gray-300 uppercase">Your alleyway is empty.</div>
               )}
             </div>
             <div className="grid grid-cols-2 gap-2 mt-4">
-              <button onClick={() => setCurrentIndex(prev => prev + 1)} className="border-4 border-black py-4 font-black uppercase">Next_Keep</button>
-              <button className="border-4 border-black py-4 font-black uppercase active:invert">Share</button>
+              <button onClick={() => setCurrentIndex(prev => prev + 1)} className="border-4 border-black py-4 font-black uppercase active:invert">Next_Fragment</button>
+              <button className="border-4 border-black py-4 font-black uppercase active:invert opacity-40">Share</button>
             </div>
           </div>
         )}

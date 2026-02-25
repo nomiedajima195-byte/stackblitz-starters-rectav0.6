@@ -8,22 +8,28 @@ const SUPABASE_KEY = 'sb_publishable_Sn_NxTgpLdu_ZFZ5-dcriA_Z5NYkr-_';
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const LIFESPAN_MS = 168 * 60 * 60 * 1000;
 
-export default function EngineShredder() {
+export default function EngineShredderFixed() {
   const [mode, setMode] = useState('MAIN'); 
   const [streetPost, setStreetPost] = useState<any>(null);
   const [keeps, setKeeps] = useState<any[]>([]);
   const [wikiData, setWikiData] = useState({ title: '', content: '', bites_count: 0 });
   const [isLoading, setIsLoading] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [myPostIds, setMyPostIds] = useState<string[]>([]); // 自分の投稿IDリスト
+  const [myPostIds, setMyPostIds] = useState<string[]>([]); 
 
   const [postInput, setPostInput] = useState({ title: '', body: '', image: '' });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // ローカルストレージから自分の投稿IDを復元
+  // 初回起動時：localStorageから自分の投稿履歴をロード
   useEffect(() => {
     const saved = localStorage.getItem('my_07734_ids');
-    if (saved) setMyPostIds(JSON.parse(saved));
+    if (saved) {
+      try {
+        setMyPostIds(JSON.parse(saved));
+      } catch (e) {
+        console.error("ID Load Error", e);
+      }
+    }
   }, []);
 
   const getBiteMask = (count: number) => {
@@ -34,7 +40,6 @@ export default function EngineShredder() {
     };
   };
 
-  // --- SHRED LOGIC (証拠隠滅) ---
   const handleShred = async (id: string) => {
     if (!confirm("Destroy this evidence?")) return;
     setIsLoading(true);
@@ -56,25 +61,34 @@ export default function EngineShredder() {
     setIsLoading(false);
   }, []);
 
+  // --- POST LOGIC (ID取得を確実に) ---
   const handlePost = async () => {
     if (!postInput.title && !postInput.body && !postInput.image) return;
     setIsLoading(true);
+    
+    // .select() を付けることで、挿入された行のデータを即座に受け取る
     const { data, error } = await supabase.from('posts').insert([{ 
       title: postInput.title || 'UNTITLED', 
-      body: postInput.body, 
+      body: postInput.body || '', 
       image: postInput.image || null, 
       bites_count: 0 
     }]).select();
 
-    if (!error && data) {
-      // 自分の投稿IDを保存
-      const newIds = [...myPostIds, data[0].id];
-      setMyPostIds(newIds);
-      localStorage.setItem('my_07734_ids', JSON.stringify(newIds));
+    if (!error && data && data.length > 0) {
+      const newId = data[0].id;
+      
+      // 関数型アップデートで最新のIDリストを作成
+      setMyPostIds(prev => {
+        const updated = [...prev, newId];
+        localStorage.setItem('my_07734_ids', JSON.stringify(updated));
+        return updated;
+      });
       
       setPostInput({ title: '', body: '', image: '' });
       setMode('MAIN');
       fetchStreet();
+    } else {
+      console.error("Post Error:", error);
     }
     setIsLoading(false);
   };
@@ -100,18 +114,18 @@ export default function EngineShredder() {
               style={mode === 'KEEP' ? {} : getBiteMask(mode === 'MAIN' ? streetPost?.bites_count : wikiData.bites_count)}
               className="flex-grow overflow-y-auto custom-scrollbar p-6 bg-white shadow-lg relative border border-gray-400"
             >
-              {(mode === 'MAIN' ? streetPost : (mode === 'KEEP' ? (keeps.length > 0 ? keeps[currentIndex % keeps.length] : null) : wikiData)) ? (
+              {(mode === 'MAIN' ? streetPost : (mode === 'KEEP' ? (keeps.length > 0 ? keeps[currentIndex % (keeps.length || 1)] : null) : wikiData)) ? (
                 <article>
                   <div className="flex justify-between items-center mb-6">
                     <div className="flex gap-2 items-center">
                       <span className="text-[10px] font-black uppercase italic opacity-30">
                         {mode === 'MAIN' ? 'STREET' : 'ALLEY'}
                       </span>
-                      {/* 自分の投稿の時だけSHREDボタンを出す */}
+                      {/* SHREDボタン判定の強化 */}
                       {mode === 'MAIN' && streetPost && myPostIds.includes(streetPost.id) && (
                         <button 
-                          onClick={() => handleShred(streetPost.id)}
-                          className="text-[8px] font-black text-red-600 border border-red-600 px-1 hover:bg-red-600 hover:text-white transition-colors"
+                          onClick={(e) => { e.stopPropagation(); handleShred(streetPost.id); }}
+                          className="text-[9px] font-black text-red-600 border border-red-600 px-2 py-0.5 bg-white hover:bg-red-600 hover:text-white transition-all animate-pulse"
                         >
                           SHRED
                         </button>
@@ -120,7 +134,7 @@ export default function EngineShredder() {
                   </div>
 
                   {(mode === 'MAIN' ? streetPost : (mode === 'KEEP' ? keeps[currentIndex % (keeps.length || 1)] : null))?.image && (
-                    <img src={(mode === 'MAIN' ? streetPost : keeps[currentIndex % (keeps.length || 1)]).image} className="w-full h-auto border border-black mb-6" alt="fragment" />
+                    <img src={(mode === 'MAIN' ? streetPost : (mode === 'KEEP' ? keeps[currentIndex % keeps.length] : null)).image} className="w-full h-auto border border-black mb-6" alt="fragment" />
                   )}
                   <h2 className="text-2xl font-black mb-6 leading-tight italic">
                     {(mode === 'MAIN' ? streetPost : (mode === 'KEEP' ? keeps[currentIndex % (keeps.length || 1)] : wikiData)).title}
@@ -138,7 +152,7 @@ export default function EngineShredder() {
             <div className="absolute bottom-6 left-0 right-0 px-6 flex justify-between items-center pointer-events-none">
               <button 
                 onClick={mode === 'MAIN' ? fetchStreet : (mode === 'WIKI' ? () => {} : () => setCurrentIndex(prev => prev + 1))} 
-                className="pointer-events-auto h-7 px-4 bg-black text-white text-[8px] font-black active:invert transition-all"
+                className="pointer-events-auto h-7 px-4 bg-black text-white text-[8px] font-black active:invert transition-all shadow-md"
               >
                 {mode === 'KEEP' ? 'FLIP' : 'NEXT'}
               </button>
@@ -151,7 +165,7 @@ export default function EngineShredder() {
                     if(!item) return;
                     await supabase.from('keeps').insert([{ title: item.title, body: item.body || item.content, image: item.image || null }]);
                   }} 
-                  className="h-7 px-3 border border-black bg-white text-[8px] font-black active:bg-black active:text-white"
+                  className="h-7 px-3 border border-black bg-white text-[8px] font-black uppercase active:bg-black active:text-white"
                 >
                   KEEP
                 </button>
@@ -164,8 +178,8 @@ export default function EngineShredder() {
         {mode === 'POST' && (
           <div className="h-full flex flex-col p-6 bg-white border border-black overflow-hidden">
               <input value={postInput.title} onChange={(e) => setPostInput(prev => ({...prev, title: e.target.value}))} placeholder="TITLE..." className="border-b border-black py-2 outline-none font-black text-lg uppercase mb-4" />
-              <textarea value={postInput.body} onChange={(e) => setPostInput(prev => ({...prev, body: e.target.value}))} placeholder="WORDS..." className="flex-grow outline-none text-sm font-bold resize-none" />
-              <button onClick={handlePost} className="h-8 bg-black text-white text-[8px] font-black uppercase mt-4">DEPOSIT</button>
+              <textarea value={postInput.body} onChange={(e) => setPostInput(prev => ({...prev, body: e.target.value}))} placeholder="DROP WORDS..." className="flex-grow outline-none text-sm font-bold resize-none" />
+              <button onClick={handlePost} className="h-8 bg-black text-white text-[8px] font-black uppercase mt-4" disabled={isLoading}>DEPOSIT</button>
           </div>
         )}
       </main>
@@ -179,7 +193,6 @@ export default function EngineShredder() {
       </footer>
 
       <style jsx global>{`
-        /* 文章コピー禁止の呪い */
         article {
           user-select: none;
           -webkit-user-select: none;

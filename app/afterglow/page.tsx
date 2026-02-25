@@ -3,12 +3,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
-// --- CONNECTION ---
 const SUPABASE_URL = 'https://pfxwhcgdbavycddapqmz.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_Sn_NxTgpLdu_ZFZ5-dcriA_Z5NYkr-_';
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-export default function EngineFinalClean() {
+export default function EngineRecirculation() {
   const [mode, setMode] = useState('WIKI'); 
   const [timeLeft, setTimeLeft] = useState(45);
   const [isClosed, setIsClosed] = useState(false);
@@ -20,10 +19,8 @@ export default function EngineFinalClean() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [postInput, setPostInput] = useState({ title: '', body: '' });
 
-  // --- UTILS ---
   const cleanTags = (str: string) => str ? str.replace(/<[^>]*>/g, '').trim() : '';
 
-  // --- WIKIPEDIA (Summary Only - High Stability) ---
   const fetchWikiSummary = async () => {
     setIsLoading(true);
     setWikiData({ title: 'CONNECTING...', content: '' });
@@ -31,18 +28,13 @@ export default function EngineFinalClean() {
       const res = await fetch(`https://ja.wikipedia.org/api/rest_v1/page/random/summary`);
       if (!res.ok) throw new Error();
       const data = await res.json();
-
-      setWikiData({ 
-        title: cleanTags(data.titles.display), 
-        content: cleanTags(data.extract) 
-      });
+      setWikiData({ title: cleanTags(data.titles.display), content: cleanTags(data.extract) });
     } catch (e) {
       setWikiData({ title: 'SIGNAL ERROR', content: '再試行してください。' });
     }
     setIsLoading(false);
   };
 
-  // --- SUPABASE ACTIONS ---
   const fetchKeeps = useCallback(async () => {
     const { data } = await supabase.from('keeps').select('*').order('created_at', { ascending: false });
     if (data) setKeeps(data);
@@ -76,7 +68,29 @@ export default function EngineFinalClean() {
     }
   };
 
-  // --- SYNC ---
+  // --- NEW: SHARE FUNCTION (Recirculate to Street) ---
+  const handleShare = async () => {
+    const currentKeep = keeps[currentIndex % keeps.length];
+    if (!currentKeep) return;
+
+    setIsLoading(true);
+    const { error } = await supabase.from('posts').insert([
+      { 
+        title: `♻ ${currentKeep.title}`, // シェアされたことがわかるマーク
+        body: currentKeep.body 
+      }
+    ]);
+
+    if (!error) {
+      alert("ストリートへ再放流した。");
+      setMode('MAIN');
+      fetchStreet();
+    } else {
+      alert("シェア失敗。");
+    }
+    setIsLoading(false);
+  };
+
   useEffect(() => {
     if (mode === 'KEEP') fetchKeeps();
     if (mode === 'MAIN') fetchStreet();
@@ -94,9 +108,9 @@ export default function EngineFinalClean() {
   }, []);
 
   if (isClosed) return (
-    <div className="bg-white text-black h-screen flex flex-col items-center justify-center font-mono border-[20px] border-black text-center p-10 select-none">
-      <h1 className="text-4xl font-black mb-4 italic">07734</h1>
-      <p className="text-xl border-y-2 border-black py-2 px-8 uppercase font-bold tracking-widest">Closed</p>
+    <div className="bg-white text-black h-screen flex flex-col items-center justify-center font-mono border-[20px] border-black text-center p-10 select-none font-black uppercase">
+      <h1 className="text-4xl italic mb-4">07734</h1>
+      <p className="text-xl border-y-2 border-black py-2 px-8">Closed</p>
     </div>
   );
 
@@ -112,7 +126,7 @@ export default function EngineFinalClean() {
         {mode === 'WIKI' && (
           <div className="flex flex-col h-full animate-in fade-in">
             <div className={`flex-grow border-4 border-black p-6 flex flex-col overflow-hidden bg-white ${isLoading ? 'opacity-20' : 'opacity-100'}`}>
-              <div className="text-[10px] font-black border-2 border-black px-2 self-start mb-4 uppercase">Wiki_Frag</div>
+              <div className="text-[10px] font-black border-2 border-black px-2 self-start mb-4 uppercase">Fragment</div>
               <h2 className="text-2xl font-black mb-4 underline decoration-4 break-all leading-tight">{wikiData.title}</h2>
               <div className="flex-grow overflow-y-auto text-sm leading-relaxed border-t-2 border-black pt-4 font-bold">{wikiData.content}</div>
             </div>
@@ -145,10 +159,10 @@ export default function EngineFinalClean() {
         )}
 
         {mode === 'POST' && (
-          <div className="flex flex-col h-full space-y-4 animate-in slide-in-from-bottom-4">
+          <div className="flex flex-col h-full space-y-4">
             <div className="text-[10px] font-black bg-black text-white px-2 self-start uppercase">Deposit_Fragment</div>
             <input value={postInput.title} onChange={(e) => setPostInput({...postInput, title: e.target.value})} placeholder="TITLE" className="border-b-4 border-black p-2 outline-none font-black text-2xl uppercase" />
-            <textarea value={postInput.body} onChange={(e) => setPostInput({...postInput, body: e.target.value})} placeholder="捨てる言葉を入力..." className="flex-grow border-4 border-black p-4 outline-none text-sm resize-none font-bold placeholder:text-gray-200" />
+            <textarea value={postInput.body} onChange={(e) => setPostInput({...postInput, body: e.target.value})} placeholder="捨てる言葉を入力..." className="flex-grow border-4 border-black p-4 outline-none text-sm resize-none font-bold" />
             <div className="flex space-x-2">
               <button onClick={() => setMode('MAIN')} className="flex-1 border-4 border-black py-4 font-black text-2xl active:invert">×</button>
               <button onClick={handlePost} className="flex-[3] border-4 border-black py-4 font-black text-2xl uppercase active:bg-black active:text-white">Post</button>
@@ -159,7 +173,7 @@ export default function EngineFinalClean() {
         {mode === 'KEEP' && (
           <div className="flex flex-col h-full">
             <div className="text-[10px] font-black bg-black text-white px-2 self-start mb-2 uppercase italic tracking-widest">Alleyway ({keeps.length})</div>
-            <div className="flex-grow border-4 border-black p-6 flex flex-col overflow-hidden bg-white">
+            <div className={`flex-grow border-4 border-black p-6 flex flex-col overflow-hidden bg-white ${isLoading ? 'opacity-20' : 'opacity-100'}`}>
               {keeps.length > 0 ? (
                 <>
                   <h3 className="text-xl font-black mb-4 underline decoration-2">{keeps[currentIndex % keeps.length].title}</h3>
@@ -174,7 +188,7 @@ export default function EngineFinalClean() {
             </div>
             <div className="grid grid-cols-2 gap-2 mt-4">
               <button onClick={() => setCurrentIndex(prev => prev + 1)} className="border-4 border-black py-4 font-black uppercase active:invert tracking-widest">Next</button>
-              <button className="border-4 border-black py-4 font-black uppercase opacity-20 italic">Share</button>
+              <button onClick={handleShare} className="border-4 border-black py-4 font-black uppercase active:bg-black active:text-white tracking-widest" disabled={isLoading}>Share</button>
             </div>
           </div>
         )}

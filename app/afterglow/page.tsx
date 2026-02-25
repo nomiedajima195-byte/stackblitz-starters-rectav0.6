@@ -8,7 +8,7 @@ const SUPABASE_KEY = 'sb_publishable_Sn_NxTgpLdu_ZFZ5-dcriA_Z5NYkr-_';
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const LIFESPAN_MS = 168 * 60 * 60 * 1000;
 
-export default function EngineComplete() {
+export default function EngineRoundBite() {
   const [mode, setMode] = useState('MAIN'); 
   const [streetPost, setStreetPost] = useState<any>(null);
   const [keeps, setKeeps] = useState<any[]>([]);
@@ -20,21 +20,21 @@ export default function EngineComplete() {
   const [postInput, setPostInput] = useState({ title: '', body: '', image: '' });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // --- BITE UI STYLE ---
-  const getBiteStyle = (count: number) => {
+  // --- ROUND BITE STYLE (Masking) ---
+  const getBiteMask = (count: number) => {
     if (!count || count === 0) return {};
+    // 右上を半径80pxの円でくり抜く
     return {
-      clipPath: `polygon(0% 0%, 82% 0%, 100% 18%, 100% 100%, 0% 100%)`,
-      transition: 'clip-path 0.2s ease-in'
+      maskImage: 'radial-gradient(circle 80px at calc(100% - 10px) 10px, transparent 100%, black 100%)',
+      WebkitMaskImage: 'radial-gradient(circle 80px at calc(100% - 10px) 10px, transparent 100%, black 100%)',
     };
   };
 
   const triggerBiteEffect = () => {
     setIsBiting(true);
-    setTimeout(() => setIsBiting(false), 400);
+    setTimeout(() => setIsBiting(false), 300);
   };
 
-  // --- ACTIONS ---
   const handleBite = async () => {
     triggerBiteEffect();
     if (mode === 'MAIN' && streetPost) {
@@ -49,36 +49,24 @@ export default function EngineComplete() {
   const handleKeep = async (item: any) => {
     if (!item) return;
     const { error } = await supabase.from('keeps').insert([{ 
-      title: item.title, 
-      body: item.body || item.content, 
-      image: item.image || '' 
+      title: item.title, body: item.body || item.content, image: item.image || '' 
     }]);
-    if (!error) {
-      alert("KEPT");
-      handleBite();
-    }
+    if (!error) { handleBite(); }
   };
 
-  // 欠落していた handlePost を定義
   const handlePost = async () => {
     if (!postInput.title && !postInput.body && !postInput.image) return;
     setIsLoading(true);
     const { error } = await supabase.from('posts').insert([{ 
-      title: postInput.title || 'UNTITLED', 
-      body: postInput.body, 
-      image: postInput.image 
+      title: postInput.title || 'UNTITLED', body: postInput.body, image: postInput.image 
     }]);
-    if (!error) {
-      setPostInput({ title: '', body: '', image: '' });
-      setMode('MAIN');
-      fetchStreet();
-    }
+    if (!error) { setPostInput({ title: '', body: '', image: '' }); setMode('MAIN'); fetchStreet(); }
     setIsLoading(false);
   };
 
   const fetchStreet = useCallback(async () => {
     setIsLoading(true);
-    const { data } = await supabase.from('posts').select('*');
+    const { data } = await supabase.from('posts').select('*').order('created_at', { ascending: false });
     if (data) {
       const alive = data.filter(p => (new Date().getTime() - new Date(p.created_at).getTime()) < LIFESPAN_MS);
       setStreetPost(alive.length > 0 ? alive[Math.floor(Math.random() * alive.length)] : null);
@@ -107,36 +95,36 @@ export default function EngineComplete() {
   return (
     <div className="bg-white text-black font-mono h-[100dvh] flex flex-col overflow-hidden select-none border-x-2 border-black">
       <header className="h-10 border-b-2 border-black flex items-center justify-between px-4 bg-white z-20 shrink-0">
-        <h1 className="text-xl font-black italic tracking-tighter">07734</h1>
-        <span className="text-[10px] font-black uppercase border border-black px-1">{mode}</span>
+        <h1 className="text-xl font-black italic tracking-tighter uppercase">07734</h1>
+        <span className="text-[10px] font-black uppercase border-2 border-black px-2 tracking-tighter bg-black text-white">{mode}</span>
       </header>
 
-      <main className="flex-grow relative flex flex-col overflow-hidden bg-[#efefef] p-3">
+      <main className="flex-grow relative flex flex-col overflow-hidden bg-[#ccc] p-3">
         {(mode === 'MAIN' || mode === 'WIKI' || mode === 'KEEP') && (
-          <div className={`flex flex-col h-full relative ${isBiting ? 'animate-shake' : ''}`}>
+          <div className={`flex flex-col h-full relative ${isBiting ? 'scale-95' : 'scale-100'} transition-transform duration-100`}>
+            {/* Card Content with Round Mask */}
             <div 
-              style={mode === 'KEEP' ? {} : getBiteStyle(mode === 'MAIN' ? streetPost?.bites_count : wikiData.bites_count)}
-              className="flex-grow overflow-y-auto custom-scrollbar p-6 bg-white border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]"
+              style={mode === 'KEEP' ? {} : getBiteMask(mode === 'MAIN' ? streetPost?.bites_count : wikiData.bites_count)}
+              className="flex-grow overflow-y-auto custom-scrollbar p-6 bg-white border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] relative"
             >
               {(mode === 'MAIN' ? streetPost : (mode === 'WIKI' ? wikiData : keeps[currentIndex % (keeps.length || 1)])) ? (
-                <article>
-                  <div className="flex justify-between items-center mb-4 text-[9px] font-black uppercase italic underline">
-                    {mode === 'MAIN' ? `STREET / BITES: ${streetPost?.bites_count || 0}` : mode === 'WIKI' ? `WIKI / BITES: ${wikiData.bites_count}` : 'STOCK'}
+                <article className={isBiting ? 'animate-shake' : ''}>
+                  <div className="flex justify-between items-center mb-6 text-[10px] font-black uppercase italic">
+                    {mode === 'MAIN' ? `FRAG / BITES: ${streetPost?.bites_count || 0}` : mode === 'WIKI' ? `WIKI / BITES: ${wikiData.bites_count}` : 'ALLEYWAY'}
                   </div>
 
-                  {/* Render Body */}
-                  { (mode === 'MAIN' ? streetPost : (mode === 'WIKI' ? null : keeps[currentIndex % keeps.length]))?.image && (
-                    <img src={(mode === 'MAIN' ? streetPost : keeps[currentIndex % keeps.length]).image} className="w-full h-auto border-2 border-black mb-6" alt="fragment" />
+                  {(mode === 'MAIN' ? streetPost : (mode === 'WIKI' ? null : keeps[currentIndex % keeps.length]))?.image && (
+                    <img src={(mode === 'MAIN' ? streetPost : keeps[currentIndex % keeps.length]).image} className="w-full h-auto border-4 border-black mb-6" alt="fragment" />
                   )}
-                  <h2 className="text-3xl font-black mb-6 underline decoration-4 leading-tight italic">
+                  <h2 className="text-3xl font-black mb-6 underline decoration-4 leading-none italic break-all">
                     {(mode === 'MAIN' ? streetPost : (mode === 'WIKI' ? wikiData : keeps[currentIndex % keeps.length])).title}
                   </h2>
-                  <p className="text-base font-bold whitespace-pre-wrap leading-relaxed pb-32">
+                  <p className="text-base font-bold whitespace-pre-wrap leading-tight pb-32">
                     {(mode === 'MAIN' ? streetPost?.body : (mode === 'WIKI' ? wikiData.content : keeps[currentIndex % keeps.length]?.body))}
                   </p>
                 </article>
               ) : (
-                <div className="h-full flex items-center justify-center italic text-gray-300">VOID SIGNAL</div>
+                <div className="h-full flex items-center justify-center italic text-black font-black">STREET IS EMPTY</div>
               )}
             </div>
 
@@ -144,14 +132,14 @@ export default function EngineComplete() {
             <div className="absolute bottom-6 left-4 right-4 flex gap-2">
               <button 
                 onClick={mode === 'MAIN' ? fetchStreet : (mode === 'WIKI' ? fetchWiki : () => setCurrentIndex(prev => prev + 1))} 
-                className="flex-[4] h-16 bg-black text-white font-black text-xl active:scale-95 transition-all shadow-[4px_4px_0px_0px_rgba(100,100,100,1)]"
+                className="flex-[4] h-16 bg-black text-white font-black text-xl active:bg-white active:text-black border-4 border-black transition-colors"
               >
                 {mode === 'KEEP' ? 'FLIP' : 'NEXT →'}
               </button>
               
               <div className="flex-[2] flex flex-col gap-1">
-                <button onClick={handleBite} className="flex-1 bg-white border-4 border-black font-black text-[10px] active:bg-black active:text-white uppercase italic">BITE</button>
-                <button onClick={() => handleKeep(mode === 'MAIN' ? streetPost : (mode === 'WIKI' ? wikiData : null))} className="flex-1 bg-white border-4 border-black font-black text-[10px] active:bg-black active:text-white uppercase">KEEP</button>
+                <button onClick={handleBite} className="flex-1 bg-white border-4 border-black font-black text-[12px] active:bg-black active:text-white italic">BITE</button>
+                <button onClick={() => handleKeep(mode === 'MAIN' ? streetPost : (mode === 'WIKI' ? wikiData : null))} className="flex-1 bg-white border-4 border-black font-black text-[12px] active:bg-black active:text-white uppercase">KEEP</button>
               </div>
             </div>
           </div>
@@ -159,39 +147,37 @@ export default function EngineComplete() {
 
         {/* POST MODE */}
         {mode === 'POST' && (
-          <div className="h-full flex flex-col p-4 bg-white border-4 border-black animate-in slide-in-from-bottom-8">
-             <input value={postInput.title} onChange={(e) => setPostInput({...postInput, title: e.target.value})} placeholder="TITLE" className="border-b-4 border-black p-2 outline-none font-black text-2xl uppercase mb-4" />
-             <div className="flex-grow flex flex-col overflow-hidden mb-4">
+          <div className="h-full flex flex-col p-4 bg-white border-4 border-black">
+             <input value={postInput.title} onChange={(e) => setPostInput({...postInput, title: e.target.value})} placeholder="TITLE" className="border-b-4 border-black p-2 outline-none font-black text-3xl uppercase mb-4" />
+             <div className="flex-grow flex flex-col overflow-hidden mb-4 border-2 border-black p-2">
                {postInput.image && <img src={postInput.image} className="h-32 w-full object-contain mb-2 border-2 border-black" />}
-               <textarea value={postInput.body} onChange={(e) => setPostInput({...postInput, body: e.target.value})} placeholder="捨て去る言葉..." className="flex-grow outline-none text-lg font-bold resize-none custom-scrollbar" />
+               <textarea value={postInput.body} onChange={(e) => setPostInput({...postInput, body: e.target.value})} placeholder="捨てる言葉..." className="flex-grow outline-none text-lg font-bold resize-none custom-scrollbar" />
              </div>
              <div className="flex gap-2 h-14 shrink-0">
-               <button onClick={() => fileInputRef.current?.click()} className="flex-1 border-4 border-black font-black text-xs">IMG</button>
+               <button onClick={() => fileInputRef.current?.click()} className="flex-1 border-4 border-black font-black text-xs uppercase">IMG</button>
                <input type="file" hidden ref={fileInputRef} accept="image/*" onChange={(e)=>{const f=e.target.files?.[0]; if(f){const r=new FileReader(); r.onload=()=>setPostInput({...postInput,image:r.result as string}); r.readAsDataURL(f);}}} />
-               <button onClick={handlePost} className="flex-[2] bg-black text-white font-black text-xl active:scale-95 transition-all" disabled={isLoading}>POST</button>
+               <button onClick={handlePost} className="flex-[2] bg-black text-white font-black text-2xl" disabled={isLoading}>POST</button>
              </div>
           </div>
         )}
       </main>
 
-      {/* Footer */}
-      <footer className="h-16 border-t-2 border-black flex bg-white shrink-0">
+      <footer className="h-14 border-t-2 border-black flex bg-white shrink-0">
         {['MAIN', 'POST', 'WIKI', 'KEEP'].map((m) => (
           <button key={m} onClick={() => setMode(m)} className={`flex-1 flex flex-col items-center justify-center border-r border-black last:border-0 ${mode === m ? 'bg-black text-white' : 'bg-white'}`}>
-            <span className="text-lg leading-none">{m === 'MAIN' ? '■' : m === 'POST' ? '◎' : m === 'WIKI' ? '△' : '▲'}</span>
-            <span className="text-[7px] font-black uppercase mt-1">{m}</span>
+            <span className="text-xl leading-none">{m === 'MAIN' ? '■' : m === 'POST' ? '◎' : m === 'WIKI' ? '△' : '▲'}</span>
           </button>
         ))}
       </footer>
 
       <style jsx global>{`
         @keyframes shake {
-          0%, 100% { transform: translate(0, 0); }
-          25% { transform: translate(-3px, 2px) rotate(-1deg); }
-          75% { transform: translate(3px, -2px) rotate(1deg); }
+          0%, 100% { transform: translateX(0); }
+          25% { transform: translateX(-4px) rotate(-1deg); }
+          75% { transform: translateX(4px) rotate(1deg); }
         }
-        .animate-shake { animation: shake 0.1s linear infinite; }
-        .custom-scrollbar::-webkit-scrollbar { width: 5px; }
+        .animate-shake { animation: shake 0.15s ease-in-out infinite; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: black; }
       `}</style>
     </div>

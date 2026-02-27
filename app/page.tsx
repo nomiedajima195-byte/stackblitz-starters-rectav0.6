@@ -12,7 +12,6 @@ const LIFESPAN_MS = 168 * 60 * 60 * 1000;
 const CARD_BG = "#F5F2E9";
 const MAX_PIXEL = 320; 
 
-// --- Utilities ---
 const getRandomStr = (len: number) => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   return Array.from({length: len}, () => chars[Math.floor(Math.random() * chars.length)]).join('');
@@ -38,6 +37,11 @@ export default function Page() {
   const [flippedIds, setFlippedIds] = useState<Set<string>>(new Set());
   const [isUploading, setIsUploading] = useState(false);
   const [pocketId, setPocketId] = useState<string | null>(null);
+  
+  // 入力モーダル用
+  const [showInput, setShowInput] = useState<{parent: string | null, file: File} | null>(null);
+  const [inputText, setInputText] = useState('');
+  
   const lastClickTime = useRef<{ [key: string]: number }>({});
 
   useEffect(() => {
@@ -69,15 +73,17 @@ export default function Page() {
     setSideCells(groupedSides);
   }, []);
 
-  const uploadFile = async (e: any, parentId: string | null = null) => {
+  const selectFile = (e: any, parentId: string | null = null) => {
     const file = e.target.files?.[0];
     if (!file || isUploading || !pocketId) return;
+    setInputText('');
+    setShowInput({ parent: parentId, file });
+  };
 
-    // 55文字のテキストを取得
-    const text = window.prompt("Words to recta (max 55):", "");
-    if (text === null) return; 
-    const clippedText = text.slice(0, 55);
-
+  const handleUpload = async () => {
+    if (!showInput) return;
+    const { file, parent: parentId } = showInput;
+    setShowInput(null);
     setIsUploading(true);
 
     const img = new Image();
@@ -106,7 +112,7 @@ export default function Page() {
             id: fileName, 
             image_url: publicUrl, 
             owner_id: pocketId,
-            description: clippedText // ここに55文字テキストを保存
+            description: inputText.slice(0, 55)
           };
 
           if (!parentId) {
@@ -123,6 +129,7 @@ export default function Page() {
 
   const Card = ({ item, isMain, hasSides }: { item: any, isMain: boolean, hasSides?: boolean }) => {
     const [isSquare, setIsSquare] = useState(false);
+    const [showText, setShowText] = useState(false);
     const isFlipped = flippedIds.has(item.id);
     const serial = useRef(getRandomStr(6)).current;
 
@@ -154,55 +161,63 @@ export default function Page() {
             }}
           >
             <div className={`relative w-full h-full transition-transform duration-[800ms] [transform-style:preserve-3d] ${isFlipped ? '[transform:rotateY(180deg)]' : ''}`}>
-              {/* Front Side */}
+              {/* Front */}
               <div className="absolute inset-0 bg-[#F5F2E9] rounded-[28px] border border-black/[0.04] [backface-visibility:hidden] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.15)] flex flex-col items-center overflow-hidden">
                 <div className="w-full pt-8 px-8 shrink-0 text-black flex justify-between items-start">
                   <div>
                     <p className="tracking-[0.2em] uppercase text-[9px] mb-1 opacity-30 font-bold">{getRandomStr(9)}</p>
-                    <p className="italic font-serif text-[13px] opacity-80 leading-tight">No. {serial}</p>
+                    <p className="italic font-serif text-[13px] opacity-80 leading-tight tracking-tighter uppercase font-bold text-black/40 italic">recta</p>
                   </div>
-                  <div className="text-[10px] font-black italic tracking-tighter opacity-20 uppercase">recta</div>
                 </div>
                 
-                <div className={`w-full flex flex-col items-center px-6 ${isSquare ? 'pt-4' : 'flex-grow justify-center py-2'}`}>
+                <div className={`w-full flex flex-col items-center px-6 flex-grow justify-center py-2`}>
                   <div className={`${isSquare ? 'w-full aspect-square' : 'w-full aspect-[3/4]'} relative overflow-hidden rounded-sm bg-black/5 shadow-inner ring-1 ring-black/5`}>
                     <img src={item.image_url} className="w-full h-full object-cover opacity-95 image-pixelated" style={{ imageRendering: 'pixelated' }} />
                   </div>
                   
-                  {/* 55文字テキストエリア */}
-                  <div className="w-full mt-5 px-1 min-h-[54px] flex flex-col justify-start">
-                    <p className="text-[11px] leading-[1.5] text-black/70 italic font-serif text-left line-clamp-3 tracking-tight">
-                      {item.description || "— no record found."}
-                    </p>
+                  {/* >>> タップギミック */}
+                  <div className="w-full mt-4 flex flex-col items-center">
+                    {!showText ? (
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); setShowText(true); }}
+                        className="text-[10px] tracking-[0.5em] opacity-20 hover:opacity-100 transition-opacity font-black py-4"
+                      >
+                        ≫≫≫
+                      </button>
+                    ) : (
+                      <div 
+                        onClick={(e) => { e.stopPropagation(); setShowText(false); }}
+                        className="w-full px-2 py-2 animate-in fade-in duration-500"
+                      >
+                        <p className="text-[11px] leading-relaxed text-black/70 italic font-serif text-left tracking-tight">
+                          {item.description || "— silent record."}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
 
                 <div className="w-full pb-10 px-8 flex items-center justify-between text-[9px] font-bold opacity-20 italic shrink-0 text-black uppercase">
-                  <span className="tracking-[0.05em]">Fragment / {getRandomStr(3)}</span>
+                  <span className="tracking-[0.05em]">No. {serial}</span>
                   <span className="tracking-[0.1em]">Rubbish</span>
                 </div>
               </div>
 
-              {/* Back Side */}
+              {/* Back */}
               <div className="absolute inset-0 [transform:rotateY(180deg)] [backface-visibility:hidden] rounded-[28px] border border-black/[0.04] overflow-hidden">
                 <CardBack />
               </div>
             </div>
           </div>
-
-          {isMain && hasSides && (
-            <div className="absolute -right-8 w-2 h-2 bg-black rounded-full opacity-40 shadow-sm animate-pulse" />
-          )}
         </div>
         
+        {/* Controls */}
         <div className="mt-8 flex items-center space-x-6 opacity-0 group-hover:opacity-100 transition-opacity min-h-[40px]">
           <button onClick={() => {
             navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}#${item.id}`);
-            alert(`No. ${serial} Copied`);
+            alert(`Copied`);
           }} className="text-xl opacity-20 hover:opacity-100 p-2 text-black">▲</button>
-          {!isMain ? (
-            <div className="flex space-x-2 text-[6px] text-black opacity-40 self-center"><span>●</span><span>●</span><span>●</span></div>
-          ) : ( <div className="w-[42px]" /> )}
+          {!isMain && <div className="flex space-x-2 text-[6px] text-black opacity-40 self-center"><span>●</span><span>●</span><span>●</span></div>}
           <button onClick={async () => {
             if (window.confirm("Delete?")) {
               await supabase.from(isMain ? 'mainline' : 'side_cells').delete().eq('id', item.id);
@@ -232,12 +247,10 @@ export default function Page() {
             <div key={main.id} className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar items-start">
               <Card item={main} isMain={true} hasSides={sideCells[main.id]?.length > 0} />
               {(sideCells[main.id] || []).map(side => <Card key={side.id} item={side} isMain={false} />)}
-              
-              {/* Add Side Cell Button */}
               <div className="flex-shrink-0 w-screen snap-center flex items-center justify-center h-full pt-10">
-                <label className="w-[310px] h-[502px] flex items-center justify-center cursor-pointer rounded-[28px] border border-black/5 bg-black/[0.01] hover:bg-black/[0.03] transition-colors">
+                <label className="w-[310px] h-[502px] flex items-center justify-center cursor-pointer rounded-[28px] border border-black/5 bg-black/[0.01] hover:bg-black/[0.03]">
                   <span className="text-xl opacity-10 font-serif italic text-black">＋</span>
-                  <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadFile(e, main.id)} />
+                  <input type="file" className="hidden" accept="image/*" onChange={(e) => selectFile(e, main.id)} />
                 </label>
               </div>
             </div>
@@ -246,16 +259,45 @@ export default function Page() {
       </div>
 
       <nav className="fixed bottom-12 left-0 right-0 flex flex-col items-center z-50">
-        <label className="w-14 h-14 flex items-center justify-center cursor-pointer bg-[#F5F2E9] rounded-full shadow-xl border border-black/5 active:scale-95 transition-transform">
+        <label className="w-14 h-14 flex items-center justify-center cursor-pointer bg-[#F5F2E9] rounded-full shadow-xl border border-black/5">
           <span className="text-xl opacity-40 text-black">◎</span>
-          <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadFile(e)} />
+          <input type="file" className="hidden" accept="image/*" onChange={(e) => selectFile(e)} />
         </label>
         <p className="mt-4 text-[8px] opacity-20 tracking-[0.5em] font-bold text-black font-serif uppercase">© 1992 Rubbish</p>
       </nav>
 
+      {/* 55文字制限・入力モーダル */}
+      {showInput && (
+        <div className="fixed inset-0 bg-[#EBE8DB]/95 backdrop-blur-xl z-[200] flex flex-col items-center justify-center p-8 animate-in fade-in zoom-in duration-300">
+          <div className="w-full max-w-sm space-y-8">
+            <div className="space-y-2">
+              <p className="text-[10px] tracking-[0.4em] opacity-40 font-black uppercase italic">recta / memories</p>
+              <div className="h-[1px] w-12 bg-black opacity-20" />
+            </div>
+            <textarea 
+              autoFocus
+              maxLength={55}
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              placeholder="..."
+              className="w-full bg-transparent border-none text-xl font-serif italic text-black/80 outline-none h-40 resize-none leading-relaxed"
+            />
+            <div className="flex justify-between items-center border-t border-black/5 pt-6">
+              <span className={`text-[10px] font-mono tracking-widest ${inputText.length >= 55 ? 'text-red-500' : 'opacity-20'}`}>
+                {inputText.length} / 55
+              </span>
+              <div className="flex space-x-8">
+                <button onClick={() => setShowInput(null)} className="text-[10px] font-black tracking-widest opacity-30 uppercase">Cancel</button>
+                <button onClick={handleUpload} className="text-[10px] font-black tracking-widest uppercase">Archive</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {isUploading && (
         <div className="fixed inset-0 bg-[#EBE8DB]/80 backdrop-blur-md z-[100] flex flex-col items-center justify-center">
-          <p className="text-[10px] tracking-[0.3em] opacity-40 italic font-bold animate-pulse text-black font-serif uppercase">Archiving to recta...</p>
+          <p className="text-[10px] tracking-[0.3em] opacity-40 italic font-bold animate-pulse text-black font-serif uppercase">Archiving...</p>
         </div>
       )}
     </div>

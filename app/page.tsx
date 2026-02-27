@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
+// --- Configuration ---
 const supabaseUrl = 'https://pfxwhcgdbavycddapqmz.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmeHdoY2dkYmF2eWNkZGFwcW16Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxNjQ0NzUsImV4cCI6MjA4Mjc0MDQ3NX0.YNQlbyocg2olS6-1WxTnbr5N2z52XcVIpI1XR-XrDtM';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
@@ -11,6 +12,7 @@ const LIFESPAN_MS = 168 * 60 * 60 * 1000;
 const CARD_BG = "#F5F2E9";
 const MAX_PIXEL = 320; 
 
+// --- Utilities ---
 const getRandomStr = (len: number) => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   return Array.from({length: len}, () => chars[Math.floor(Math.random() * chars.length)]).join('');
@@ -70,6 +72,12 @@ export default function Page() {
   const uploadFile = async (e: any, parentId: string | null = null) => {
     const file = e.target.files?.[0];
     if (!file || isUploading || !pocketId) return;
+
+    // 55文字のテキストを取得
+    const text = window.prompt("Words to recta (max 55):", "");
+    if (text === null) return; 
+    const clippedText = text.slice(0, 55);
+
     setIsUploading(true);
 
     const img = new Image();
@@ -94,13 +102,19 @@ export default function Page() {
           await supabase.storage.from('images').upload(fileName, blob, { contentType: 'image/png' });
           const { data: { publicUrl } } = supabase.storage.from('images').getPublicUrl(fileName);
           
+          const payload = { 
+            id: fileName, 
+            image_url: publicUrl, 
+            owner_id: pocketId,
+            description: clippedText // ここに55文字テキストを保存
+          };
+
           if (!parentId) {
-            await supabase.from('mainline').insert([{ id: fileName, image_url: publicUrl, owner_id: pocketId, is_public: true }]);
-            await fetchData();
+            await supabase.from('mainline').insert([{ ...payload, is_public: true }]);
           } else {
-            await supabase.from('side_cells').insert([{ id: fileName, image_url: publicUrl, owner_id: pocketId, parent_id: parentId }]);
-            await fetchData();
+            await supabase.from('side_cells').insert([{ ...payload, parent_id: parentId }]);
           }
+          await fetchData();
         }
         setIsUploading(false);
       }, 'image/png');
@@ -117,7 +131,6 @@ export default function Page() {
       img.src = item.image_url;
       img.onload = () => {
         const r = img.width / img.height;
-        // 判定を厳格化: 0.75(3:4) を拾わないように 0.85 以上にする
         setIsSquare(r > 0.85 && r < 1.15);
       };
     }, [item.image_url]);
@@ -141,33 +154,36 @@ export default function Page() {
             }}
           >
             <div className={`relative w-full h-full transition-transform duration-[800ms] [transform-style:preserve-3d] ${isFlipped ? '[transform:rotateY(180deg)]' : ''}`}>
+              {/* Front Side */}
               <div className="absolute inset-0 bg-[#F5F2E9] rounded-[28px] border border-black/[0.04] [backface-visibility:hidden] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.15)] flex flex-col items-center overflow-hidden">
-                <div className="w-full pt-8 px-8 shrink-0 text-black">
-                  <p className="tracking-[0.2em] uppercase text-[9px] mb-1 opacity-30 font-bold">{getRandomStr(9)}</p>
-                  <p className="italic font-serif text-[13px] opacity-80 leading-tight">No. {serial}</p>
+                <div className="w-full pt-8 px-8 shrink-0 text-black flex justify-between items-start">
+                  <div>
+                    <p className="tracking-[0.2em] uppercase text-[9px] mb-1 opacity-30 font-bold">{getRandomStr(9)}</p>
+                    <p className="italic font-serif text-[13px] opacity-80 leading-tight">No. {serial}</p>
+                  </div>
+                  <div className="text-[10px] font-black italic tracking-tighter opacity-20 uppercase">recta</div>
                 </div>
                 
-                <div className={`w-full flex flex-col items-center px-6 ${isSquare ? 'pt-4' : 'flex-grow justify-center py-4'}`}>
-                  {isSquare ? (
-                    <>
-                      <div className="w-full aspect-square relative overflow-hidden rounded-sm">
-                        <img src={item.image_url} className="w-full h-full object-fill opacity-95 image-pixelated" style={{ imageRendering: 'pixelated' }} />
-                      </div>
-                      <div className="w-full mt-10 mb-12 opacity-10 text-[7px] tracking-[0.2em] text-center font-bold italic text-black uppercase">Full Frame Artifact</div>
-                    </>
-                  ) : (
-                    <div className="w-full aspect-[3/4] relative overflow-hidden rounded-sm bg-black/5 shadow-inner">
-                      <img src={item.image_url} className="w-full h-full object-cover opacity-95 image-pixelated" style={{ imageRendering: 'pixelated' }} />
-                      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle,transparent_40%,rgba(0,0,0,0.35)_100%)] mix-blend-multiply" />
-                    </div>
-                  )}
+                <div className={`w-full flex flex-col items-center px-6 ${isSquare ? 'pt-4' : 'flex-grow justify-center py-2'}`}>
+                  <div className={`${isSquare ? 'w-full aspect-square' : 'w-full aspect-[3/4]'} relative overflow-hidden rounded-sm bg-black/5 shadow-inner ring-1 ring-black/5`}>
+                    <img src={item.image_url} className="w-full h-full object-cover opacity-95 image-pixelated" style={{ imageRendering: 'pixelated' }} />
+                  </div>
+                  
+                  {/* 55文字テキストエリア */}
+                  <div className="w-full mt-5 px-1 min-h-[54px] flex flex-col justify-start">
+                    <p className="text-[11px] leading-[1.5] text-black/70 italic font-serif text-left line-clamp-3 tracking-tight">
+                      {item.description || "— no record found."}
+                    </p>
+                  </div>
                 </div>
 
                 <div className="w-full pb-10 px-8 flex items-center justify-between text-[9px] font-bold opacity-20 italic shrink-0 text-black uppercase">
-                  <span className="tracking-[0.05em]">No. / {getRandomStr(3)} / {serial}</span>
+                  <span className="tracking-[0.05em]">Fragment / {getRandomStr(3)}</span>
                   <span className="tracking-[0.1em]">Rubbish</span>
                 </div>
               </div>
+
+              {/* Back Side */}
               <div className="absolute inset-0 [transform:rotateY(180deg)] [backface-visibility:hidden] rounded-[28px] border border-black/[0.04] overflow-hidden">
                 <CardBack />
               </div>
@@ -204,18 +220,22 @@ export default function Page() {
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .image-pixelated { image-rendering: pixelated; }
       `}</style>
+      
       <header className="w-full h-32 flex flex-col items-center justify-center opacity-40">
-        <p className="text-[10px] tracking-[0.5em] font-bold uppercase mb-2 text-black">Rubbish</p>
+        <p className="text-[12px] tracking-[0.6em] font-black uppercase mb-2 text-black">Rubbish</p>
         <div className="w-[1px] h-10 bg-black opacity-20" />
       </header>
+
       <div className="pb-64 pt-6">
         <div className="flex flex-col space-y-20">
           {allCards.map(main => (
             <div key={main.id} className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar items-start">
               <Card item={main} isMain={true} hasSides={sideCells[main.id]?.length > 0} />
               {(sideCells[main.id] || []).map(side => <Card key={side.id} item={side} isMain={false} />)}
+              
+              {/* Add Side Cell Button */}
               <div className="flex-shrink-0 w-screen snap-center flex items-center justify-center h-full pt-10">
-                <label className="w-[310px] h-[502px] flex items-center justify-center cursor-pointer rounded-[28px] border border-black/5 bg-black/[0.01] hover:bg-black/[0.03]">
+                <label className="w-[310px] h-[502px] flex items-center justify-center cursor-pointer rounded-[28px] border border-black/5 bg-black/[0.01] hover:bg-black/[0.03] transition-colors">
                   <span className="text-xl opacity-10 font-serif italic text-black">＋</span>
                   <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadFile(e, main.id)} />
                 </label>
@@ -224,16 +244,18 @@ export default function Page() {
           ))}
         </div>
       </div>
+
       <nav className="fixed bottom-12 left-0 right-0 flex flex-col items-center z-50">
-        <label className="w-14 h-14 flex items-center justify-center cursor-pointer bg-[#F5F2E9] rounded-full shadow-xl border border-black/5">
+        <label className="w-14 h-14 flex items-center justify-center cursor-pointer bg-[#F5F2E9] rounded-full shadow-xl border border-black/5 active:scale-95 transition-transform">
           <span className="text-xl opacity-40 text-black">◎</span>
           <input type="file" className="hidden" accept="image/*" onChange={(e) => uploadFile(e)} />
         </label>
         <p className="mt-4 text-[8px] opacity-20 tracking-[0.5em] font-bold text-black font-serif uppercase">© 1992 Rubbish</p>
       </nav>
+
       {isUploading && (
         <div className="fixed inset-0 bg-[#EBE8DB]/80 backdrop-blur-md z-[100] flex flex-col items-center justify-center">
-          <p className="text-[10px] tracking-[0.3em] opacity-40 italic font-bold animate-pulse text-black font-serif uppercase">Archiving...</p>
+          <p className="text-[10px] tracking-[0.3em] opacity-40 italic font-bold animate-pulse text-black font-serif uppercase">Archiving to recta...</p>
         </div>
       )}
     </div>

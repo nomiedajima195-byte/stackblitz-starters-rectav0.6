@@ -229,16 +229,26 @@ export default function Page() {
             <div key={main.id} className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar items-start">
               <Card item={main} isMain={true} hasSides={sideCells[main.id]?.length > 0} />
               {(sideCells[main.id] || []).map(side => <Card key={side.id} item={side} isMain={false} />)}
+              
+              {/* 横丁の末尾（＋）セクション */}
               <div className="flex-shrink-0 w-screen snap-center flex items-center justify-center h-full pt-5">
-                <label className="w-[310px] h-[502px] flex items-center justify-center cursor-pointer rounded-[28px] border border-black/5 bg-black/[0.01] hover:bg-black/[0.03]">
-                  <span className="text-xl opacity-10 font-serif italic text-black">＋</span>
-                  <input type="file" className="hidden" accept="image/*" onChange={(e) => selectFile(e, main.id)} />
-                </label>
+                <div className="w-[310px] h-[502px] flex flex-col items-center justify-center rounded-[28px] border border-black/5 bg-black/[0.01] space-y-12">
+                   <button onClick={() => openTextInput(main.id)} className="group flex flex-col items-center space-y-3">
+                     <span className="text-xl opacity-10 font-serif italic text-black group-hover:opacity-40 transition-opacity">✎</span>
+                     <span className="text-[8px] tracking-[0.3em] opacity-0 group-hover:opacity-20 uppercase font-black transition-opacity">Text</span>
+                   </button>
+                   <label className="group flex flex-col items-center space-y-3 cursor-pointer">
+                     <span className="text-xl opacity-10 font-serif italic text-black group-hover:opacity-40 transition-opacity">◎</span>
+                     <span className="text-[8px] tracking-[0.3em] opacity-0 group-hover:opacity-20 uppercase font-black transition-opacity">Image</span>
+                     <input type="file" className="hidden" accept="image/*" onChange={(e) => selectFile(e, main.id)} />
+                   </label>
+                </div>
               </div>
             </div>
           ))}
         </div>
       </div>
+
       <nav className="fixed bottom-12 left-0 right-0 flex justify-center items-center space-x-8 z-50">
         <button onClick={() => openTextInput()} className="w-12 h-12 flex items-center justify-center bg-[#F5F2E9] rounded-full shadow-lg border border-black/5 opacity-40 active:scale-95 transition-transform">
           <span className="text-lg opacity-60">✎</span>
@@ -248,10 +258,11 @@ export default function Page() {
           <input type="file" className="hidden" accept="image/*" onChange={(e) => selectFile(e)} />
         </label>
       </nav>
+
       {showInput && (
         <div className="fixed inset-0 bg-[#EBE8DB]/95 backdrop-blur-xl z-[200] flex flex-col items-center justify-center p-8 animate-in fade-in zoom-in duration-300">
           <div className="w-full max-w-sm space-y-8">
-            <p className="text-[10px] tracking-[0.4em] opacity-40 font-black uppercase italic">recta / memories</p>
+            <p className="text-[10px] tracking-[0.4em] opacity-40 font-black uppercase italic">recta / {showInput.parent ? 'Side Cell' : 'Mainline'}</p>
             <textarea autoFocus maxLength={55} value={inputText} onChange={(e) => setInputText(e.target.value)} placeholder="..." className="w-full bg-transparent border-none text-xl font-serif italic text-black/80 outline-none h-40 resize-none leading-relaxed" />
             <div className="flex justify-between items-center border-t border-black/5 pt-6">
               <span className={`text-[10px] font-mono tracking-widest ${inputText.length >= 55 ? 'text-red-500' : 'opacity-20'}`}>{inputText.length} / 55</span>

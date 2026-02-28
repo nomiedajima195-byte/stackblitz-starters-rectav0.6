@@ -82,45 +82,69 @@ export default function Page() {
   const handleUpload = async () => {
     if (!showInput) return;
     const { file, parent: parentId } = showInput;
+    const textToSubmit = inputText.trim();
+    
     setShowInput(null);
     setIsUploading(true);
     let publicUrl = null;
 
-    if (file) {
-      const img = new Image();
-      img.src = URL.createObjectURL(file);
-      await new Promise((resolve) => {
-        img.onload = async () => {
-          let w = img.width; let h = img.height;
-          if (w > h && w > MAX_PIXEL) { h *= MAX_PIXEL / w; w = MAX_PIXEL; }
-          else if (h > MAX_PIXEL) { w *= MAX_PIXEL / h; h = MAX_PIXEL; }
-          const canvas = document.createElement('canvas');
-          canvas.width = w; canvas.height = h;
-          const ctx = canvas.getContext('2d');
-          if (ctx) { ctx.fillStyle = CARD_BG; ctx.fillRect(0, 0, w, h); ctx.drawImage(img, 0, 0, w, h); }
-          canvas.toBlob(async (blob) => {
-            if (blob) {
-              const fileName = `${Date.now()}-${getRandomStr(5)}.png`;
-              await supabase.storage.from('images').upload(fileName, blob, { contentType: 'image/png' });
-              const { data } = supabase.storage.from('images').getPublicUrl(fileName);
-              publicUrl = data.publicUrl;
-            }
-            resolve(null);
-          }, 'image/png');
-        };
-      });
-    }
+    try {
+      // 画像がある場合の処理
+      if (file) {
+        const img = new Image();
+        img.src = URL.createObjectURL(file);
+        await new Promise((resolve, reject) => {
+          img.onload = async () => {
+            let w = img.width; let h = img.height;
+            if (w > h && w > MAX_PIXEL) { h *= MAX_PIXEL / w; w = MAX_PIXEL; }
+            else if (h > MAX_PIXEL) { w *= MAX_PIXEL / h; h = MAX_PIXEL; }
+            const canvas = document.createElement('canvas');
+            canvas.width = w; canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            if (ctx) { ctx.fillStyle = CARD_BG; ctx.fillRect(0, 0, w, h); ctx.drawImage(img, 0, 0, w, h); }
+            canvas.toBlob(async (blob) => {
+              if (blob) {
+                const fileName = `${Date.now()}-${getRandomStr(5)}.png`;
+                const { error: storageErr } = await supabase.storage.from('images').upload(fileName, blob, { contentType: 'image/png' });
+                if (storageErr) reject(storageErr);
+                const { data } = supabase.storage.from('images').getPublicUrl(fileName);
+                publicUrl = data.publicUrl;
+                resolve(null);
+              }
+            }, 'image/png');
+          };
+        });
+      }
 
-    const payload = { 
-      id: `${Date.now()}-${getRandomStr(5)}`, 
-      image_url: publicUrl, 
-      owner_id: pocketId,
-      description: inputText.slice(0, 55)
-    };
-    if (!parentId) { await supabase.from('mainline').insert([{ ...payload, is_public: true }]); }
-    else { await supabase.from('side_cells').insert([{ ...payload, parent_id: parentId }]); }
-    await fetchData();
-    setIsUploading(false);
+      // DB投稿用ペイロード（IDはユニークにする）
+      const newId = `${Date.now()}-${getRandomStr(5)}`;
+      const payload: any = { 
+        id: newId, 
+        image_url: publicUrl, 
+        owner_id: pocketId,
+        description: textToSubmit || null
+      };
+
+      if (!parentId) {
+        // メインライン投稿
+        const { error } = await supabase.from('mainline').insert([{ ...payload, is_public: true }]);
+        if (error) throw error;
+      } else {
+        // 横丁投稿（parent_id を明示的に追加）
+        const { error } = await supabase.from('side_cells').insert([{ 
+          ...payload, 
+          parent_id: parentId 
+        }]);
+        if (error) throw error;
+      }
+
+      await fetchData();
+    } catch (err) {
+      console.error("Upload Error:", err);
+      alert("Archive failed.");
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const Card = ({ item, isMain, hasSides }: { item: any, isMain: boolean, hasSides?: boolean }) => {
@@ -176,14 +200,14 @@ export default function Page() {
                       </div>
                       <button onClick={(e) => { e.stopPropagation(); setShowText(!showText); }} className="text-[10px] tracking-[0.5em] opacity-20 hover:opacity-100 transition-opacity font-black py-4">≫≫≫</button>
                       {showText && (
-                        <div onClick={(e) => { e.stopPropagation(); setShowText(false); }} className="w-full px-2 animate-in fade-in duration-500">
-                          <p className="text-[11px] leading-relaxed text-black/70 italic font-serif text-left tracking-tight">{item.description || "— silent record."}</p>
+                        <div onClick={(e) => { e.stopPropagation(); setShowText(false); }} className="w-full px-2 animate-in fade-in duration-500 max-h-24 overflow-y-auto no-scrollbar">
+                          <p className="text-[11px] leading-relaxed text-black/70 italic font-serif text-left tracking-tight whitespace-pre-wrap">{item.description || "— silent record."}</p>
                         </div>
                       )}
                     </>
                   ) : (
                     <div className="w-full py-10 px-4 border-y border-black/[0.03]">
-                      <p className="text-[16px] leading-[1.8] text-black/80 italic font-serif tracking-tight text-center">
+                      <p className="text-[16px] leading-[1.8] text-black/80 italic font-serif tracking-tight text-center whitespace-pre-wrap">
                         {item.description || "— silent fragment."}
                       </p>
                     </div>
@@ -232,12 +256,12 @@ export default function Page() {
               
               {/* 横丁の末尾（＋）セクション */}
               <div className="flex-shrink-0 w-screen snap-center flex items-center justify-center h-full pt-5">
-                <div className="w-[310px] h-[502px] flex flex-col items-center justify-center rounded-[28px] border border-black/5 bg-black/[0.01] space-y-12">
-                   <button onClick={() => openTextInput(main.id)} className="group flex flex-col items-center space-y-3">
+                <div className="w-[310px] h-[502px] flex flex-col items-center justify-center rounded-[28px] border border-black/5 bg-black/[0.01] space-y-12 transition-colors hover:bg-black/[0.02]">
+                   <button onClick={() => openTextInput(main.id)} className="group flex flex-col items-center space-y-3 p-4">
                      <span className="text-xl opacity-10 font-serif italic text-black group-hover:opacity-40 transition-opacity">✎</span>
                      <span className="text-[8px] tracking-[0.3em] opacity-0 group-hover:opacity-20 uppercase font-black transition-opacity">Text</span>
                    </button>
-                   <label className="group flex flex-col items-center space-y-3 cursor-pointer">
+                   <label className="group flex flex-col items-center space-y-3 cursor-pointer p-4">
                      <span className="text-xl opacity-10 font-serif italic text-black group-hover:opacity-40 transition-opacity">◎</span>
                      <span className="text-[8px] tracking-[0.3em] opacity-0 group-hover:opacity-20 uppercase font-black transition-opacity">Image</span>
                      <input type="file" className="hidden" accept="image/*" onChange={(e) => selectFile(e, main.id)} />

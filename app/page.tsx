@@ -20,12 +20,11 @@ export default function Page() {
   const [nodes, setNodes] = useState<any[]>([]);
   const [pocketId, setPocketId] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [showInput, setShowInput] = useState<{file: File | null} | null>(null);
+  const [showInput, setShowInput] = useState<{file: File | null, parentId?: string} | null>(null);
   const [inputText, setInputText] = useState('');
   
-  // リンク・ネットワーク用
   const [linkingFrom, setLinkingFrom] = useState<string | null>(null); 
-  const [existingLinks, setExistingLinks] = useState<string[]>([]); // 現在の選択元と既に繋がっているIDリスト
+  const [existingLinks, setExistingLinks] = useState<string[]>([]); 
   const [networkView, setNetworkView] = useState<{originId: string, linkedNodes: any[]} | null>(null);
 
   useEffect(() => {
@@ -38,13 +37,9 @@ export default function Page() {
     fetchData();
   }, []);
 
-  // リンクモードに入った時、既存の接続をフェッチして重複を防ぐ
   useEffect(() => {
-    if (linkingFrom) {
-      fetchExistingLinks(linkingFrom);
-    } else {
-      setExistingLinks([]);
-    }
+    if (linkingFrom) fetchExistingLinks(linkingFrom);
+    else setExistingLinks([]);
   }, [linkingFrom]);
 
   const fetchData = useCallback(async () => {
@@ -56,42 +51,28 @@ export default function Page() {
   }, []);
 
   const fetchExistingLinks = async (nodeId: string) => {
-    const { data } = await supabase.from('links')
-      .select('*')
-      .or(`node_a.eq.${nodeId},node_b.eq.${nodeId}`);
-    if (data) {
-      const ids = data.map(l => l.node_a === nodeId ? l.node_b : l.node_a);
-      setExistingLinks(ids);
-    }
+    const { data } = await supabase.from('links').select('*').or(`node_a.eq.${nodeId},node_b.eq.${nodeId}`);
+    if (data) setExistingLinks(data.map(l => l.node_a === nodeId ? l.node_b : l.node_a));
   };
 
   const openNetwork = async (nodeId: string) => {
-    const { data: links } = await supabase.from('links')
-      .select('*')
-      .or(`node_a.eq.${nodeId},node_b.eq.${nodeId}`);
-    
-    if (!links) {
-      setNetworkView({ originId: nodeId, linkedNodes: [] });
-      return;
-    }
-    const linkedIds = links.map(l => l.node_a === nodeId ? l.node_b : l.node_a);
+    const { data: links } = await supabase.from('links').select('*').or(`node_a.eq.${nodeId},node_b.eq.${nodeId}`);
+    const linkedIds = links ? links.map(l => l.node_a === nodeId ? l.node_b : l.node_a) : [];
     const linkedNodes = nodes.filter(n => linkedIds.includes(n.id)).sort(() => Math.random() - 0.5);
     setNetworkView({ originId: nodeId, linkedNodes });
   };
 
-  const connectNodes = async (targetId: string) => {
-    if (!linkingFrom || linkingFrom === targetId || existingLinks.includes(targetId)) return;
-
-    const { error } = await supabase.from('links').insert([{ node_a: linkingFrom, node_b: targetId }]);
-    if (!error) {
-      // 状態を更新して「接続済み」表示に変える
-      setExistingLinks(prev => [...prev, targetId]);
-    }
+  const connectNodes = async (targetId: string, fromId?: string) => {
+    const sourceId = fromId || linkingFrom;
+    if (!sourceId || sourceId === targetId) return;
+    const { error } = await supabase.from('links').insert([{ node_a: sourceId, node_b: targetId }]);
+    if (!error && !fromId) setExistingLinks(prev => [...prev, targetId]);
+    return !error;
   };
 
   const handleUpload = async () => {
     if (!showInput) return;
-    const { file } = showInput;
+    const { file, parentId } = showInput;
     const text = inputText.trim();
     setShowInput(null);
     setIsUploading(true);
@@ -126,13 +107,22 @@ export default function Page() {
         });
       }
 
+      const newNodeId = `${Date.now()}-${getRandomStr(4)}`;
       await supabase.from('mainline').insert([{
-        id: `${Date.now()}-${getRandomStr(4)}`,
+        id: newNodeId,
         image_url: publicUrl || "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
         description: text || null,
         owner_id: pocketId
       }]);
-      fetchData();
+
+      // 親ノード（View元）がある場合、自動リンク
+      if (parentId) {
+        await connectNodes(newNodeId, parentId);
+        await fetchData(); // ノードリスト更新
+        openNetwork(parentId); // Viewを再読み込み
+      } else {
+        fetchData();
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -140,18 +130,36 @@ export default function Page() {
     }
   };
 
+  // 共通のカードコンポーネント
+  const NodeCard = ({ node, isLinking, onLink, onView, onSave, extraButtons }: any) => (
+    <div className="flex flex-col items-center">
+      <div className={`w-[300px] aspect-[1/1.4] bg-[#F5F2E9] rounded-[24px] shadow-2xl border transition-all duration-500 overflow-hidden flex flex-col items-center justify-center p-6 relative ${isLinking ? 'border-blue-500 ring-4 ring-blue-500/20' : 'border-black/5'}`}>
+        {node.image_url?.startsWith('http') && <img src={node.image_url} className="w-full aspect-square object-cover grayscale-[20%] opacity-90 rounded-sm mb-6 shadow-sm pixelated" />}
+        <p className="text-[14px] italic text-center leading-relaxed opacity-80 whitespace-pre-wrap px-2">{node.description || "— silent fragment"}</p>
+        <div className="absolute bottom-6 text-[8px] font-bold opacity-10 tracking-[0.4em] uppercase italic">{node.id.split('-')[1] || "NODE"} // RUBBISH</div>
+      </div>
+      <div className="mt-6 flex items-center space-x-10 text-black/40">
+        <button onClick={onLink} className={`flex flex-col items-center space-y-1 transition-all ${isLinking ? 'text-blue-500 scale-110 opacity-100' : 'hover:opacity-100'}`}>
+          <span className="text-xl">▲</span><span className="text-[8px] font-black tracking-widest uppercase">Link</span>
+        </button>
+        <button onClick={onView} className="flex flex-col items-center space-y-1 hover:opacity-100 transition-all">
+          <span className="text-xl">■</span><span className="text-[8px] font-black tracking-widest uppercase">View</span>
+        </button>
+        <button onClick={onSave} className="flex flex-col items-center space-y-1 hover:opacity-100 transition-all opacity-20">
+          <span className="text-xl">♦</span><span className="text-[8px] font-black tracking-widest uppercase">Save</span>
+        </button>
+      </div>
+      {extraButtons}
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-[#EBE8DB] text-[#2D2D2D] font-serif select-none overflow-x-hidden">
-      <style jsx global>{`
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .pixelated { image-rendering: pixelated; }
-      `}</style>
+      <style jsx global>{` .no-scrollbar::-webkit-scrollbar { display: none; } .pixelated { image-rendering: pixelated; } `}</style>
       
-      {/* リンクモード中のヘッダー通知 */}
       {linkingFrom && (
-        <div className="fixed top-0 left-0 right-0 bg-blue-600 text-white text-[10px] py-2 px-4 z-[500] flex justify-between items-center font-black tracking-widest uppercase animate-in slide-in-from-top duration-300">
-          <span>Linking Mode: Select nodes to connect</span>
-          <button onClick={() => setLinkingFrom(null)} className="bg-white text-blue-600 px-3 py-1 rounded-full text-[8px]">Finish</button>
+        <div className="fixed top-0 left-0 right-0 bg-blue-600 text-white text-[10px] py-2 px-4 z-[1000] flex justify-between items-center font-black tracking-widest uppercase animate-in slide-in-from-top">
+          <span>Linking Mode</span><button onClick={() => setLinkingFrom(null)} className="bg-white text-blue-600 px-3 py-1 rounded-full text-[8px]">Finish</button>
         </div>
       )}
 
@@ -161,126 +169,74 @@ export default function Page() {
 
       <main className="flex flex-col items-center space-y-24 pb-64">
         {nodes.map(node => (
-          <div key={node.id} className="flex flex-col items-center animate-in fade-in slide-in-from-bottom-6 duration-700">
-            
-            {/* カード本体 */}
-            <div className={`w-[300px] aspect-[1/1.4] bg-[#F5F2E9] rounded-[24px] shadow-2xl border transition-all duration-500 overflow-hidden flex flex-col items-center justify-center p-6 relative ${linkingFrom === node.id ? 'border-blue-500 ring-4 ring-blue-500/20' : 'border-black/5'}`}>
-              {node.image_url?.startsWith('http') ? (
-                <img src={node.image_url} className="w-full aspect-square object-cover grayscale-[20%] opacity-90 rounded-sm mb-6 shadow-sm pixelated" />
-              ) : null}
-              <p className="text-[14px] italic text-center leading-relaxed opacity-80 whitespace-pre-wrap px-2">
-                {node.description || "— silent fragment"}
-              </p>
-              <div className="absolute bottom-6 text-[8px] font-bold opacity-10 tracking-[0.4em] uppercase italic">
-                {node.id.split('-')[1] || "NODE"} // RUBBISH
-              </div>
-            </div>
-
-            {/* 操作ボタン群 */}
-            <div className="mt-6 flex items-center space-x-10 text-black/40">
-              <button 
-                onClick={() => setLinkingFrom(node.id === linkingFrom ? null : node.id)}
-                className={`flex flex-col items-center space-y-1 transition-all ${linkingFrom === node.id ? 'text-blue-500 scale-110 opacity-100' : 'hover:opacity-100'}`}
-              >
-                <span className="text-xl">▲</span>
-                <span className="text-[8px] font-black tracking-widest uppercase">Link</span>
-              </button>
-
-              <button 
-                onClick={() => openNetwork(node.id)}
-                className="flex flex-col items-center space-y-1 hover:opacity-100 transition-all"
-              >
-                <span className="text-xl">■</span>
-                <span className="text-[8px] font-black tracking-widest uppercase">View</span>
-              </button>
-
-              <button 
-                className="flex flex-col items-center space-y-1 hover:opacity-100 transition-all opacity-20"
-              >
-                <span className="text-xl">♦</span>
-                <span className="text-[8px] font-black tracking-widest uppercase">Save</span>
-              </button>
-            </div>
-
-            {/* 接続アクションボタン */}
-            {linkingFrom && linkingFrom !== node.id && (
+          <NodeCard 
+            key={node.id} 
+            node={node} 
+            isLinking={linkingFrom === node.id}
+            onLink={() => setLinkingFrom(node.id === linkingFrom ? null : node.id)}
+            onView={() => openNetwork(node.id)}
+            onSave={() => {}}
+            extraButtons={linkingFrom && linkingFrom !== node.id && (
               <div className="mt-4">
                 {existingLinks.includes(node.id) ? (
-                  <div className="text-blue-500 text-[10px] font-black tracking-widest uppercase py-2 px-6 border border-blue-200 rounded-full bg-blue-50">
-                    ✔ Connected
-                  </div>
+                  <div className="text-blue-500 text-[10px] font-black tracking-widest uppercase py-2 px-6 border border-blue-200 rounded-full bg-blue-50">✔ Connected</div>
                 ) : (
-                  <button 
-                    onClick={() => connectNodes(node.id)}
-                    className="bg-red-600 text-white text-[10px] font-black py-2 px-6 rounded-full shadow-lg animate-bounce tracking-widest uppercase active:scale-95 transition-transform"
-                  >
-                    ● Connect Here
-                  </button>
+                  <button onClick={() => connectNodes(node.id)} className="bg-red-600 text-white text-[10px] font-black py-2 px-6 rounded-full shadow-lg animate-bounce tracking-widest uppercase">● Connect Here</button>
                 )}
               </div>
             )}
-          </div>
+          />
         ))}
       </main>
 
-      {/* ネットワークオーバーレイ */}
+      {/* ネットワークオーバーレイ（無限回廊対応） */}
       {networkView && (
-        <div className="fixed inset-0 z-[600] bg-[#EBE8DB]/98 backdrop-blur-2xl overflow-y-auto no-scrollbar pt-24 pb-48 flex flex-col items-center">
-          <button onClick={() => setNetworkView(null)} className="fixed top-10 right-10 text-3xl opacity-20 hover:opacity-100 transition-opacity">✕</button>
+        <div className="fixed inset-0 z-[600] bg-[#EBE8DB]/98 backdrop-blur-2xl overflow-y-auto no-scrollbar pt-24 pb-48 flex flex-col items-center animate-in fade-in duration-500">
+          <button onClick={() => setNetworkView(null)} className="fixed top-10 right-10 text-3xl opacity-20 hover:opacity-100 transition-opacity z-[700]">✕</button>
           <p className="text-[10px] tracking-[0.6em] opacity-30 uppercase font-black mb-12">Constellation Network</p>
 
-          <div className="flex flex-col items-center space-y-12">
+          <div className="flex flex-col items-center space-y-16">
             {networkView.linkedNodes.map(lnode => (
-              <div key={lnode.id} className="w-[280px] bg-[#F5F2E9] rounded-2xl shadow-xl p-5 border border-black/5 animate-in zoom-in-95 duration-500">
-                 {lnode.image_url?.startsWith('http') && (
-                   <img src={lnode.image_url} className="w-full aspect-square object-cover opacity-80 mb-4 rounded-sm pixelated" />
-                 )}
-                 <p className="text-[12px] italic opacity-70 text-center leading-relaxed px-2">{lnode.description || "— connected"}</p>
-              </div>
+              <NodeCard 
+                key={lnode.id} 
+                node={lnode} 
+                isLinking={linkingFrom === lnode.id}
+                onLink={() => setLinkingFrom(lnode.id === linkingFrom ? null : lnode.id)}
+                onView={() => openNetwork(lnode.id)} // ここで次のViewへ遷移（閉じない）
+                onSave={() => {}}
+              />
             ))}
-            {networkView.linkedNodes.length === 0 && (
-              <p className="opacity-20 italic mt-20">No connections found for this node.</p>
-            )}
+            
+            {/* View内での新規投稿ボタン */}
+            <button 
+              onClick={() => setShowInput({file: null, parentId: networkView.originId})}
+              className="w-[300px] h-20 border-2 border-dashed border-black/10 rounded-2xl flex items-center justify-center opacity-40 hover:opacity-100 transition-all group"
+            >
+              <span className="text-xl group-hover:scale-125 transition-transform">＋ Add to this network</span>
+            </button>
           </div>
         </div>
       )}
 
-      {/* フッター操作 */}
+      {/* フッター */}
       <nav className="fixed bottom-12 left-0 right-0 flex justify-center space-x-12 z-[100]">
-        <button onClick={() => { setInputText(''); setShowInput({file: null}); }} className="w-14 h-14 bg-[#F5F2E9] rounded-full shadow-2xl flex items-center justify-center border border-black/5 opacity-50 hover:opacity-100 transition-all">
-          <span className="text-xl">✎</span>
-        </button>
-        <label className="w-14 h-14 bg-[#F5F2E9] rounded-full shadow-2xl flex items-center justify-center border border-black/5 opacity-50 cursor-pointer hover:opacity-100 transition-all">
-          <span className="text-xl">◎</span>
-          <input type="file" className="hidden" accept="image/*" onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) { setInputText(''); setShowInput({file}); }
-          }} />
-        </label>
+        <button onClick={() => setShowInput({file: null})} className="w-14 h-14 bg-[#F5F2E9] rounded-full shadow-2xl flex items-center justify-center border border-black/5 opacity-50 hover:opacity-100 transition-all"><span className="text-xl">✎</span></button>
+        <label className="w-14 h-14 bg-[#F5F2E9] rounded-full shadow-2xl flex items-center justify-center border border-black/5 opacity-50 cursor-pointer hover:opacity-100 transition-all"><span className="text-xl">◎</span><input type="file" className="hidden" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (file) setShowInput({file}); }} /></label>
       </nav>
 
-      {/* 入力画面 */}
+      {/* 入力モーダル */}
       {showInput && (
-        <div className="fixed inset-0 bg-[#EBE8DB]/96 backdrop-blur-3xl z-[700] flex flex-col items-center justify-center p-10 animate-in fade-in duration-300">
-          <textarea 
-            autoFocus 
-            maxLength={55} 
-            value={inputText} 
-            onChange={(e) => setInputText(e.target.value)} 
-            placeholder="..." 
-            className="w-full max-w-sm bg-transparent border-none text-2xl font-serif italic outline-none h-48 resize-none text-center text-black/80" 
-          />
+        <div className="fixed inset-0 bg-[#EBE8DB]/96 backdrop-blur-3xl z-[2000] flex flex-col items-center justify-center p-10">
+          <textarea autoFocus maxLength={55} value={inputText} onChange={(e) => setInputText(e.target.value)} placeholder={showInput.parentId ? "Relate something..." : "Archive..."} className="w-full max-w-sm bg-transparent border-none text-2xl font-serif italic outline-none h-48 resize-none text-center text-black/80" />
           <div className="flex space-x-16 mt-12">
             <button onClick={() => setShowInput(null)} className="text-[11px] font-black tracking-[0.3em] opacity-20 uppercase">Discard</button>
-            <button onClick={handleUpload} className="text-[11px] font-black tracking-[0.3em] uppercase">Archive</button>
+            <button onClick={handleUpload} className="text-[11px] font-black tracking-[0.3em] uppercase">{showInput.parentId ? "Relate" : "Archive"}</button>
           </div>
         </div>
       )}
 
       {isUploading && (
-        <div className="fixed inset-0 bg-[#EBE8DB]/80 backdrop-blur-md z-[800] flex items-center justify-center text-[10px] tracking-[0.5em] font-black uppercase italic animate-pulse">
-          Archiving...
-        </div>
+        <div className="fixed inset-0 bg-[#EBE8DB]/80 backdrop-blur-md z-[3000] flex items-center justify-center text-[10px] tracking-[0.5em] font-black uppercase italic animate-pulse">Archiving...</div>
       )}
     </div>
   );

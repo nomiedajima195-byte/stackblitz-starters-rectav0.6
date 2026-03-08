@@ -115,14 +115,14 @@ export default function Page() {
         owner_id: pocketId
       }]);
 
-      // 親ノード（View元）がある場合、自動リンク
       if (parentId) {
         await connectNodes(newNodeId, parentId);
-        await fetchData(); // ノードリスト更新
-        openNetwork(parentId); // Viewを再読み込み
+        await fetchData(); 
+        openNetwork(parentId); 
       } else {
         fetchData();
       }
+      setInputText('');
     } catch (e) {
       console.error(e);
     } finally {
@@ -130,7 +130,6 @@ export default function Page() {
     }
   };
 
-  // 共通のカードコンポーネント
   const NodeCard = ({ node, isLinking, onLink, onView, onSave, extraButtons }: any) => (
     <div className="flex flex-col items-center">
       <div className={`w-[300px] aspect-[1/1.4] bg-[#F5F2E9] rounded-[24px] shadow-2xl border transition-all duration-500 overflow-hidden flex flex-col items-center justify-center p-6 relative ${isLinking ? 'border-blue-500 ring-4 ring-blue-500/20' : 'border-black/5'}`}>
@@ -145,9 +144,7 @@ export default function Page() {
         <button onClick={onView} className="flex flex-col items-center space-y-1 hover:opacity-100 transition-all">
           <span className="text-xl">■</span><span className="text-[8px] font-black tracking-widest uppercase">View</span>
         </button>
-        <button onClick={onSave} className="flex flex-col items-center space-y-1 hover:opacity-100 transition-all opacity-20">
-          <span className="text-xl">♦</span><span className="text-[8px] font-black tracking-widest uppercase">Save</span>
-        </button>
+        <button className="flex flex-col items-center space-y-1 opacity-20"><span className="text-xl">♦</span><span className="text-[8px] font-black tracking-widest uppercase">Save</span></button>
       </div>
       {extraButtons}
     </div>
@@ -175,7 +172,6 @@ export default function Page() {
             isLinking={linkingFrom === node.id}
             onLink={() => setLinkingFrom(node.id === linkingFrom ? null : node.id)}
             onView={() => openNetwork(node.id)}
-            onSave={() => {}}
             extraButtons={linkingFrom && linkingFrom !== node.id && (
               <div className="mt-4">
                 {existingLinks.includes(node.id) ? (
@@ -189,7 +185,7 @@ export default function Page() {
         ))}
       </main>
 
-      {/* ネットワークオーバーレイ（無限回廊対応） */}
+      {/* ネットワークオーバーレイ */}
       {networkView && (
         <div className="fixed inset-0 z-[600] bg-[#EBE8DB]/98 backdrop-blur-2xl overflow-y-auto no-scrollbar pt-24 pb-48 flex flex-col items-center animate-in fade-in duration-500">
           <button onClick={() => setNetworkView(null)} className="fixed top-10 right-10 text-3xl opacity-20 hover:opacity-100 transition-opacity z-[700]">✕</button>
@@ -202,23 +198,36 @@ export default function Page() {
                 node={lnode} 
                 isLinking={linkingFrom === lnode.id}
                 onLink={() => setLinkingFrom(lnode.id === linkingFrom ? null : lnode.id)}
-                onView={() => openNetwork(lnode.id)} // ここで次のViewへ遷移（閉じない）
-                onSave={() => {}}
+                onView={() => openNetwork(lnode.id)} 
               />
             ))}
             
-            {/* View内での新規投稿ボタン */}
-            <button 
-              onClick={() => setShowInput({file: null, parentId: networkView.originId})}
-              className="w-[300px] h-20 border-2 border-dashed border-black/10 rounded-2xl flex items-center justify-center opacity-40 hover:opacity-100 transition-all group"
-            >
-              <span className="text-xl group-hover:scale-125 transition-transform">＋ Add to this network</span>
-            </button>
+            {/* View内での新規投稿セクション */}
+            <div className="flex flex-col items-center space-y-4 pt-10">
+               <p className="text-[10px] tracking-[0.4em] opacity-20 uppercase font-black">Add to this constellation</p>
+               <div className="flex space-x-8">
+                  {/* テキストのみ */}
+                  <button 
+                    onClick={() => setShowInput({file: null, parentId: networkView.originId})}
+                    className="w-14 h-14 bg-[#F5F2E9] rounded-full shadow-xl flex items-center justify-center border border-black/5 opacity-50 hover:opacity-100 transition-all"
+                  >
+                    <span className="text-xl">✎</span>
+                  </button>
+                  {/* 画像＋テキスト */}
+                  <label className="w-14 h-14 bg-[#F5F2E9] rounded-full shadow-xl flex items-center justify-center border border-black/5 opacity-50 cursor-pointer hover:opacity-100 transition-all">
+                    <span className="text-xl">◎</span>
+                    <input type="file" className="hidden" accept="image/*" onChange={(e) => { 
+                      const file = e.target.files?.[0]; 
+                      if (file) setShowInput({file, parentId: networkView.originId}); 
+                    }} />
+                  </label>
+               </div>
+            </div>
           </div>
         </div>
       )}
 
-      {/* フッター */}
+      {/* メインフッター */}
       <nav className="fixed bottom-12 left-0 right-0 flex justify-center space-x-12 z-[100]">
         <button onClick={() => setShowInput({file: null})} className="w-14 h-14 bg-[#F5F2E9] rounded-full shadow-2xl flex items-center justify-center border border-black/5 opacity-50 hover:opacity-100 transition-all"><span className="text-xl">✎</span></button>
         <label className="w-14 h-14 bg-[#F5F2E9] rounded-full shadow-2xl flex items-center justify-center border border-black/5 opacity-50 cursor-pointer hover:opacity-100 transition-all"><span className="text-xl">◎</span><input type="file" className="hidden" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (file) setShowInput({file}); }} /></label>
@@ -226,10 +235,18 @@ export default function Page() {
 
       {/* 入力モーダル */}
       {showInput && (
-        <div className="fixed inset-0 bg-[#EBE8DB]/96 backdrop-blur-3xl z-[2000] flex flex-col items-center justify-center p-10">
+        <div className="fixed inset-0 bg-[#EBE8DB]/96 backdrop-blur-3xl z-[2000] flex flex-col items-center justify-center p-10 animate-in fade-in zoom-in-95 duration-200">
+          {showInput.file && (
+            <div className="mb-6 opacity-60">
+               <p className="text-[10px] tracking-widest uppercase font-black mb-2 text-center">Image Selected</p>
+               <div className="w-20 h-20 bg-black/5 rounded-lg overflow-hidden flex items-center justify-center">
+                  <span className="text-xs">📸</span>
+               </div>
+            </div>
+          )}
           <textarea autoFocus maxLength={55} value={inputText} onChange={(e) => setInputText(e.target.value)} placeholder={showInput.parentId ? "Relate something..." : "Archive..."} className="w-full max-w-sm bg-transparent border-none text-2xl font-serif italic outline-none h-48 resize-none text-center text-black/80" />
           <div className="flex space-x-16 mt-12">
-            <button onClick={() => setShowInput(null)} className="text-[11px] font-black tracking-[0.3em] opacity-20 uppercase">Discard</button>
+            <button onClick={() => { setShowInput(null); setInputText(''); }} className="text-[11px] font-black tracking-[0.3em] opacity-20 uppercase">Discard</button>
             <button onClick={handleUpload} className="text-[11px] font-black tracking-[0.3em] uppercase">{showInput.parentId ? "Relate" : "Archive"}</button>
           </div>
         </div>

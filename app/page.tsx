@@ -25,6 +25,7 @@ export default function Page() {
   
   // リンク・ネットワーク用
   const [linkingFrom, setLinkingFrom] = useState<string | null>(null); 
+  const [existingLinks, setExistingLinks] = useState<string[]>([]); // 現在の選択元と既に繋がっているIDリスト
   const [networkView, setNetworkView] = useState<{originId: string, linkedNodes: any[]} | null>(null);
 
   useEffect(() => {
@@ -37,14 +38,32 @@ export default function Page() {
     fetchData();
   }, []);
 
+  // リンクモードに入った時、既存の接続をフェッチして重複を防ぐ
+  useEffect(() => {
+    if (linkingFrom) {
+      fetchExistingLinks(linkingFrom);
+    } else {
+      setExistingLinks([]);
+    }
+  }, [linkingFrom]);
+
   const fetchData = useCallback(async () => {
     const { data, error } = await supabase.from('mainline').select('*').order('created_at', { ascending: false });
     if (error) return;
     const now = new Date().getTime();
-    // current_at がない場合は created_at を参照
     const active = data.filter(n => (now - new Date(n.created_at).getTime()) < LIFESPAN_MS);
     setNodes(active);
   }, []);
+
+  const fetchExistingLinks = async (nodeId: string) => {
+    const { data } = await supabase.from('links')
+      .select('*')
+      .or(`node_a.eq.${nodeId},node_b.eq.${nodeId}`);
+    if (data) {
+      const ids = data.map(l => l.node_a === nodeId ? l.node_b : l.node_a);
+      setExistingLinks(ids);
+    }
+  };
 
   const openNetwork = async (nodeId: string) => {
     const { data: links } = await supabase.from('links')
@@ -61,22 +80,12 @@ export default function Page() {
   };
 
   const connectNodes = async (targetId: string) => {
-    if (!linkingFrom || linkingFrom === targetId) return;
-    const { error } = await supabase.from('links').insert([{ node_a: linkingFrom, node_b: targetId }]);
-    if (error) {
-      console.error(error);
-    } else {
-      setLinkingFrom(null);
-      alert("接続完了");
-    }
-  };
+    if (!linkingFrom || linkingFrom === targetId || existingLinks.includes(targetId)) return;
 
-  const saveToLocal = (nodeId: string) => {
-    const saved = JSON.parse(localStorage.getItem('recta_saved_nodes') || '[]');
-    if (!saved.includes(nodeId)) {
-      saved.push(nodeId);
-      localStorage.setItem('recta_saved_nodes', JSON.stringify(saved));
-      alert("保存しました");
+    const { error } = await supabase.from('links').insert([{ node_a: linkingFrom, node_b: targetId }]);
+    if (!error) {
+      // 状態を更新して「接続済み」表示に変える
+      setExistingLinks(prev => [...prev, targetId]);
     }
   };
 
@@ -138,6 +147,14 @@ export default function Page() {
         .pixelated { image-rendering: pixelated; }
       `}</style>
       
+      {/* リンクモード中のヘッダー通知 */}
+      {linkingFrom && (
+        <div className="fixed top-0 left-0 right-0 bg-blue-600 text-white text-[10px] py-2 px-4 z-[500] flex justify-between items-center font-black tracking-widest uppercase animate-in slide-in-from-top duration-300">
+          <span>Linking Mode: Select nodes to connect</span>
+          <button onClick={() => setLinkingFrom(null)} className="bg-white text-blue-600 px-3 py-1 rounded-full text-[8px]">Finish</button>
+        </div>
+      )}
+
       <header className="py-12 flex flex-col items-center opacity-40">
         <p className="text-[12px] tracking-[0.6em] font-black uppercase text-black">Rubbish</p>
       </header>
@@ -147,7 +164,7 @@ export default function Page() {
           <div key={node.id} className="flex flex-col items-center animate-in fade-in slide-in-from-bottom-6 duration-700">
             
             {/* カード本体 */}
-            <div className="w-[300px] aspect-[1/1.4] bg-[#F5F2E9] rounded-[24px] shadow-2xl border border-black/5 overflow-hidden flex flex-col items-center justify-center p-6 relative">
+            <div className={`w-[300px] aspect-[1/1.4] bg-[#F5F2E9] rounded-[24px] shadow-2xl border transition-all duration-500 overflow-hidden flex flex-col items-center justify-center p-6 relative ${linkingFrom === node.id ? 'border-blue-500 ring-4 ring-blue-500/20' : 'border-black/5'}`}>
               {node.image_url?.startsWith('http') ? (
                 <img src={node.image_url} className="w-full aspect-square object-cover grayscale-[20%] opacity-90 rounded-sm mb-6 shadow-sm pixelated" />
               ) : null}
@@ -159,7 +176,7 @@ export default function Page() {
               </div>
             </div>
 
-            {/* カード直下のボタン群 */}
+            {/* 操作ボタン群 */}
             <div className="mt-6 flex items-center space-x-10 text-black/40">
               <button 
                 onClick={() => setLinkingFrom(node.id === linkingFrom ? null : node.id)}
@@ -178,37 +195,43 @@ export default function Page() {
               </button>
 
               <button 
-                onClick={() => saveToLocal(node.id)}
-                className="flex flex-col items-center space-y-1 hover:opacity-100 transition-all"
+                className="flex flex-col items-center space-y-1 hover:opacity-100 transition-all opacity-20"
               >
                 <span className="text-xl">♦</span>
                 <span className="text-[8px] font-black tracking-widest uppercase">Save</span>
               </button>
             </div>
 
-            {/* 接続待機中の時だけ出現する「決定ボタン」 */}
+            {/* 接続アクションボタン */}
             {linkingFrom && linkingFrom !== node.id && (
-              <button 
-                onClick={() => connectNodes(node.id)}
-                className="mt-4 bg-red-600 text-white text-[10px] font-black py-2 px-6 rounded-full shadow-lg animate-bounce tracking-widest uppercase"
-              >
-                ● Connect Here
-              </button>
+              <div className="mt-4">
+                {existingLinks.includes(node.id) ? (
+                  <div className="text-blue-500 text-[10px] font-black tracking-widest uppercase py-2 px-6 border border-blue-200 rounded-full bg-blue-50">
+                    ✔ Connected
+                  </div>
+                ) : (
+                  <button 
+                    onClick={() => connectNodes(node.id)}
+                    className="bg-red-600 text-white text-[10px] font-black py-2 px-6 rounded-full shadow-lg animate-bounce tracking-widest uppercase active:scale-95 transition-transform"
+                  >
+                    ● Connect Here
+                  </button>
+                )}
+              </div>
             )}
           </div>
         ))}
       </main>
 
-      {/* ネットワークオーバーレイ（星座表示） */}
+      {/* ネットワークオーバーレイ */}
       {networkView && (
-        <div className="fixed inset-0 z-[300] bg-[#EBE8DB]/98 backdrop-blur-2xl overflow-y-auto no-scrollbar pt-24 pb-48 flex flex-col items-center animate-in fade-in duration-500">
+        <div className="fixed inset-0 z-[600] bg-[#EBE8DB]/98 backdrop-blur-2xl overflow-y-auto no-scrollbar pt-24 pb-48 flex flex-col items-center">
           <button onClick={() => setNetworkView(null)} className="fixed top-10 right-10 text-3xl opacity-20 hover:opacity-100 transition-opacity">✕</button>
-          
-          <p className="text-[10px] tracking-[0.6em] opacity-30 uppercase font-black mb-12">Constellation</p>
+          <p className="text-[10px] tracking-[0.6em] opacity-30 uppercase font-black mb-12">Constellation Network</p>
 
           <div className="flex flex-col items-center space-y-12">
             {networkView.linkedNodes.map(lnode => (
-              <div key={lnode.id} className="w-[280px] bg-[#F5F2E9] rounded-2xl shadow-xl p-5 border border-black/5 animate-in zoom-in-95 duration-700">
+              <div key={lnode.id} className="w-[280px] bg-[#F5F2E9] rounded-2xl shadow-xl p-5 border border-black/5 animate-in zoom-in-95 duration-500">
                  {lnode.image_url?.startsWith('http') && (
                    <img src={lnode.image_url} className="w-full aspect-square object-cover opacity-80 mb-4 rounded-sm pixelated" />
                  )}
@@ -216,7 +239,7 @@ export default function Page() {
               </div>
             ))}
             {networkView.linkedNodes.length === 0 && (
-              <p className="opacity-20 italic mt-20">No connections found.</p>
+              <p className="opacity-20 italic mt-20">No connections found for this node.</p>
             )}
           </div>
         </div>
@@ -238,7 +261,7 @@ export default function Page() {
 
       {/* 入力画面 */}
       {showInput && (
-        <div className="fixed inset-0 bg-[#EBE8DB]/96 backdrop-blur-3xl z-[400] flex flex-col items-center justify-center p-10">
+        <div className="fixed inset-0 bg-[#EBE8DB]/96 backdrop-blur-3xl z-[700] flex flex-col items-center justify-center p-10 animate-in fade-in duration-300">
           <textarea 
             autoFocus 
             maxLength={55} 
@@ -255,7 +278,7 @@ export default function Page() {
       )}
 
       {isUploading && (
-        <div className="fixed inset-0 bg-[#EBE8DB]/80 backdrop-blur-md z-[500] flex items-center justify-center text-[10px] tracking-[0.5em] font-black uppercase italic animate-pulse">
+        <div className="fixed inset-0 bg-[#EBE8DB]/80 backdrop-blur-md z-[800] flex items-center justify-center text-[10px] tracking-[0.5em] font-black uppercase italic animate-pulse">
           Archiving...
         </div>
       )}

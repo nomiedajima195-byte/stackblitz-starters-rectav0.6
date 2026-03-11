@@ -64,15 +64,21 @@ export default function Page() {
     const linkedNodes = nodes.filter(n => linkedIds.includes(n.id)).sort(() => Math.random() - 0.5);
     
     setNetworkView({ originNode: origin, linkedNodes });
-    // Viewを開いた時、スクロールをトップに戻す
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const connectNodes = async (targetId: string, fromId?: string) => {
     const sourceId = fromId || linkingFrom;
     if (!sourceId || sourceId === targetId) return;
     const { error } = await supabase.from('links').insert([{ node_a: sourceId, node_b: targetId }]);
-    if (!error && !fromId) setExistingLinks(prev => [...prev, targetId]);
+    
+    // リンク成功時の処理
+    if (!error) {
+      if (!fromId) setExistingLinks(prev => [...prev, targetId]);
+      // Viewを開いている場合は更新
+      if (networkView) {
+        openNetwork(networkView.originNode.id);
+      }
+    }
     return !error;
   };
 
@@ -136,7 +142,8 @@ export default function Page() {
     }
   };
 
-  const NodeCard = ({ node, isLinking, onLink, onView, isOrigin }: any) => (
+  // 共通のカードコンポーネント
+  const NodeCard = ({ node, isLinking, onLink, onView, isOrigin, extraButtons }: any) => (
     <div className="flex flex-col items-center">
       <div className={`w-[300px] aspect-[1/1.4] bg-[#F5F2E9] rounded-[24px] shadow-2xl border transition-all duration-500 overflow-hidden flex flex-col items-center justify-center p-6 relative ${isLinking ? 'border-blue-500 ring-4 ring-blue-500/20' : isOrigin ? 'border-amber-500 ring-4 ring-amber-500/10' : 'border-black/5'}`}>
         {node.image_url?.startsWith('http') && <img src={node.image_url} className="w-full aspect-square object-cover grayscale-[20%] opacity-90 rounded-sm mb-6 shadow-sm pixelated" />}
@@ -152,6 +159,7 @@ export default function Page() {
         </button>
         <button className="flex flex-col items-center space-y-1 opacity-20"><span className="text-xl">♦</span><span className="text-[8px] font-black tracking-widest uppercase">Save</span></button>
       </div>
+      {extraButtons}
     </div>
   );
 
@@ -190,7 +198,7 @@ export default function Page() {
         ))}
       </main>
 
-      {/* ネットワークオーバーレイ（Origin表示対応） */}
+      {/* ネットワークオーバーレイ（Link機能修正版） */}
       {networkView && (
         <div className="fixed inset-0 z-[600] bg-[#EBE8DB]/98 backdrop-blur-2xl overflow-y-auto no-scrollbar pt-24 pb-48 flex flex-col items-center animate-in fade-in duration-500">
           <button onClick={() => setNetworkView(null)} className="fixed top-10 right-10 text-3xl opacity-20 hover:opacity-100 transition-opacity z-[700]">✕</button>
@@ -198,12 +206,21 @@ export default function Page() {
           <div className="flex flex-col items-center w-full max-w-lg px-6">
             <p className="text-[10px] tracking-[0.6em] opacity-30 uppercase font-black mb-8">Origin Node</p>
             
-            {/* 元ノードの固定表示 */}
             <NodeCard 
               node={networkView.originNode}
               isOrigin={true}
-              onLink={() => setLinkingFrom(networkView.originNode.id)}
-              onView={() => {}} // 自身なので何もしない
+              isLinking={linkingFrom === networkView.originNode.id}
+              onLink={() => setLinkingFrom(networkView.originNode.id === linkingFrom ? null : networkView.originNode.id)}
+              onView={() => {}} 
+              extraButtons={linkingFrom && linkingFrom !== networkView.originNode.id && (
+                <div className="mt-4">
+                  {existingLinks.includes(networkView.originNode.id) ? (
+                    <div className="text-blue-500 text-[10px] font-black tracking-widest uppercase py-2 px-6 border border-blue-200 rounded-full bg-blue-50">✔ Connected</div>
+                  ) : (
+                    <button onClick={() => connectNodes(networkView.originNode.id)} className="bg-red-600 text-white text-[10px] font-black py-2 px-6 rounded-full shadow-lg animate-bounce tracking-widest uppercase">● Connect Here</button>
+                  )}
+                </div>
+              )}
             />
 
             <div className="w-px h-16 bg-gradient-to-b from-amber-500/30 to-transparent my-8"></div>
@@ -219,13 +236,21 @@ export default function Page() {
                     isLinking={linkingFrom === lnode.id}
                     onLink={() => setLinkingFrom(lnode.id === linkingFrom ? null : lnode.id)}
                     onView={() => openNetwork(lnode.id)} 
+                    extraButtons={linkingFrom && linkingFrom !== lnode.id && (
+                      <div className="mt-4">
+                        {existingLinks.includes(lnode.id) ? (
+                          <div className="text-blue-500 text-[10px] font-black tracking-widest uppercase py-2 px-6 border border-blue-200 rounded-full bg-blue-50">✔ Connected</div>
+                        ) : (
+                          <button onClick={() => connectNodes(lnode.id)} className="bg-red-600 text-white text-[10px] font-black py-2 px-6 rounded-full shadow-lg animate-bounce tracking-widest uppercase">● Connect Here</button>
+                        )}
+                      </div>
+                    )}
                   />
                 ))
               ) : (
                 <p className="text-[12px] italic opacity-20 py-20">No connections found.</p>
               )}
               
-              {/* View内での新規投稿セクション */}
               <div className="flex flex-col items-center space-y-4 pt-10">
                  <p className="text-[10px] tracking-[0.4em] opacity-20 uppercase font-black">Add to this network</p>
                  <div className="flex space-x-8">
@@ -249,13 +274,11 @@ export default function Page() {
         </div>
       )}
 
-      {/* メインフッター */}
       <nav className="fixed bottom-12 left-0 right-0 flex justify-center space-x-12 z-[100]">
         <button onClick={() => setShowInput({file: null})} className="w-14 h-14 bg-[#F5F2E9] rounded-full shadow-2xl flex items-center justify-center border border-black/5 opacity-50 hover:opacity-100 transition-all"><span className="text-xl">✎</span></button>
         <label className="w-14 h-14 bg-[#F5F2E9] rounded-full shadow-2xl flex items-center justify-center border border-black/5 opacity-50 cursor-pointer hover:opacity-100 transition-all"><span className="text-xl">◎</span><input type="file" className="hidden" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (file) setShowInput({file}); }} /></label>
       </nav>
 
-      {/* 入力モーダル */}
       {showInput && (
         <div className="fixed inset-0 bg-[#EBE8DB]/96 backdrop-blur-3xl z-[2000] flex flex-col items-center justify-center p-10 animate-in fade-in zoom-in-95 duration-200">
           {showInput.file && (

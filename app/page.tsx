@@ -25,7 +25,7 @@ export default function Page() {
   
   const [linkingFrom, setLinkingFrom] = useState<string | null>(null); 
   const [existingLinks, setExistingLinks] = useState<string[]>([]); 
-  const [networkView, setNetworkView] = useState<{originId: string, linkedNodes: any[]} | null>(null);
+  const [networkView, setNetworkView] = useState<{originNode: any, linkedNodes: any[]} | null>(null);
 
   useEffect(() => {
     let id = localStorage.getItem('recta_pocket_id');
@@ -56,10 +56,16 @@ export default function Page() {
   };
 
   const openNetwork = async (nodeId: string) => {
+    const origin = nodes.find(n => n.id === nodeId);
+    if (!origin) return;
+
     const { data: links } = await supabase.from('links').select('*').or(`node_a.eq.${nodeId},node_b.eq.${nodeId}`);
     const linkedIds = links ? links.map(l => l.node_a === nodeId ? l.node_b : l.node_a) : [];
     const linkedNodes = nodes.filter(n => linkedIds.includes(n.id)).sort(() => Math.random() - 0.5);
-    setNetworkView({ originId: nodeId, linkedNodes });
+    
+    setNetworkView({ originNode: origin, linkedNodes });
+    // Viewを開いた時、スクロールをトップに戻す
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const connectNodes = async (targetId: string, fromId?: string) => {
@@ -130,12 +136,12 @@ export default function Page() {
     }
   };
 
-  const NodeCard = ({ node, isLinking, onLink, onView, onSave, extraButtons }: any) => (
+  const NodeCard = ({ node, isLinking, onLink, onView, isOrigin }: any) => (
     <div className="flex flex-col items-center">
-      <div className={`w-[300px] aspect-[1/1.4] bg-[#F5F2E9] rounded-[24px] shadow-2xl border transition-all duration-500 overflow-hidden flex flex-col items-center justify-center p-6 relative ${isLinking ? 'border-blue-500 ring-4 ring-blue-500/20' : 'border-black/5'}`}>
+      <div className={`w-[300px] aspect-[1/1.4] bg-[#F5F2E9] rounded-[24px] shadow-2xl border transition-all duration-500 overflow-hidden flex flex-col items-center justify-center p-6 relative ${isLinking ? 'border-blue-500 ring-4 ring-blue-500/20' : isOrigin ? 'border-amber-500 ring-4 ring-amber-500/10' : 'border-black/5'}`}>
         {node.image_url?.startsWith('http') && <img src={node.image_url} className="w-full aspect-square object-cover grayscale-[20%] opacity-90 rounded-sm mb-6 shadow-sm pixelated" />}
         <p className="text-[14px] italic text-center leading-relaxed opacity-80 whitespace-pre-wrap px-2">{node.description || "— silent fragment"}</p>
-        <div className="absolute bottom-6 text-[8px] font-bold opacity-10 tracking-[0.4em] uppercase italic">{node.id.split('-')[1] || "NODE"} // RUBBISH</div>
+        <div className="absolute bottom-6 text-[8px] font-bold opacity-10 tracking-[0.4em] uppercase italic">{node.id.split('-')[1] || "NODE"} // {isOrigin ? "ORIGIN" : "RUBBISH"}</div>
       </div>
       <div className="mt-6 flex items-center space-x-10 text-black/40">
         <button onClick={onLink} className={`flex flex-col items-center space-y-1 transition-all ${isLinking ? 'text-blue-500 scale-110 opacity-100' : 'hover:opacity-100'}`}>
@@ -146,7 +152,6 @@ export default function Page() {
         </button>
         <button className="flex flex-col items-center space-y-1 opacity-20"><span className="text-xl">♦</span><span className="text-[8px] font-black tracking-widest uppercase">Save</span></button>
       </div>
-      {extraButtons}
     </div>
   );
 
@@ -185,43 +190,60 @@ export default function Page() {
         ))}
       </main>
 
-      {/* ネットワークオーバーレイ */}
+      {/* ネットワークオーバーレイ（Origin表示対応） */}
       {networkView && (
         <div className="fixed inset-0 z-[600] bg-[#EBE8DB]/98 backdrop-blur-2xl overflow-y-auto no-scrollbar pt-24 pb-48 flex flex-col items-center animate-in fade-in duration-500">
           <button onClick={() => setNetworkView(null)} className="fixed top-10 right-10 text-3xl opacity-20 hover:opacity-100 transition-opacity z-[700]">✕</button>
-          <p className="text-[10px] tracking-[0.6em] opacity-30 uppercase font-black mb-12">Constellation Network</p>
-
-          <div className="flex flex-col items-center space-y-16">
-            {networkView.linkedNodes.map(lnode => (
-              <NodeCard 
-                key={lnode.id} 
-                node={lnode} 
-                isLinking={linkingFrom === lnode.id}
-                onLink={() => setLinkingFrom(lnode.id === linkingFrom ? null : lnode.id)}
-                onView={() => openNetwork(lnode.id)} 
-              />
-            ))}
+          
+          <div className="flex flex-col items-center w-full max-w-lg px-6">
+            <p className="text-[10px] tracking-[0.6em] opacity-30 uppercase font-black mb-8">Origin Node</p>
             
-            {/* View内での新規投稿セクション */}
-            <div className="flex flex-col items-center space-y-4 pt-10">
-               <p className="text-[10px] tracking-[0.4em] opacity-20 uppercase font-black">Add to this constellation</p>
-               <div className="flex space-x-8">
-                  {/* テキストのみ */}
-                  <button 
-                    onClick={() => setShowInput({file: null, parentId: networkView.originId})}
-                    className="w-14 h-14 bg-[#F5F2E9] rounded-full shadow-xl flex items-center justify-center border border-black/5 opacity-50 hover:opacity-100 transition-all"
-                  >
-                    <span className="text-xl">✎</span>
-                  </button>
-                  {/* 画像＋テキスト */}
-                  <label className="w-14 h-14 bg-[#F5F2E9] rounded-full shadow-xl flex items-center justify-center border border-black/5 opacity-50 cursor-pointer hover:opacity-100 transition-all">
-                    <span className="text-xl">◎</span>
-                    <input type="file" className="hidden" accept="image/*" onChange={(e) => { 
-                      const file = e.target.files?.[0]; 
-                      if (file) setShowInput({file, parentId: networkView.originId}); 
-                    }} />
-                  </label>
-               </div>
+            {/* 元ノードの固定表示 */}
+            <NodeCard 
+              node={networkView.originNode}
+              isOrigin={true}
+              onLink={() => setLinkingFrom(networkView.originNode.id)}
+              onView={() => {}} // 自身なので何もしない
+            />
+
+            <div className="w-px h-16 bg-gradient-to-b from-amber-500/30 to-transparent my-8"></div>
+            
+            <p className="text-[10px] tracking-[0.6em] opacity-30 uppercase font-black mb-12">Connections</p>
+
+            <div className="flex flex-col items-center space-y-16 w-full">
+              {networkView.linkedNodes.length > 0 ? (
+                networkView.linkedNodes.map(lnode => (
+                  <NodeCard 
+                    key={lnode.id} 
+                    node={lnode} 
+                    isLinking={linkingFrom === lnode.id}
+                    onLink={() => setLinkingFrom(lnode.id === linkingFrom ? null : lnode.id)}
+                    onView={() => openNetwork(lnode.id)} 
+                  />
+                ))
+              ) : (
+                <p className="text-[12px] italic opacity-20 py-20">No connections found.</p>
+              )}
+              
+              {/* View内での新規投稿セクション */}
+              <div className="flex flex-col items-center space-y-4 pt-10">
+                 <p className="text-[10px] tracking-[0.4em] opacity-20 uppercase font-black">Add to this network</p>
+                 <div className="flex space-x-8">
+                    <button 
+                      onClick={() => setShowInput({file: null, parentId: networkView.originNode.id})}
+                      className="w-14 h-14 bg-[#F5F2E9] rounded-full shadow-xl flex items-center justify-center border border-black/5 opacity-50 hover:opacity-100 transition-all"
+                    >
+                      <span className="text-xl">✎</span>
+                    </button>
+                    <label className="w-14 h-14 bg-[#F5F2E9] rounded-full shadow-xl flex items-center justify-center border border-black/5 opacity-50 cursor-pointer hover:opacity-100 transition-all">
+                      <span className="text-xl">◎</span>
+                      <input type="file" className="hidden" accept="image/*" onChange={(e) => { 
+                        const file = e.target.files?.[0]; 
+                        if (file) setShowInput({file, parentId: networkView.originNode.id}); 
+                      }} />
+                    </label>
+                 </div>
+              </div>
             </div>
           </div>
         </div>

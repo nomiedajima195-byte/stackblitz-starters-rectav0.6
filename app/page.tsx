@@ -3,13 +3,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
-// --- FIXED CONFIG ---
+// --- FIXED CONFIG (そのまま使用) ---
 const supabaseUrl = 'https://pfxwhcgdbavycddapqmz.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmeHdoY2dkYmF2eWNkZGFwcW16Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxNjQ0NzUsImV4cCI6MjA4Mjc0MDQ3NX0.YNQlbyocg2olS6-1WxTnbr5N2z52XcVIpI1XR-XrDtM';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-export default function RectaFullStack() {
+export default function RectaBulletproofPost() {
   const [nodes, setNodes] = useState<any[]>([]);
+  // ... (他のStateはそのまま)
   const [pads, setPads] = useState<(any | null)[]>(Array(4).fill(null));
   const [activePad, setActivePad] = useState<number | null>(null);
   const [track, setTrack] = useState<any[]>([]);
@@ -21,41 +22,100 @@ export default function RectaFullStack() {
   const [playingTrack, setPlayingTrack] = useState<any[] | null>(null);
   const [playIdx, setPlayIdx] = useState(0);
 
-  // 1. DATA FETCH
+  // 1. データ取得
   const fetchData = useCallback(async () => {
+    console.log("🛰 Fetching nodes...");
     const { data, error } = await supabase
       .from('mainline')
       .select('*')
       .order('created_at', { ascending: false });
-    if (data) setNodes(data);
+    
+    if (error) {
+      console.error("❌ Fetch Error:", error.message);
+    } else {
+      console.log("✅ Fetched Nodes:", data?.length);
+      setNodes(data || []);
+    }
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // 2. NORMAL POST
+  // 2. 新規投稿 (防弾仕様)
   const handleUpload = async () => {
     if (!showInput && !inputText.trim()) return;
     setIsProcessing(true);
     let publicUrl = null;
+
+    console.log("🚀 Starting upload process...");
+
     try {
+      // --- STEP 1: 画像アップロード ---
       if (showInput?.file) {
+        console.log("📸 Uploading image...");
         const file = showInput.file;
-        const fileName = `${Date.now()}-${file.name}`;
-        await supabase.storage.from('images').upload(fileName, file);
-        const { data } = supabase.storage.from('images').getPublicUrl(fileName);
-        publicUrl = data.publicUrl;
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Date.now()}.${fileExt}`; // ユニークなファイル名
+
+        const { error: storageError, data: storageData } = await supabase.storage
+          .from('images') // 💡 バケット名が 'images' であることを確認
+          .upload(fileName, file);
+
+        if (storageError) {
+          console.error("❌ Storage Error:", storageError.message);
+          alert(`Image Upload Failed: ${storageError.message}`);
+          throw storageError;
+        }
+
+        console.log("✅ Image Uploaded:", storageData.path);
+
+        // 公開URLを取得
+        const { data: urlData } = supabase.storage
+          .from('images')
+          .getPublicUrl(fileName);
+        
+        publicUrl = urlData.publicUrl;
+        console.log("🔗 Public URL:", publicUrl);
       }
-      await supabase.from('mainline').insert([{
+
+      // --- STEP 2: DBへの書き込み ---
+      console.log("📝 Inserting into DB...");
+      
+      const insertData = {
         image_url: publicUrl,
         description: inputText.trim() || null,
         owner_id: 'guest',
-        created_at: new Date().toISOString()
-      }]);
-      setShowInput(null); setInputText(''); fetchData();
-    } finally { setIsProcessing(false); }
+        created_at: new Date().toISOString() // フロント側で時間を刻印
+      };
+
+      console.log("📄 Insert Data:", insertData);
+
+      const { data: insertedData, error: dbError } = await supabase
+        .from('mainline')
+        .insert([insertData])
+        .select(); // 💡 挿入されたデータを返すように要求
+
+      if (dbError) {
+        console.error("❌ DB Error:", dbError.message);
+        // 🚨 ここでエラーが出る場合、RLSのINSERTポリシーが設定されていません
+        alert(`Database Post Failed: ${dbError.message}\n(Check RLS Policies)`);
+        throw dbError;
+      }
+
+      console.log("💎 Successfully Inserted:", insertedData);
+      alert("✅ Post Success!"); // 成功したらアラートを出す（デバッグ用）
+
+      setShowInput(null);
+      setInputText('');
+      fetchData(); // リロード
+
+    } catch (e: any) {
+      console.error("🔥 Global Error:", e);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
-  // 3. TRACK ARCHIVE
+  // ... (他の関数 archiveTrack, triggerPad はそのまま)
   const archiveTrack = async () => {
     if (track.length === 0) return;
     setIsProcessing(true);
@@ -70,7 +130,6 @@ export default function RectaFullStack() {
     } finally { setIsProcessing(false); }
   };
 
-  // 4. MPC & PLAYBACK
   const triggerPad = (idx: number) => {
     if (!pads[idx]) return;
     setActivePad(idx);
@@ -87,6 +146,7 @@ export default function RectaFullStack() {
     }
   }, [playingTrack, playIdx]);
 
+  // --- UI (前回と同じ) ---
   return (
     <div className="min-h-screen bg-[#EBE8DB] text-[#2D2D2D] font-serif overflow-x-hidden">
       <style jsx global>{`

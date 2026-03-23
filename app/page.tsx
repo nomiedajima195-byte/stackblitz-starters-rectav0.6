@@ -8,9 +8,10 @@ const supabaseUrl = 'https://pfxwhcgdbavycddapqmz.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmeHdoY2dkYmF2eWNkZGFwcW16Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxNjQ0NzUsImV4cCI6MjA4Mjc0MDQ3NX0.YNQlbyocg2olS6-1WxTnbr5N2z52XcVIpI1XR-XrDtM';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-export default function RectaComplete() {
+export default function RectaOctoPad() {
   const [nodes, setNodes] = useState<any[]>([]);
-  const [pads, setPads] = useState<(any | null)[]>(Array(4).fill(null));
+  // 💡 4個から8個（Array(8)）に変更
+  const [pads, setPads] = useState<(any | null)[]>(Array(8).fill(null));
   const [activePad, setActivePad] = useState<number | null>(null);
   const [track, setTrack] = useState<any[]>([]);
   const [isRecording, setIsRecording] = useState(false);
@@ -21,25 +22,23 @@ export default function RectaComplete() {
   const [playingTrack, setPlayingTrack] = useState<any[] | null>(null);
   const [playIdx, setPlayIdx] = useState(0);
 
-  // 1. DATA FETCH (最新順)
+  // 1. DATA FETCH
   const fetchData = useCallback(async () => {
     const { data, error } = await supabase
       .from('mainline')
       .select('*')
       .order('created_at', { ascending: false });
-    
     if (error) console.error("Fetch Error:", error.message);
     if (data) setNodes(data);
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // 2. NORMAL POST (画像 & テキスト)
+  // 2. NORMAL POST
   const handleUpload = async () => {
     if (!showInput && !inputText.trim()) return;
     setIsProcessing(true);
     let publicUrl = null;
-
     try {
       if (showInput?.file) {
         const file = showInput.file;
@@ -49,27 +48,19 @@ export default function RectaComplete() {
         const { data } = supabase.storage.from('images').getPublicUrl(fileName);
         publicUrl = data.publicUrl;
       }
-
-      const { error: dbError } = await supabase.from('mainline').insert([{
+      await supabase.from('mainline').insert([{
         image_url: publicUrl,
         description: inputText.trim() || null,
         owner_id: 'guest',
         created_at: new Date().toISOString()
       }]);
-
-      if (dbError) throw dbError;
-
-      setShowInput(null);
-      setInputText('');
-      fetchData();
+      setShowInput(null); setInputText(''); fetchData();
     } catch (e: any) {
       alert(`Archive Failed: ${e.message}`);
-    } finally {
-      setIsProcessing(false);
-    }
+    } finally { setIsProcessing(false); }
   };
 
-  // 3. TRACK ARCHIVE (MPC演奏の保存)
+  // 3. TRACK ARCHIVE
   const archiveTrack = async () => {
     if (track.length === 0) return;
     setIsProcessing(true);
@@ -81,28 +72,28 @@ export default function RectaComplete() {
         created_at: new Date().toISOString()
       }]);
       if (error) throw error;
-      setTrack([]); setIsRecording(false); setIsMPCVisible(false); fetchData();
+      // 💡 8個でリセット
+      setTrack([]); setIsRecording(false); setIsMPCVisible(false); setPads(Array(8).fill(null)); fetchData();
     } catch (e: any) {
       alert(`Track Archive Failed: ${e.message}`);
-    } finally {
-      setIsProcessing(false);
-    }
+    } finally { setIsProcessing(false); }
   };
 
   // 4. MPC LOGIC
   const triggerPad = (idx: number) => {
     if (!pads[idx]) return;
     setActivePad(idx);
-    if (isRecording && track.length < 24) {
+    // 💡 トラックの上限も少し緩和（24 -> 32音）
+    if (isRecording && track.length < 32) {
       setTrack(prev => [...prev, pads[idx]]);
     }
-    setTimeout(() => setActivePad(null), 150);
+    setTimeout(() => setActivePad(null), 120);
   };
 
   // 5. PLAYBACK ENGINE
   useEffect(() => {
     if (playingTrack && playIdx < playingTrack.length) {
-      const timer = setTimeout(() => setPlayIdx(prev => prev + 1), 600);
+      const timer = setTimeout(() => setPlayIdx(prev => prev + 1), 600); // 💡 再生速度を少し速く（600ms）
       return () => clearTimeout(timer);
     } else if (playingTrack && playIdx >= playingTrack.length) {
       setPlayingTrack(null);
@@ -117,7 +108,7 @@ export default function RectaComplete() {
         .no-scrollbar::-webkit-scrollbar { display: none; }
       `}</style>
 
-      {/* FLASH LAYER: 演奏・再生時の全画面フラッシュ */}
+      {/* FLASH LAYER */}
       {(activePad !== null || playingTrack) && (
         <div className="fixed inset-0 z-[3000] bg-black flex items-center justify-center animate-in fade-in duration-75">
           {activePad !== null ? (
@@ -137,7 +128,7 @@ export default function RectaComplete() {
         <h1 className="text-[10px] tracking-[1.5em] font-black uppercase opacity-20 bg-[#EBE8DB]/60 backdrop-blur-md px-10 py-4 rounded-full border border-black/5">Rubbish</h1>
       </header>
 
-      {/* MAIN WALL: 石垣 */}
+      {/* MAIN WALL */}
       <main className={`p-2 transition-all duration-1000 ${isMPCVisible || showInput ? 'opacity-40 blur-md scale-[0.98]' : 'opacity-100'}`}>
         <div className="stone-wall max-w-[120rem] mx-auto">
           {nodes.map(node => (
@@ -148,10 +139,12 @@ export default function RectaComplete() {
                   setPlayingTrack(JSON.parse(node.description));
                   setPlayIdx(0);
                 } else {
+                  // 💡 8パッドに対応したサンプリングロジック
                   setPads(prev => {
                     const next = [...prev];
                     const empty = next.findIndex(p => p === null);
-                    next[empty === -1 ? 0 : empty] = node;
+                    // 空きがなければ、古いパッドから上書きしていく
+                    next[empty === -1 ? track.length % 8 : empty] = node;
                     return next;
                   });
                   setIsMPCVisible(true);
@@ -178,7 +171,7 @@ export default function RectaComplete() {
         </div>
       </main>
 
-      {/* FOOTER NAV: ◎ボタンとStudio切り替え */}
+      {/* FOOTER NAV */}
       <nav className="fixed bottom-12 left-1/2 -translate-x-1/2 flex items-center space-x-6 z-[500]">
         <button onClick={() => setShowInput({file: null})} className="bg-white/40 backdrop-blur-3xl w-20 h-20 rounded-full shadow-2xl border border-white/40 text-3xl opacity-40 hover:opacity-100 hover:scale-105 transition-all flex items-center justify-center font-light">◎</button>
         <button 
@@ -191,7 +184,7 @@ export default function RectaComplete() {
         </button>
       </nav>
 
-      {/* POST MODAL: 投稿画面 */}
+      {/* POST MODAL */}
       {showInput && (
         <div className="fixed inset-0 bg-[#EBE8DB]/96 backdrop-blur-3xl z-[2000] flex flex-col items-center justify-center p-8 animate-in fade-in zoom-in-95 duration-500">
           <textarea 
@@ -212,7 +205,7 @@ export default function RectaComplete() {
         </div>
       )}
 
-      {/* STUDIO MODAL: 透過MPCパッド */}
+      {/* STUDIO MODAL: 8パッド（2段）構成 */}
       {isMPCVisible && (
         <div className="fixed inset-0 z-[1000] flex items-end justify-center pb-40 p-6 pointer-events-none">
           <div className="bg-white/5 backdrop-blur-3xl w-full max-w-sm p-8 rounded-[3.5rem] shadow-[0_20px_80px_rgba(0,0,0,0.15)] border border-white/20 pointer-events-auto animate-in slide-in-from-bottom-20 duration-700">
@@ -224,9 +217,10 @@ export default function RectaComplete() {
                 <div className={`w-2 h-2 rounded-full ${isRecording ? 'bg-red-500 animate-pulse shadow-[0_0_10px_rgba(239,68,68,1)]' : 'bg-black/10'}`} />
                 <span className={`text-[8px] font-black uppercase tracking-widest ${isRecording ? 'text-red-500' : 'text-black/30'}`}>Recording</span>
               </button>
-              <div className="text-[9px] text-black/20 font-mono italic">{track.length} / 24</div>
+              <div className="text-[9px] text-black/20 font-mono italic">{track.length} / 32</div>
             </div>
 
+            {/* 💡 グリッド：4列×2段に変更 */}
             <div className="grid grid-cols-4 gap-4 mb-8">
               {pads.map((pad, i) => (
                 <div 

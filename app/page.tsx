@@ -8,9 +8,8 @@ const supabaseUrl = 'https://pfxwhcgdbavycddapqmz.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmeHdoY2dkYmF2eWNkZGFwcW16Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxNjQ0NzUsImV4cCI6MjA4Mjc0MDQ3NX0.YNQlbyocg2olS6-1WxTnbr5N2z52XcVIpI1XR-XrDtM';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-export default function RectaOctoPad() {
+export default function RectaTrackThumbnail() {
   const [nodes, setNodes] = useState<any[]>([]);
-  // 💡 4個から8個（Array(8)）に変更
   const [pads, setPads] = useState<(any | null)[]>(Array(8).fill(null));
   const [activePad, setActivePad] = useState<number | null>(null);
   const [track, setTrack] = useState<any[]>([]);
@@ -72,7 +71,6 @@ export default function RectaOctoPad() {
         created_at: new Date().toISOString()
       }]);
       if (error) throw error;
-      // 💡 8個でリセット
       setTrack([]); setIsRecording(false); setIsMPCVisible(false); setPads(Array(8).fill(null)); fetchData();
     } catch (e: any) {
       alert(`Track Archive Failed: ${e.message}`);
@@ -83,7 +81,6 @@ export default function RectaOctoPad() {
   const triggerPad = (idx: number) => {
     if (!pads[idx]) return;
     setActivePad(idx);
-    // 💡 トラックの上限も少し緩和（24 -> 32音）
     if (isRecording && track.length < 32) {
       setTrack(prev => [...prev, pads[idx]]);
     }
@@ -93,7 +90,7 @@ export default function RectaOctoPad() {
   // 5. PLAYBACK ENGINE
   useEffect(() => {
     if (playingTrack && playIdx < playingTrack.length) {
-      const timer = setTimeout(() => setPlayIdx(prev => prev + 1), 600); // 💡 再生速度を少し速く（600ms）
+      const timer = setTimeout(() => setPlayIdx(prev => prev + 1), 600);
       return () => clearTimeout(timer);
     } else if (playingTrack && playIdx >= playingTrack.length) {
       setPlayingTrack(null);
@@ -128,46 +125,76 @@ export default function RectaOctoPad() {
         <h1 className="text-[10px] tracking-[1.5em] font-black uppercase opacity-20 bg-[#EBE8DB]/60 backdrop-blur-md px-10 py-4 rounded-full border border-black/5">Rubbish</h1>
       </header>
 
-      {/* MAIN WALL */}
+      {/* MAIN WALL: 石垣 */}
       <main className={`p-2 transition-all duration-1000 ${isMPCVisible || showInput ? 'opacity-40 blur-md scale-[0.98]' : 'opacity-100'}`}>
         <div className="stone-wall max-w-[120rem] mx-auto">
-          {nodes.map(node => (
-            <div 
-              key={node.id} 
-              onClick={() => {
-                if (node.image_url === 'TRACK_TYPE') {
-                  setPlayingTrack(JSON.parse(node.description));
-                  setPlayIdx(0);
-                } else {
-                  // 💡 8パッドに対応したサンプリングロジック
-                  setPads(prev => {
-                    const next = [...prev];
-                    const empty = next.findIndex(p => p === null);
-                    // 空きがなければ、古いパッドから上書きしていく
-                    next[empty === -1 ? track.length % 8 : empty] = node;
-                    return next;
-                  });
-                  setIsMPCVisible(true);
-                }
-              }}
-              className={`mb-2 break-inside-avoid rounded-sm overflow-hidden active:scale-95 transition-all cursor-pointer border border-black/5
-                ${node.image_url === 'TRACK_TYPE' ? 'bg-[#1a1a1a] text-[#EBE8DB] p-8 h-48 flex flex-col justify-between shadow-inner' : 'bg-[#EDE9D9] shadow-sm'}
-              `}
-            >
-              {node.image_url === 'TRACK_TYPE' ? (
-                <>
-                  <div className="text-[8px] tracking-[0.5em] opacity-40 uppercase font-black">Memory Loop</div>
-                  <div className="text-[12px] italic opacity-80 leading-snug tracking-tight">Sequence of {JSON.parse(node.description).length} fragments</div>
-                  <div className="text-2xl self-end opacity-20 font-light">PLAY</div>
-                </>
-              ) : (
-                <>
-                  {node.image_url && <img src={node.image_url} className="w-full h-auto grayscale-[30%] hover:grayscale-0 transition-all duration-700" loading="lazy" />}
-                  {node.description && <div className="p-5 text-[12px] italic leading-relaxed opacity-70 tracking-tight whitespace-pre-wrap">{node.description}</div>}
-                </>
-              )}
-            </div>
-          ))}
+          {nodes.map(node => {
+            // 💡 トラックタイルの解析ロジック
+            let trackThumb = null;
+            if (node.image_url === 'TRACK_TYPE') {
+              const trackData = JSON.parse(node.description);
+              // 1コマ目の画像を取得
+              if (trackData.length > 0 && trackData[0].image_url) {
+                trackThumb = trackData[0].image_url;
+              }
+            }
+
+            return (
+              <div 
+                key={node.id} 
+                onClick={() => {
+                  if (node.image_url === 'TRACK_TYPE') {
+                    setPlayingTrack(JSON.parse(node.description));
+                    setPlayIdx(0);
+                  } else {
+                    setPads(prev => {
+                      const next = [...prev];
+                      const empty = next.findIndex(p => p === null);
+                      next[empty === -1 ? track.length % 8 : empty] = node;
+                      return next;
+                    });
+                    setIsMPCVisible(true);
+                  }
+                }}
+                // 💡 トラックタイルのスタイルを変更：サムネイル背景、シャドウ、そして◀マーク
+                className={`mb-2 break-inside-avoid rounded-sm overflow-hidden active:scale-95 transition-all cursor-pointer border border-black/5 relative
+                  ${node.image_url === 'TRACK_TYPE' 
+                    ? `bg-[#1a1a1a] p-0 h-48 flex flex-col justify-end shadow-2xl` 
+                    : 'bg-[#EDE9D9] shadow-sm'}
+                `}
+              >
+                {node.image_url === 'TRACK_TYPE' ? (
+                  <>
+                    {/* 💡 1コマ目の画像を背景に敷く */}
+                    {trackThumb && (
+                      <img src={trackThumb} className="absolute inset-0 w-full h-full object-cover grayscale opacity-50 transition-all hover:grayscale-0 hover:opacity-100 duration-500" />
+                    ) || (
+                      // 画像がなければテキストノードがサムネイルになる、など（テキストは未対応）
+                      <div className="absolute inset-0 flex items-center justify-center p-8 bg-black">
+                        <div className="text-[12px] italic text-[#EBE8DB]/60">{JSON.parse(node.description)[0]?.description}</div>
+                      </div>
+                    )}
+                    
+                    {/* 💡 再生マーク（▶）をオーバーラップ：中央にデカデカと */}
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="text-white text-7xl font-light opacity-10 hover:opacity-30 transition-opacity">▶</div>
+                    </div>
+
+                    {/* 💡 トラック情報（下に小さく） */}
+                    <div className="bg-gradient-to-t from-black/80 to-transparent p-6 relative z-10 w-full">
+                      <div className="text-[7px] tracking-[0.5em] text-[#EBE8DB] opacity-30 uppercase font-black mb-1">Loop Memory</div>
+                      <div className="text-[11px] italic text-[#EBE8DB] opacity-70 leading-tight tracking-tight">Sequence of {JSON.parse(node.description).length} nodes</div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {node.image_url && <img src={node.image_url} className="w-full h-auto grayscale-[30%] hover:grayscale-0 transition-all duration-700" loading="lazy" />}
+                    {node.description && <div className="p-5 text-[12px] italic leading-relaxed opacity-70 tracking-tight whitespace-pre-wrap">{node.description}</div>}
+                  </>
+                )}
+              </div>
+            );
+          })}
         </div>
       </main>
 
@@ -205,7 +232,7 @@ export default function RectaOctoPad() {
         </div>
       )}
 
-      {/* STUDIO MODAL: 8パッド（2段）構成 */}
+      {/* STUDIO MODAL */}
       {isMPCVisible && (
         <div className="fixed inset-0 z-[1000] flex items-end justify-center pb-40 p-6 pointer-events-none">
           <div className="bg-white/5 backdrop-blur-3xl w-full max-w-sm p-8 rounded-[3.5rem] shadow-[0_20px_80px_rgba(0,0,0,0.15)] border border-white/20 pointer-events-auto animate-in slide-in-from-bottom-20 duration-700">
@@ -220,7 +247,6 @@ export default function RectaOctoPad() {
               <div className="text-[9px] text-black/20 font-mono italic">{track.length} / 32</div>
             </div>
 
-            {/* 💡 グリッド：4列×2段に変更 */}
             <div className="grid grid-cols-4 gap-4 mb-8">
               {pads.map((pad, i) => (
                 <div 

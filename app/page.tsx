@@ -36,14 +36,23 @@ export default function Room134() {
   return (
     <div className="min-h-screen bg-[#EBE8DB] text-[#2D2D2D] font-serif overflow-x-hidden selection:bg-black selection:text-white">
       <style jsx global>{`
-        /* カラムの隙間を広げて重なりを見えるようにする */
         .mosaic-wall { column-count: 2; column-gap: 2.5rem; } 
         @media (min-width: 768px) { .mosaic-wall { column-count: 4; } }
         .no-scrollbar::-webkit-scrollbar { display: none; }
       `}</style>
 
+      {/* 🏛 HEADER: Room134 */}
+      <header className={`fixed top-0 left-0 w-full z-[3000] p-8 transition-all duration-1000 ${creatorMode !== 'NONE' || viewingNode ? 'opacity-0 -translate-y-10 pointer-events-none' : 'opacity-100'}`}>
+        <h1 
+          onClick={() => window.location.reload()} 
+          className="text-[10px] font-black uppercase tracking-[0.5em] opacity-30 text-center cursor-pointer hover:opacity-100 transition-opacity"
+        >
+          Room134
+        </h1>
+      </header>
+
       {/* 1. MAIN WALL */}
-      <main className={`p-8 transition-all duration-1000 ${creatorMode !== 'NONE' || viewingNode ? 'opacity-5 blur-3xl scale-90 pointer-events-none' : 'opacity-100'}`}>
+      <main className={`p-8 pt-24 transition-all duration-1000 ${creatorMode !== 'NONE' || viewingNode ? 'opacity-5 blur-3xl scale-90 pointer-events-none' : 'opacity-100'}`}>
         <div className="mosaic-wall max-w-[120rem] mx-auto">
           {nodes.map(node => {
             const isTrack = node.image_url === 'TRACK_TYPE';
@@ -57,12 +66,10 @@ export default function Room134() {
             return (
               <div key={node.id} onClick={() => setViewingNode(node)} className="mb-14 break-inside-avoid relative group cursor-pointer transition-transform duration-300 active:scale-95">
                 
-                {/* 📦 BOX限定: 背後の重なりエフェクト (はっきり版) */}
+                {/* 📦 BOX限定: 背後の重なりエフェクト */}
                 {isBox && contents.length > 1 && (
                   <>
-                    {/* 2枚目 (濃いめのベージュ) */}
                     <div className="absolute inset-0 bg-[#DEDAC8] border border-black/10 rounded-sm translate-x-2.5 translate-y-2.5 rotate-[2deg] -z-10 transition-transform duration-300 group-hover:translate-x-5 group-hover:translate-y-5 group-hover:rotate-[4deg] shadow-sm"></div>
-                    {/* 3枚目 (さらに濃いめ) */}
                     <div className="absolute inset-0 bg-[#CECAB8] border border-black/10 rounded-sm translate-x-5 translate-y-5 rotate-[4deg] -z-20 transition-transform duration-500 group-hover:translate-x-10 group-hover:translate-y-10 group-hover:rotate-[8deg] shadow-sm"></div>
                   </>
                 )}
@@ -79,17 +86,14 @@ export default function Room134() {
                     </div>
                   )}
                   
-                  {/* BOXラベル */}
                   {isBox && (
                     <div className="absolute top-2 left-2 bg-black text-white px-2 py-1 rounded-full z-10 shadow-lg">
                        <span className="text-[7px] font-black uppercase tracking-widest leading-none">BOX: {contents.length}</span>
                     </div>
                   )}
 
-                  {/* TRACKアイコン */}
                   {isTrack && <div className="absolute inset-0 flex items-center justify-center bg-black/5 text-white/40 text-5xl font-light pointer-events-none group-hover:text-white/70 transition-colors">▷</div>}
                   
-                  {/* re ボタン (TRACKのみ) */}
                   {isTrack && (
                     <button onClick={(e) => {
                       e.stopPropagation();
@@ -153,7 +157,7 @@ export default function Room134() {
   );
 }
 
-// --- SUB COMPONENTS (Stable Logic) ---
+// --- SUB COMPONENTS ---
 
 function TrackPlayer({data, onComplete}: any) {
   const [idx, setIdx] = useState(0);

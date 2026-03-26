@@ -36,51 +36,68 @@ export default function Room134() {
   return (
     <div className="min-h-screen bg-[#EBE8DB] text-[#2D2D2D] font-serif overflow-x-hidden selection:bg-black selection:text-white">
       <style jsx global>{`
-        .mosaic-wall { column-count: 2; column-gap: 0.5rem; }
+        .mosaic-wall { column-count: 2; column-gap: 1rem; }
         @media (min-width: 768px) { .mosaic-wall { column-count: 4; } }
         .no-scrollbar::-webkit-scrollbar { display: none; }
       `}</style>
 
       {/* 1. MAIN WALL */}
-      <main className={`p-2 transition-all duration-1000 ${creatorMode !== 'NONE' || viewingNode ? 'opacity-5 blur-3xl scale-90 pointer-events-none' : 'opacity-100'}`}>
+      <main className={`p-4 transition-all duration-1000 ${creatorMode !== 'NONE' || viewingNode ? 'opacity-5 blur-3xl scale-90 pointer-events-none' : 'opacity-100'}`}>
         <div className="mosaic-wall max-w-[120rem] mx-auto">
           {nodes.map(node => {
             const isTrack = node.image_url === 'TRACK_TYPE';
             const isBox = node.image_url === 'BOX_TYPE';
             const contents = (isTrack || isBox) ? JSON.parse(node.description || '[]') : [];
             
-            // 💡 修正: ネタバレ防止ロジック
-            // 「画像を探す」のではなく「1コマ目（contents[0]）をそのまま映す」
+            // 💡 1コマ目重視ロジック (ネタバレ防止)
             const firstItem = contents[0];
             const thumb = (isTrack || isBox) ? firstItem?.image_url : node.image_url;
             const previewText = isTrack ? firstItem?.description : node.description;
 
             return (
-              <div key={node.id} onClick={() => setViewingNode(node)} className="mb-2 break-inside-avoid rounded-sm overflow-hidden active:scale-95 transition-all cursor-pointer border border-black/5 relative bg-[#F0EEE4] shadow-sm min-h-[120px]">
-                {thumb ? (
-                  <img src={thumb} className="w-full h-auto grayscale-[10%]" />
-                ) : (
-                  <div className="p-5 min-h-[150px] flex items-center justify-center text-center">
-                    <p className="text-[13px] leading-relaxed italic opacity-70">
-                      {previewText?.length > 45 ? previewText.substring(0, 45) + "..." : previewText}
-                    </p>
-                  </div>
-                )}
+              <div key={node.id} onClick={() => setViewingNode(node)} className="mb-8 break-inside-avoid relative group cursor-pointer">
                 
-                {isTrack && <div className="absolute inset-0 flex items-center justify-center bg-black/5 text-white/40 text-4xl font-light pointer-events-none">▷</div>}
-                {isBox && <div className="absolute inset-0 flex items-center justify-center bg-white/5 text-black/20 text-4xl font-light pointer-events-none">▢</div>}
-                
-                {isTrack && (
-                  <button onClick={(e) => {
-                    e.stopPropagation();
-                    setTrackData([...contents]);
-                    const uniqueImages = Array.from(new Set(contents.filter((s:any)=>s.image_url).map((s:any)=>s.image_url))).slice(0,8);
-                    const newPads = Array(8).fill(null);
-                    uniqueImages.forEach((url, i) => { newPads[i] = { id: Date.now()+i, image_url: url as string }; });
-                    setPads(newPads);
-                    setCreatorMode('TRACK');
-                  }} className="absolute bottom-2 right-2 bg-black text-white text-[8px] px-2 py-1 rounded-full font-black uppercase z-10 shadow-lg">re</button>
+                {/* 📦 BOX限定: 背後の重なりエフェクト */}
+                {isBox && contents.length > 1 && (
+                  <>
+                    <div className="absolute inset-0 bg-black/5 border border-black/5 rounded-sm translate-x-1.5 translate-y-1.5 rotate-1 scale-[0.98] -z-10 transition-transform duration-500 group-hover:translate-x-3 group-hover:translate-y-3 group-hover:rotate-2"></div>
+                    <div className="absolute inset-0 bg-black/5 border border-black/5 rounded-sm translate-x-3 translate-y-3 rotate-2 scale-[0.96] -z-20 transition-transform duration-700 group-hover:translate-x-6 group-hover:translate-y-6 group-hover:rotate-3"></div>
+                  </>
                 )}
+
+                {/* メインカード */}
+                <div className="rounded-sm overflow-hidden active:scale-95 transition-all duration-500 border border-black/5 bg-[#F0EEE4] shadow-sm relative z-0">
+                  {thumb ? (
+                    <img src={thumb} className="w-full h-auto grayscale-[10%] group-hover:grayscale-0 transition-all duration-700" />
+                  ) : (
+                    <div className="p-6 min-h-[160px] flex items-center justify-center text-center">
+                      <p className="text-[13px] leading-relaxed italic opacity-60 group-hover:opacity-100 transition-opacity">
+                        {previewText?.length > 50 ? previewText.substring(0, 50) + "..." : previewText}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {/* オーバーレイ要素 */}
+                  {isTrack && <div className="absolute inset-0 flex items-center justify-center bg-black/5 text-white/40 text-4xl font-light pointer-events-none">▷</div>}
+                  
+                  {isBox && (
+                    <div className="absolute top-2 left-2 bg-black/80 backdrop-blur-md px-2 py-0.5 rounded-full shadow-xl">
+                       <span className="text-[7px] font-black text-white uppercase tracking-widest leading-none">Box: {contents.length}</span>
+                    </div>
+                  )}
+                  
+                  {isTrack && (
+                    <button onClick={(e) => {
+                      e.stopPropagation();
+                      setTrackData([...contents]);
+                      const uniqueImages = Array.from(new Set(contents.filter((s:any)=>s.image_url).map((s:any)=>s.image_url))).slice(0,8);
+                      const newPads = Array(8).fill(null);
+                      uniqueImages.forEach((url, i) => { newPads[i] = { id: Date.now()+i, image_url: url as string }; });
+                      setPads(newPads);
+                      setCreatorMode('TRACK');
+                    }} className="absolute bottom-2 right-2 bg-black text-white text-[8px] px-2 py-1 rounded-full font-black uppercase z-10 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">re</button>
+                  )}
+                </div>
               </div>
             );
           })}
@@ -131,6 +148,8 @@ export default function Room134() {
     </div>
   );
 }
+
+// --- SUB COMPONENTS (Logic remains stable) ---
 
 function TrackPlayer({data, onComplete}: any) {
   const [idx, setIdx] = useState(0);

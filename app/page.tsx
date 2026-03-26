@@ -36,13 +36,15 @@ export default function Room134() {
   return (
     <div className="min-h-screen bg-[#EBE8DB] text-[#2D2D2D] font-serif overflow-x-hidden selection:bg-black selection:text-white">
       <style jsx global>{`
-        .mosaic-wall { column-count: 2; column-gap: 2.5rem; } 
-        @media (min-width: 768px) { .mosaic-wall { column-count: 4; } }
+        /* 間隔を極限まで狭める (0.5rem = 8px) */
+        .mosaic-wall { column-count: 2; column-gap: 0.5rem; } 
+        @media (min-width: 768px) { .mosaic-wall { column-count: 4; column-gap: 0.75rem; } }
+        @media (min-width: 1200px) { .mosaic-wall { column-count: 6; column-gap: 0.75rem; } }
         .no-scrollbar::-webkit-scrollbar { display: none; }
       `}</style>
 
-      {/* 🏛 HEADER: Room134 */}
-      <header className={`fixed top-0 left-0 w-full z-[3000] p-8 transition-all duration-1000 ${creatorMode !== 'NONE' || viewingNode ? 'opacity-0 -translate-y-10 pointer-events-none' : 'opacity-100'}`}>
+      {/* 🏛 HEADER */}
+      <header className={`fixed top-0 left-0 w-full z-[3000] p-6 transition-all duration-1000 ${creatorMode !== 'NONE' || viewingNode ? 'opacity-0 -translate-y-10 pointer-events-none' : 'opacity-100'}`}>
         <h1 
           onClick={() => window.location.reload()} 
           className="text-[10px] font-black uppercase tracking-[0.5em] opacity-30 text-center cursor-pointer hover:opacity-100 transition-opacity"
@@ -52,8 +54,8 @@ export default function Room134() {
       </header>
 
       {/* 1. MAIN WALL */}
-      <main className={`p-8 pt-24 transition-all duration-1000 ${creatorMode !== 'NONE' || viewingNode ? 'opacity-5 blur-3xl scale-90 pointer-events-none' : 'opacity-100'}`}>
-        <div className="mosaic-wall max-w-[120rem] mx-auto">
+      <main className={`p-2 pt-20 transition-all duration-1000 ${creatorMode !== 'NONE' || viewingNode ? 'opacity-5 blur-3xl scale-90 pointer-events-none' : 'opacity-100'}`}>
+        <div className="mosaic-wall max-w-[140rem] mx-auto">
           {nodes.map(node => {
             const isTrack = node.image_url === 'TRACK_TYPE';
             const isBox = node.image_url === 'BOX_TYPE';
@@ -64,35 +66,36 @@ export default function Room134() {
             const previewText = isTrack ? firstItem?.description : node.description;
 
             return (
-              <div key={node.id} onClick={() => setViewingNode(node)} className="mb-14 break-inside-avoid relative group cursor-pointer transition-transform duration-300 active:scale-95">
+              /* mb-2 で上下の間隔も詰め、z-index管理で重なりが下に来るように調整 */
+              <div key={node.id} onClick={() => setViewingNode(node)} className="mb-2 break-inside-avoid relative group cursor-pointer active:scale-[0.98] transition-transform">
                 
-                {/* 📦 BOX限定: 背後の重なりエフェクト */}
+                {/* 📦 BOX限定: 背後の重なりエフェクト (密着に合わせて控えめに調整) */}
                 {isBox && contents.length > 1 && (
                   <>
-                    <div className="absolute inset-0 bg-[#DEDAC8] border border-black/10 rounded-sm translate-x-2.5 translate-y-2.5 rotate-[2deg] -z-10 transition-transform duration-300 group-hover:translate-x-5 group-hover:translate-y-5 group-hover:rotate-[4deg] shadow-sm"></div>
-                    <div className="absolute inset-0 bg-[#CECAB8] border border-black/10 rounded-sm translate-x-5 translate-y-5 rotate-[4deg] -z-20 transition-transform duration-500 group-hover:translate-x-10 group-hover:translate-y-10 group-hover:rotate-[8deg] shadow-sm"></div>
+                    <div className="absolute inset-0 bg-black/10 border border-black/5 rounded-sm translate-x-1 translate-y-1 rotate-[1deg] -z-10 group-hover:translate-x-2 group-hover:translate-y-2 group-hover:rotate-[2deg] transition-transform"></div>
+                    <div className="absolute inset-0 bg-black/5 border border-black/5 rounded-sm translate-x-2 translate-y-2 rotate-[2deg] -z-20 group-hover:translate-x-3 group-hover:translate-y-3 group-hover:rotate-[3deg] transition-transform"></div>
                   </>
                 )}
 
                 {/* メインカード本体 */}
-                <div className="relative z-0 rounded-sm overflow-hidden bg-[#F0EEE4] border border-black/10 shadow-md">
+                <div className="relative z-0 rounded-sm overflow-hidden bg-[#F0EEE4] border border-black/10 shadow-sm">
                   {thumb ? (
-                    <img src={thumb} className="w-full h-auto grayscale-[10%] group-hover:grayscale-0 transition-all duration-700" />
+                    <img src={thumb} className="w-full h-auto grayscale-[20%] group-hover:grayscale-0 transition-all duration-500" />
                   ) : (
-                    <div className="p-6 min-h-[160px] flex items-center justify-center text-center">
-                      <p className="text-[13px] leading-relaxed italic opacity-60 group-hover:opacity-100 transition-opacity">
-                        {previewText?.length > 50 ? previewText.substring(0, 50) + "..." : previewText}
+                    <div className="p-4 min-h-[120px] flex items-center justify-center text-center">
+                      <p className="text-[11px] leading-snug italic opacity-60 group-hover:opacity-100 transition-opacity">
+                        {previewText?.length > 40 ? previewText.substring(0, 40) + "..." : previewText}
                       </p>
                     </div>
                   )}
                   
                   {isBox && (
-                    <div className="absolute top-2 left-2 bg-black text-white px-2 py-1 rounded-full z-10 shadow-lg">
-                       <span className="text-[7px] font-black uppercase tracking-widest leading-none">BOX: {contents.length}</span>
+                    <div className="absolute top-1.5 left-1.5 bg-black/80 text-white px-1.5 py-0.5 rounded-sm z-10">
+                       <span className="text-[6px] font-black uppercase tracking-tighter leading-none">{contents.length}</span>
                     </div>
                   )}
 
-                  {isTrack && <div className="absolute inset-0 flex items-center justify-center bg-black/5 text-white/40 text-5xl font-light pointer-events-none group-hover:text-white/70 transition-colors">▷</div>}
+                  {isTrack && <div className="absolute inset-0 flex items-center justify-center bg-black/5 text-white/30 text-3xl font-light pointer-events-none group-hover:text-white/60 transition-colors">▷</div>}
                   
                   {isTrack && (
                     <button onClick={(e) => {
@@ -103,7 +106,7 @@ export default function Room134() {
                       uniqueImages.forEach((url, i) => { newPads[i] = { id: Date.now()+i, image_url: url as string }; });
                       setPads(newPads);
                       setCreatorMode('TRACK');
-                    }} className="absolute bottom-2 right-2 bg-black text-white text-[8px] px-2 py-1 rounded-full font-black uppercase z-10 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">re</button>
+                    }} className="absolute bottom-1.5 right-1.5 bg-black text-white text-[7px] px-1.5 py-0.5 rounded-sm font-black uppercase z-10 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg">re</button>
                   )}
                 </div>
               </div>
@@ -112,7 +115,7 @@ export default function Room134() {
         </div>
       </main>
 
-      {/* 2. VIEWER LAYER */}
+      {/* 2. VIEWER LAYER (変更なし) */}
       {viewingNode && (
         <div className="fixed inset-0 z-[5000] bg-[#EBE8DB] flex flex-col animate-in fade-in duration-700">
           <div className="flex-grow flex items-center justify-center overflow-hidden">
@@ -133,7 +136,7 @@ export default function Room134() {
         </div>
       )}
 
-      {/* 3. MENU ◎ */}
+      {/* 3. MENU ◎ (変更なし) */}
       {!viewingNode && (
         <nav className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[4000] flex flex-col items-center">
           {creatorMode === 'NONE' ? (
@@ -149,7 +152,7 @@ export default function Room134() {
         </nav>
       )}
 
-      {/* 4. CREATORS */}
+      {/* 4. CREATORS (変更なし) */}
       {creatorMode === 'NODE' && <NodeCreator onPost={(p:any)=>handlePost('NODE', p)} onCancel={()=>setCreatorMode('NONE')} />}
       {creatorMode === 'TRACK' && <TrackCreator pads={pads} setPads={setPads} trackData={trackData} setTrackData={setTrackData} onRelease={(p:any)=>handlePost('TRACK_TYPE', p)} onCancel={()=>setCreatorMode('NONE')} />}
       {creatorMode === 'BOX' && <BoxCreator onRelease={(p:any)=>handlePost('BOX_TYPE', p)} onCancel={()=>setCreatorMode('NONE')} />}
@@ -157,7 +160,7 @@ export default function Room134() {
   );
 }
 
-// --- SUB COMPONENTS ---
+// --- SUB COMPONENTS (Logic remains stable) ---
 
 function TrackPlayer({data, onComplete}: any) {
   const [idx, setIdx] = useState(0);

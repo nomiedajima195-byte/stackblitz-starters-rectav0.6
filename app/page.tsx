@@ -7,13 +7,12 @@ const supabaseUrl = 'https://pfxwhcgdbavycddapqmz.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmeHdoY2dkYmF2eWNkZGFwcW16Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxNjQ0NzUsImV4cCI6MjA4Mjc0MDQ3NX0.YNQlbyocg2olS6-1WxTnbr5N2z52XcVIpI1XR-XrDtM';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-export default function Room134MenuFix() {
+export default function Room134FullEngine() {
   const [nodes, setNodes] = useState<any[]>([]);
   const [viewingNode, setViewingNode] = useState<any | null>(null);
-  
-  // モード管理: NONE (壁) -> MENU (選択) -> 各作成画面
   const [creatorMode, setCreatorMode] = useState<'NONE' | 'MENU' | 'NODE' | 'TRACK' | 'BOX'>('NONE');
   
+  // スタジオ共有データ
   const [pads, setPads] = useState<(any | null)[]>(Array(8).fill(null));
   const [trackData, setTrackData] = useState<any[]>([]);
 
@@ -37,15 +36,15 @@ export default function Room134MenuFix() {
   };
 
   return (
-    <div className="min-h-screen bg-[#EBE8DB] text-[#2D2D2D] font-serif overflow-x-hidden">
+    <div className="min-h-screen bg-[#EBE8DB] text-[#2D2D2D] font-serif overflow-x-hidden selection:bg-black selection:text-white">
       <style jsx global>{`
         .mosaic-wall { column-count: 2; column-gap: 0.5rem; }
         @media (min-width: 768px) { .mosaic-wall { column-count: 4; } }
         .no-scrollbar::-webkit-scrollbar { display: none; }
       `}</style>
 
-      {/* MAIN WALL */}
-      <main className={`p-2 transition-all duration-700 ${creatorMode !== 'NONE' || viewingNode ? 'opacity-5 blur-3xl scale-90 pointer-events-none' : 'opacity-100'}`}>
+      {/* 1. MAIN WALL (Mosaic) */}
+      <main className={`p-2 transition-all duration-1000 ${creatorMode !== 'NONE' || viewingNode ? 'opacity-5 blur-3xl scale-90 pointer-events-none' : 'opacity-100'}`}>
         <div className="mosaic-wall max-w-[120rem] mx-auto">
           {nodes.map(node => {
             const isTrack = node.image_url === 'TRACK_TYPE';
@@ -57,6 +56,7 @@ export default function Room134MenuFix() {
               <div key={node.id} onClick={() => setViewingNode(node)} className="mb-2 break-inside-avoid rounded-sm overflow-hidden active:scale-95 transition-all cursor-pointer border border-black/5 relative bg-[#EDE9D9]">
                 {thumb && <img src={thumb} className="w-full h-auto grayscale-[10%]" />}
                 {!thumb && node.description && <div className="p-4 text-[11px] italic opacity-50 leading-relaxed">{node.description}</div>}
+                
                 {isTrack && <div className="absolute inset-0 flex items-center justify-center bg-black/10 text-white text-3xl font-light">▷</div>}
                 {isBox && <div className="absolute inset-0 flex items-center justify-center bg-white/10 text-black text-3xl font-light">▢</div>}
                 
@@ -77,40 +77,45 @@ export default function Room134MenuFix() {
         </div>
       </main>
 
-      {/* VIEWER (再生・閲覧) */}
+      {/* 2. VIEWER LAYER (Node / Track / Box) */}
       {viewingNode && (
-        <div className="fixed inset-0 z-[5000] bg-[#EBE8DB] flex flex-col animate-in fade-in duration-500">
+        <div className="fixed inset-0 z-[5000] bg-[#EBE8DB] flex flex-col animate-in fade-in duration-700">
           <div className="flex-grow flex items-center justify-center overflow-hidden">
-            {viewingNode.image_url === 'TRACK_TYPE' ? <TrackPlayer data={JSON.parse(viewingNode.description)} /> : 
-             viewingNode.image_url === 'BOX_TYPE' ? <BoxViewer data={JSON.parse(viewingNode.description)} /> : 
-             <div className="max-w-4xl w-full p-6 text-center" onClick={() => setViewingNode(null)}>
+            {viewingNode.image_url === 'TRACK_TYPE' ? (
+               <TrackPlayer data={JSON.parse(viewingNode.description)} onComplete={() => setViewingNode(null)} />
+            ) : viewingNode.image_url === 'BOX_TYPE' ? (
+               <BoxViewer data={JSON.parse(viewingNode.description)} />
+            ) : (
+              <div className="max-w-4xl w-full p-6 text-center animate-in zoom-in-95" onClick={() => setViewingNode(null)}>
                 {viewingNode.image_url && <img src={viewingNode.image_url} className="max-h-[85vh] mx-auto object-contain shadow-2xl rounded-sm" />}
                 {viewingNode.description && <p className="mt-8 text-lg italic opacity-40 px-10 leading-relaxed">{viewingNode.description}</p>}
-             </div>}
+              </div>
+            )}
           </div>
+          {/* 下部の◎ボタン（Track以外で表示、Trackは自動で閉じるため） */}
           <div className="h-32 flex items-center justify-center">
-            <button onClick={() => setViewingNode(null)} className="w-14 h-14 bg-black text-white rounded-full flex items-center justify-center text-2xl shadow-xl active:scale-90 transition-all border border-white/10">◎</button>
+            <button onClick={() => setViewingNode(null)} className="w-14 h-14 bg-black text-white rounded-full flex items-center justify-center text-2xl shadow-xl active:scale-90 transition-all">◎</button>
           </div>
         </div>
       )}
 
-      {/* UNIVERSAL CREATOR ◎ */}
+      {/* 3. UNIVERSAL CREATOR ◎ */}
       {!viewingNode && (
         <nav className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[4000] flex flex-col items-center">
           {creatorMode === 'NONE' ? (
-            <button onClick={() => setCreatorMode('MENU')} className="w-16 h-16 bg-black text-white rounded-full flex items-center justify-center text-3xl shadow-2xl active:scale-90 transition-all border border-white/5">◎</button>
+            <button onClick={() => setCreatorMode('MENU')} className="w-16 h-16 bg-black text-white rounded-full flex items-center justify-center text-3xl shadow-2xl active:scale-90 transition-all border border-white/5 shadow-black/20">◎</button>
           ) : creatorMode === 'MENU' ? (
             <div className="flex space-x-4 bg-white/90 backdrop-blur-2xl p-3 rounded-full shadow-2xl border border-black/5 animate-in slide-in-from-bottom-10">
-              <button onClick={() => setCreatorMode('NODE')} className="px-6 py-3 bg-black text-white text-[9px] font-black uppercase rounded-full tracking-widest transition-all hover:scale-105 active:scale-95">Node</button>
-              <button onClick={() => setCreatorMode('TRACK')} className="px-6 py-3 bg-black text-white text-[9px] font-black uppercase rounded-full tracking-widest transition-all hover:scale-105 active:scale-95">Track</button>
-              <button onClick={() => setCreatorMode('BOX')} className="px-6 py-3 bg-[#EBE8DB] text-black text-[9px] font-black uppercase rounded-full tracking-widest border border-black/5 transition-all hover:scale-105 active:scale-95">Box</button>
+              <button onClick={() => setCreatorMode('NODE')} className="px-6 py-3 bg-black text-white text-[9px] font-black uppercase rounded-full tracking-widest hover:scale-105 active:scale-95 transition-all">Node</button>
+              <button onClick={() => setCreatorMode('TRACK')} className="px-6 py-3 bg-black text-white text-[9px] font-black uppercase rounded-full tracking-widest hover:scale-105 active:scale-95 transition-all">Track</button>
+              <button onClick={() => setCreatorMode('BOX')} className="px-6 py-3 bg-[#EBE8DB] text-black text-[9px] font-black uppercase rounded-full tracking-widest border border-black/5 hover:scale-105 active:scale-95 transition-all">Box</button>
               <button onClick={() => setCreatorMode('NONE')} className="px-4 py-3 text-[9px] font-black uppercase opacity-20 hover:opacity-100 transition-opacity">✕</button>
             </div>
           ) : null}
         </nav>
       )}
 
-      {/* CREATOR SCREENS */}
+      {/* 4. CREATOR SCREENS */}
       {creatorMode === 'NODE' && <NodeCreator onPost={(p:any)=>handlePost('NODE', p)} onCancel={()=>setCreatorMode('NONE')} />}
       {creatorMode === 'TRACK' && <TrackCreator pads={pads} setPads={setPads} trackData={trackData} setTrackData={setTrackData} onRelease={(p:any)=>handlePost('TRACK_TYPE', p)} onCancel={()=>setCreatorMode('NONE')} />}
       {creatorMode === 'BOX' && <BoxCreator onRelease={(p:any)=>handlePost('BOX_TYPE', p)} onCancel={()=>setCreatorMode('NONE')} />}
@@ -118,8 +123,8 @@ export default function Room134MenuFix() {
   );
 }
 
-// --- SUB COMPONENTS (NodeCreator, TrackCreator, BoxCreator, etc.) ---
-// ※以下、以前の全要件を盛り込んだ詳細なコンポーネント群をすべて含みます。
+// --- SUB COMPONENTS ---
+
 function NodeCreator({onPost, onCancel}: any) {
   const [text, setText] = useState('');
   const [file, setFile] = useState<File | null>(null);
@@ -142,7 +147,6 @@ function NodeCreator({onPost, onCancel}: any) {
         <button onClick={onCancel} className="text-[9px] font-black uppercase opacity-30">Cancel</button>
         <button onClick={handlePost} disabled={loading} className="text-[10px] font-black uppercase border-b border-black/20 pb-1">{loading ? '...' : 'Post'}</button>
       </div>
-      {file && <div className="mt-4 text-[8px] opacity-30 uppercase tracking-widest">{file.name}</div>}
     </div>
   );
 }
@@ -163,7 +167,7 @@ function TrackCreator({pads, setPads, trackData, setTrackData, onRelease, onCanc
   };
   return (
     <div className="fixed inset-0 z-[4500] bg-black/10 backdrop-blur-3xl flex items-center justify-center p-4">
-      <div className="bg-white/90 w-full max-w-xs p-8 rounded-[3.5rem] shadow-2xl border border-white/20">
+      <div className="bg-white/90 w-full max-w-xs p-8 rounded-[3.5rem] shadow-2xl border border-white/20 animate-in zoom-in-95">
         <div className="flex justify-between items-center mb-8">
            <button onClick={()=>setIsRecording(!isRecording)} className={`text-[9px] font-black uppercase px-5 py-2.5 rounded-full transition-all ${isRecording ? 'bg-red-500 text-white shadow-lg animate-pulse' : 'bg-black text-white'}`}>{isRecording ? 'Rec...' : 'Start Rec'}</button>
            <div className="text-[10px] font-black opacity-20 tabular-nums">{trackData.length}/32</div>
@@ -211,17 +215,31 @@ function BoxCreator({onRelease, onCancel}: any) {
   );
 }
 
-function TrackPlayer({data}: any) {
+function TrackPlayer({data, onComplete}: any) {
   const [idx, setIdx] = useState(0);
   useEffect(() => {
-    if(!data || data.length === 0) return;
-    const t = setInterval(() => setIdx(v => (v + 1) % data.length), 500);
-    return () => clearInterval(t);
-  }, [data]);
+    if(!data || data.length === 0) { onComplete(); return; }
+    const timer = setInterval(() => {
+      setIdx(v => {
+        if (v >= data.length - 1) {
+          clearInterval(timer);
+          setTimeout(onComplete, 600); // 最後の余韻
+          return v;
+        }
+        return v + 1;
+      });
+    }, 500);
+    return () => clearInterval(timer);
+  }, [data, onComplete]);
+
   const current = data[idx];
   return (
     <div className="w-full h-full flex flex-col items-center justify-center p-4">
-        {current?.image_url ? <img src={current.image_url} className="max-h-[80vh] max-w-full object-contain shadow-2xl rounded-sm" /> : <div className="text-2xl italic opacity-40 px-10 text-center">{current?.description}</div>}
+        {current?.image_url ? (
+          <img key={idx} src={current.image_url} className="max-h-[80vh] max-w-full object-contain shadow-2xl rounded-sm animate-in fade-in duration-300" />
+        ) : (
+          <div className="text-2xl italic opacity-40 px-10 text-center">{current?.description}</div>
+        )}
     </div>
   );
 }

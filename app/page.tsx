@@ -48,22 +48,27 @@ export default function Room134() {
             const isTrack = node.image_url === 'TRACK_TYPE';
             const isBox = node.image_url === 'BOX_TYPE';
             const contents = (isTrack || isBox) ? JSON.parse(node.description || '[]') : [];
-            const firstImg = contents.find((c: any) => c.image_url)?.image_url;
-            const thumb = (isTrack || isBox) ? firstImg : node.image_url;
+            
+            // 💡 修正: ネタバレ防止ロジック
+            // 「画像を探す」のではなく「1コマ目（contents[0]）をそのまま映す」
+            const firstItem = contents[0];
+            const thumb = (isTrack || isBox) ? firstItem?.image_url : node.image_url;
+            const previewText = isTrack ? firstItem?.description : node.description;
 
             return (
-              <div key={node.id} onClick={() => setViewingNode(node)} className="mb-2 break-inside-avoid rounded-sm overflow-hidden active:scale-95 transition-all cursor-pointer border border-black/5 relative bg-[#F0EEE4] shadow-sm">
+              <div key={node.id} onClick={() => setViewingNode(node)} className="mb-2 break-inside-avoid rounded-sm overflow-hidden active:scale-95 transition-all cursor-pointer border border-black/5 relative bg-[#F0EEE4] shadow-sm min-h-[120px]">
                 {thumb ? (
                   <img src={thumb} className="w-full h-auto grayscale-[10%]" />
                 ) : (
-                  <div className="p-5 min-h-[140px] flex items-center justify-center text-center">
+                  <div className="p-5 min-h-[150px] flex items-center justify-center text-center">
                     <p className="text-[13px] leading-relaxed italic opacity-70">
-                      {isTrack ? "TRACK" : (node.description?.length > 40 ? node.description.substring(0, 40) + "..." : node.description)}
+                      {previewText?.length > 45 ? previewText.substring(0, 45) + "..." : previewText}
                     </p>
                   </div>
                 )}
-                {isTrack && <div className="absolute inset-0 flex items-center justify-center bg-black/5 text-white text-3xl font-light">▷</div>}
-                {isBox && <div className="absolute inset-0 flex items-center justify-center bg-white/5 text-black text-3xl font-light">▢</div>}
+                
+                {isTrack && <div className="absolute inset-0 flex items-center justify-center bg-black/5 text-white/40 text-4xl font-light pointer-events-none">▷</div>}
+                {isBox && <div className="absolute inset-0 flex items-center justify-center bg-white/5 text-black/20 text-4xl font-light pointer-events-none">▢</div>}
                 
                 {isTrack && (
                   <button onClick={(e) => {
@@ -74,7 +79,7 @@ export default function Room134() {
                     uniqueImages.forEach((url, i) => { newPads[i] = { id: Date.now()+i, image_url: url as string }; });
                     setPads(newPads);
                     setCreatorMode('TRACK');
-                  }} className="absolute bottom-2 right-2 bg-black text-white text-[8px] px-2 py-1 rounded-full font-black uppercase z-10">re</button>
+                  }} className="absolute bottom-2 right-2 bg-black text-white text-[8px] px-2 py-1 rounded-full font-black uppercase z-10 shadow-lg">re</button>
                 )}
               </div>
             );
@@ -98,7 +103,7 @@ export default function Room134() {
             )}
           </div>
           <div className="h-32 flex items-center justify-center">
-            <button onClick={() => setViewingNode(null)} className="w-14 h-14 bg-black text-white rounded-full flex items-center justify-center text-2xl shadow-xl active:scale-90 transition-all">◎</button>
+            <button onClick={() => setViewingNode(null)} className="w-14 h-14 bg-black text-white rounded-full flex items-center justify-center text-2xl shadow-xl active:scale-90 transition-all border border-white/10">◎</button>
           </div>
         </div>
       )}
@@ -107,7 +112,7 @@ export default function Room134() {
       {!viewingNode && (
         <nav className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[4000] flex flex-col items-center">
           {creatorMode === 'NONE' ? (
-            <button onClick={() => setCreatorMode('MENU')} className="w-16 h-16 bg-black text-white rounded-full flex items-center justify-center text-3xl shadow-2xl active:scale-90 transition-all">◎</button>
+            <button onClick={() => setCreatorMode('MENU')} className="w-16 h-16 bg-black text-white rounded-full flex items-center justify-center text-3xl shadow-2xl active:scale-90 transition-all border border-white/5">◎</button>
           ) : creatorMode === 'MENU' ? (
             <div className="flex space-x-4 bg-white/90 backdrop-blur-2xl p-3 rounded-full shadow-2xl border border-black/5 animate-in slide-in-from-bottom-10">
               <button onClick={() => setCreatorMode('NODE')} className="px-6 py-3 bg-black text-white text-[9px] font-black uppercase rounded-full tracking-widest transition-all">Node</button>
@@ -127,7 +132,6 @@ export default function Room134() {
   );
 }
 
-// --- SUB COMPONENTS (Player, Viewer, Creators) は安定版を継続 ---
 function TrackPlayer({data, onComplete}: any) {
   const [idx, setIdx] = useState(0);
   useEffect(() => {
@@ -146,7 +150,7 @@ function TrackPlayer({data, onComplete}: any) {
       {current?.image_url ? (
         <img key={idx} src={current.image_url} className="max-h-[80vh] max-w-full object-contain animate-in fade-in duration-300" />
       ) : (
-        <div className="text-3xl italic opacity-30 text-center">{current?.description || "..."}</div>
+        <div key={idx} className="text-3xl italic opacity-30 text-center px-12 leading-relaxed animate-in fade-in duration-500">{current?.description || "..."}</div>
       )}
     </div>
   );
@@ -207,19 +211,19 @@ function TrackCreator({pads, setPads, trackData, setTrackData, onRelease, onCanc
   };
   return (
     <div className="fixed inset-0 z-[4500] bg-black/10 backdrop-blur-3xl flex items-center justify-center p-4">
-      <div className="bg-white/95 w-full max-w-xs p-8 rounded-[3.5rem] shadow-2xl animate-in zoom-in-95">
+      <div className="bg-white/95 w-full max-w-xs p-8 rounded-[3.5rem] shadow-2xl animate-in zoom-in-95 border border-white/20">
         <div className="flex justify-between items-center mb-8">
-           <button onClick={()=>setIsRecording(!isRecording)} className={`text-[9px] font-black uppercase px-5 py-2.5 rounded-full ${isRecording ? 'bg-red-500 text-white animate-pulse' : 'bg-black text-white'}`}>{isRecording ? 'Rec...' : 'Start Rec'}</button>
-           <div className="text-[10px] font-black opacity-20">{trackData.length}/32</div>
+           <button onClick={()=>setIsRecording(!isRecording)} className={`text-[9px] font-black uppercase px-5 py-2.5 rounded-full shadow-sm transition-all ${isRecording ? 'bg-red-500 text-white animate-pulse' : 'bg-black text-white'}`}>{isRecording ? 'Rec...' : 'Start Rec'}</button>
+           <div className="text-[10px] font-black opacity-20 tabular-nums">{trackData.length}/32</div>
         </div>
         <div className="grid grid-cols-4 gap-3 mb-10">
           {pads.map((p:any, i:number) => (
-            <div key={i} onMouseDown={()=>triggerPad(i)} className={`aspect-square rounded-2xl border flex items-center justify-center relative overflow-hidden active:scale-90 cursor-pointer ${p ? 'bg-white border-black/10 shadow-sm' : 'bg-black/5 border-dashed border-black/10'}`}>
-              {p?.image_url ? <img src={p.image_url} className="w-full h-full object-cover" /> : <label className="w-full h-full flex items-center justify-center cursor-pointer opacity-10">＋<input type="file" className="hidden" onChange={e=>e.target.files?.[0] && handleFile(i, e.target.files[0])} /></label>}
+            <div key={i} onMouseDown={()=>triggerPad(i)} className={`aspect-square rounded-2xl border transition-all flex items-center justify-center relative overflow-hidden active:scale-90 cursor-pointer ${p ? 'bg-white border-black/10 shadow-sm' : 'bg-black/5 border-dashed border-black/10'}`}>
+              {p?.image_url ? <img src={p.image_url} className="w-full h-full object-cover opacity-80" /> : <label className="w-full h-full flex items-center justify-center cursor-pointer opacity-10 hover:opacity-40 transition-opacity">＋<input type="file" className="hidden" onChange={e=>e.target.files?.[0] && handleFile(i, e.target.files[0])} /></label>}
             </div>
           ))}
         </div>
-        <button onClick={()=>onRelease({description: JSON.stringify(trackData)})} className="w-full py-4 bg-black text-white text-[9px] font-black uppercase tracking-[0.3em] rounded-2xl mb-2 shadow-lg active:scale-95 transition-all">Release</button>
+        <button onClick={()=>onRelease({description: JSON.stringify(trackData)})} className="w-full py-4 bg-black text-white text-[9px] font-black uppercase tracking-[0.3em] rounded-2xl mb-2 shadow-xl active:scale-95 transition-all">Release Track</button>
         <button onClick={onCancel} className="w-full py-2 text-[8px] font-black uppercase opacity-20">Cancel</button>
       </div>
     </div>
@@ -242,12 +246,12 @@ function BoxCreator({onRelease, onCancel}: any) {
        <div className="w-full max-w-6xl overflow-x-auto no-scrollbar py-10 flex space-x-6 snap-x snap-proximity">
          {boxItems.map((item, i) => (
            <div key={i} className="flex-shrink-0 w-56 aspect-[3/4] border border-black/5 bg-white shadow-sm rounded-sm flex items-center justify-center overflow-hidden snap-center relative">
-             {item?.image_url ? <img src={item.image_url} className="w-full h-full object-cover" /> : <label className="w-full h-full flex items-center justify-center text-3xl opacity-5 cursor-pointer">＋<input type="file" className="hidden" onChange={e=>e.target.files?.[0] && handleFile(i, e.target.files[0])} /></label>}
+             {item?.image_url ? <img src={item.image_url} className="w-full h-full object-cover" /> : <label className="w-full h-full flex items-center justify-center text-3xl opacity-5 hover:opacity-20 cursor-pointer transition-opacity">＋<input type="file" className="hidden" onChange={e=>e.target.files?.[0] && handleFile(i, e.target.files[0])} /></label>}
            </div>
          ))}
        </div>
        <div className="mt-12 flex items-center space-x-10">
-          <button onClick={onCancel} className="text-[10px] font-black uppercase opacity-20">Cancel</button>
+          <button onClick={onCancel} className="text-[10px] font-black uppercase opacity-20 tracking-widest">Cancel</button>
           <button onClick={async ()=>{setLoading(true); await onRelease({description: JSON.stringify(boxItems.filter(i=>i!==null))});}} disabled={loading} className="px-10 py-4 bg-black text-white text-[10px] font-black uppercase rounded-full tracking-[0.2em] shadow-xl active:scale-95 transition-all">{loading ? '...' : 'Release Box'}</button>
        </div>
     </div>

@@ -7,7 +7,7 @@ const supabaseUrl = 'https://pfxwhcgdbavycddapqmz.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmeHdoY2dkYmF2eWNkZGFwcW16Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxNjQ0NzUsImV4cCI6MjA4Mjc0MDQ3NX0.YNQlbyocg2olS6-1WxTnbr5N2z52XcVIpI1XR-XrDtM';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-export default function Room134Serendipity() {
+export default function Room134Fixed() {
   const [nodes, setNodes] = useState<any[]>([]);
   const [pads, setPads] = useState<(any | null)[]>(Array(8).fill(null));
   const [isMPCVisible, setIsMPCVisible] = useState(false);
@@ -15,6 +15,7 @@ export default function Room134Serendipity() {
   const [showSerendipity, setShowSerendipity] = useState(false);
   const [serenArticle, setSerenArticle] = useState<any>(null);
   const [canSample, setCanSample] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const fetchData = useCallback(async () => {
@@ -24,39 +25,10 @@ export default function Room134Serendipity() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // --- 07734 ENGINE LOGIC ---
-  const fetchRandomSerendipity = async () => {
-    setSerenArticle(null); setCanSample(false);
-    try {
-      const res = await fetch(`https://ja.wikipedia.org/w/api.php?action=query&format=json&list=random&rnnamespace=0&rnlimit=1&origin=*`);
-      const data = await res.json();
-      const pageid = data.query.random[0].id;
-      const contentRes = await fetch(`https://ja.wikipedia.org/w/api.php?action=query&format=json&prop=extracts&explaintext&pageids=${pageid}&origin=*`);
-      const contentData = await contentRes.json();
-      setSerenArticle(contentData.query.pages[pageid]);
-    } catch (e) { console.error(e); }
-  };
-
-  const handleSerenScroll = () => {
-    const el = scrollRef.current;
-    if (el && el.scrollHeight - el.scrollTop <= el.clientHeight + 20) setCanSample(true);
-  };
-
-  const sampleFromSeren = () => {
-    if (!canSample || !serenArticle) return;
-    const emptyIdx = pads.findIndex(p => p === null);
-    if (emptyIdx !== -1) {
-      setPads(prev => {
-        const n = [...prev];
-        n[emptyIdx] = { 
-          id: `seren-${Date.now()}`, 
-          description: `${serenArticle.title}\n\n${serenArticle.extract.substring(0, 300)}...`, 
-          image_url: null 
-        };
-        return n;
-      });
-    }
-    setShowSerendipity(false);
+  // 💡 判定ロジック: 文字列がJSON形式（Box）かどうかをチェック
+  const getBoxContent = (str: string | null) => {
+    if (!str || !str.startsWith('[')) return null;
+    try { return JSON.parse(str); } catch (e) { return null; }
   };
 
   const pickNode = (node: any) => {
@@ -64,6 +36,21 @@ export default function Room134Serendipity() {
     if (emptyIdx !== -1) {
       setPads(prev => { const n = [...prev]; n[emptyIdx] = node; return n; });
     }
+  };
+
+  const packToBox = async () => {
+    const validPads = pads.filter(p => p !== null);
+    if (validPads.length === 0) return;
+    setIsProcessing(true);
+    try {
+      await supabase.from('mainline').insert([{
+        description: JSON.stringify(validPads),
+        image_url: 'BOX_TYPE',
+        owner_id: 'packer',
+        created_at: new Date().toISOString()
+      }]);
+      fetchData();
+    } catch (e: any) { alert(e.message); } finally { setIsProcessing(false); }
   };
 
   return (
@@ -74,17 +61,16 @@ export default function Room134Serendipity() {
         .no-scrollbar::-webkit-scrollbar { display: none; }
       `}</style>
 
-      {/* HEADER */}
       <header className="py-10 flex justify-center sticky top-0 z-[50]">
         <h1 className="text-[10px] tracking-[1.5em] font-black uppercase opacity-20 bg-[#EBE8DB]/60 backdrop-blur-md px-10 py-4 rounded-full border border-black/5 transition-all hover:opacity-100">room134</h1>
       </header>
 
-      {/* MAIN WALL */}
       <main className={`p-2 transition-all duration-700 ${openedBox || isMPCVisible || showSerendipity ? 'opacity-20 blur-3xl scale-95' : 'opacity-100'}`}>
         <div className="stone-wall max-w-[120rem] mx-auto">
           {nodes.map(node => {
-            const isBox = node.image_url === 'BOX_TYPE';
-            const contents = isBox ? JSON.parse(node.description) : [];
+            const contents = getBoxContent(node.description);
+            const isBox = node.image_url === 'BOX_TYPE' || contents !== null;
+
             return (
               <div 
                 key={node.id} 
@@ -108,46 +94,6 @@ export default function Room134Serendipity() {
         </div>
       </main>
 
-      {/* 07734: SERENDIPITY ENGINE (WITH DISCARD) */}
-      {showSerendipity && (
-        <div className="fixed inset-0 bg-black z-[4000] flex flex-col text-gray-400 font-mono animate-in fade-in duration-500">
-          <header className="p-6 border-b border-white/5 flex justify-between text-[9px] tracking-widest text-white/20">
-            <div>ENGINE_ID: 07734</div>
-            <button onClick={() => setShowSerendipity(false)} className="hover:text-white transition-colors">EXIT</button>
-          </header>
-          
-          {!serenArticle ? (
-            <div className="flex-grow flex items-center justify-center">
-              <button onClick={fetchRandomSerendipity} className="text-white border border-white/10 px-12 py-6 hover:bg-white hover:text-black transition-all tracking-[1em] text-xs">INITIALIZE</button>
-            </div>
-          ) : (
-            <main className="flex-grow flex flex-col max-w-2xl mx-auto w-full p-8 overflow-hidden">
-              <h2 className="text-2xl text-white mb-10 border-l-2 border-white pl-6">{serenArticle.title}</h2>
-              <div ref={scrollRef} onScroll={handleSerenScroll} className="flex-grow overflow-y-auto pr-4 leading-loose text-sm space-y-8 no-scrollbar scroll-smooth">
-                {serenArticle.extract.split('\n').map((p:string, i:number) => <p key={i}>{p}</p>)}
-                <div className="h-40 border-t border-white/5 pt-10 text-[8px] text-center opacity-20">--- END OF FRAGMENT ---</div>
-              </div>
-              
-              <footer className="h-32 flex flex-col items-center justify-center mt-6 space-y-6">
-                {canSample ? (
-                  <button onClick={sampleFromSeren} className="w-full bg-white text-black py-5 text-[10px] font-black tracking-widest animate-in slide-in-from-bottom-2">SAMPLE INTO PAD</button>
-                ) : (
-                  <div className="text-[8px] opacity-20 tracking-[0.3em] animate-pulse uppercase">Read to the bottom to sample</div>
-                )}
-                
-                {/* 💡 DISCARD: 次のランダム記事へスキップ */}
-                <button 
-                  onClick={fetchRandomSerendipity} 
-                  className="text-[9px] uppercase tracking-[0.4em] opacity-30 hover:opacity-100 hover:text-red-400 transition-all border-b border-transparent hover:border-red-400/30 pb-1"
-                >
-                  Discard & Next Fragment
-                </button>
-              </footer>
-            </main>
-          )}
-        </div>
-      )}
-
       {/* BOX OPENING LAYER */}
       {openedBox && (
         <div className="fixed inset-0 z-[2000] bg-white/30 backdrop-blur-3xl flex flex-col animate-in fade-in duration-500">
@@ -157,7 +103,7 @@ export default function Room134Serendipity() {
           </header>
           <div className="flex-grow overflow-y-auto px-6 pb-40 no-scrollbar">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
-              {openedBox.map((item, i) => (
+              {openedBox.map((item: any, i: number) => (
                 <div key={i} onClick={() => pickNode(item)} className="bg-white/40 p-1 rounded-sm shadow-sm active:scale-90 transition-transform cursor-copy group relative">
                   {item.image_url && <img src={item.image_url} className="w-full h-auto grayscale group-hover:grayscale-0 transition-all" />}
                   {item.description && <div className="p-3 text-[10px] italic opacity-60 leading-tight">{item.description}</div>}
@@ -171,7 +117,7 @@ export default function Room134Serendipity() {
         </div>
       )}
 
-      {/* STUDIO CONTROLS */}
+      {/* STUDIO PADS */}
       <nav className="fixed bottom-10 left-1/2 -translate-x-1/2 flex items-center space-x-6 z-[500]">
         <button onClick={() => setIsMPCVisible(!isMPCVisible)} className="px-14 py-6 bg-black text-white rounded-full text-[9px] font-black uppercase tracking-[0.4em] shadow-2xl active:scale-95 transition-all">
           {isMPCVisible ? 'Close Pad' : 'Your Studio'}
@@ -183,7 +129,7 @@ export default function Room134Serendipity() {
           <div className="bg-white/10 backdrop-blur-3xl w-full max-w-xs p-6 rounded-[3.5rem] shadow-2xl border border-white/20 pointer-events-auto animate-in slide-in-from-bottom-20">
             <div className="flex justify-between items-center mb-6 px-1">
               <div className="text-[8px] font-black uppercase tracking-widest opacity-20 italic">Studio Pad</div>
-              <button onClick={() => setShowSerendipity(true)} className="text-[9px] font-black uppercase bg-white/40 px-4 py-1.5 rounded-full hover:bg-white transition-all">07734</button>
+              <button onClick={packToBox} className="text-[8px] font-black uppercase bg-black text-white px-4 py-1.5 rounded-full hover:opacity-80 transition-all">Pack to Box</button>
             </div>
             <div className="grid grid-cols-4 gap-3">
               {pads.map((pad, i) => (

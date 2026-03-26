@@ -15,13 +15,22 @@ export default function Room135() {
     if (saved) setFavorites(JSON.parse(saved));
   }, []);
 
-  const toggleFavorite = (title: string) => {
-    let newFavs;
-    if (favorites.includes(title)) {
-      newFavs = favorites.filter(f => f !== title);
-    } else {
-      newFavs = [...favorites, title];
+  // 記事が更新されたら、スクロールが必要か判定する
+  useEffect(() => {
+    if (mode === 'READ' && scrollRef.current) {
+      const el = scrollRef.current;
+      // 100ms待ってDOMの描画を待ってから判定（短い記事対策）
+      const timer = setTimeout(() => {
+        if (el.scrollHeight <= el.clientHeight + 10) {
+          setCanNext(true); // スクロール不要なほど短い場合は即NEXT解禁
+        }
+      }, 100);
+      return () => clearTimeout(timer);
     }
+  }, [article, mode]);
+
+  const toggleFavorite = (title: string) => {
+    let newFavs = favorites.includes(title) ? favorites.filter(f => f !== title) : [...favorites, title];
     setFavorites(newFavs);
     localStorage.setItem('room135_favs', JSON.stringify(newFavs));
   };
@@ -32,33 +41,25 @@ export default function Room135() {
     try {
       const res = await fetch('https://ja.wikipedia.org/api/rest_v1/page/random/summary');
       const data = await res.json();
-      
-      // ここでHTMLタグを除去。displaytitleに含まれる<span>等を取り除く
       const cleanTitle = data.titles.display.replace(/<[^>]*>/g, '');
-      
-      setArticle({
-        title: cleanTitle,
-        extract: data.extract,
-        url: data.content_urls.desktop.page
-      });
+      setArticle({ title: cleanTitle, extract: data.extract, url: data.content_urls.desktop.page });
       setMode('READ');
       if (scrollRef.current) scrollRef.current.scrollTop = 0;
-    } catch (e) {
-      console.error("Signal Lost");
-    }
+    } catch (e) { console.error("Signal Lost"); }
     setIsLoading(false);
   };
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
-    if (scrollHeight - scrollTop <= clientHeight + 50) {
+    // 下まであと少し（20px以内）なら解禁
+    if (scrollHeight - scrollTop <= clientHeight + 20) {
       setCanNext(true);
     }
   };
 
   return (
     <div className="bg-white text-black font-serif h-[100dvh] flex flex-col overflow-hidden select-none">
-      <header className="h-16 flex items-center justify-center border-b border-gray-100 shrink-0">
+      <header className="h-16 flex items-center justify-center border-b border-gray-50 shrink-0">
         <h1 className="text-xl tracking-[0.2em] font-light italic">room135</h1>
       </header>
 
@@ -66,7 +67,7 @@ export default function Room135() {
         {mode === 'HOME' && (
           <div className="flex-grow flex items-center justify-center">
             <button onClick={fetchRandom} className="group flex flex-col items-center gap-4">
-              <div className="w-16 h-16 border border-black rounded-full flex items-center justify-center group-active:scale-90 transition-transform">
+              <div className="w-16 h-16 border border-black rounded-full flex items-center justify-center group-active:scale-95 transition-transform">
                 <div className="w-2 h-2 bg-black rounded-full" />
               </div>
               <span className="text-[10px] tracking-widest uppercase opacity-40">Start</span>
@@ -76,20 +77,28 @@ export default function Room135() {
 
         {mode === 'READ' && article && (
           <div className="h-full flex flex-col">
-            <div ref={scrollRef} onScroll={handleScroll} className="flex-grow overflow-y-auto px-8 pt-12 pb-32">
+            <div 
+              ref={scrollRef} 
+              onScroll={handleScroll} 
+              className="flex-grow overflow-y-auto px-8 pt-12 pb-32 scroll-smooth"
+            >
               <div className="max-w-md mx-auto">
                 <h2 className="text-3xl font-bold mb-8 leading-tight">{article.title}</h2>
                 <p className="text-lg leading-relaxed text-gray-800">{article.extract}</p>
-                <div className="mt-12 h-px bg-gray-100 w-full" />
+                <div className="mt-12 h-px bg-gray-50 w-full" />
               </div>
             </div>
 
             <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-white via-white to-transparent flex items-center justify-between px-8 z-10">
               <div className="flex gap-12 items-center mx-auto">
-                <button onClick={() => toggleFavorite(article.title)} className="text-2xl">
+                <button onClick={() => toggleFavorite(article.title)} className="text-2xl active:scale-125 transition-transform">
                   {favorites.includes(article.title) ? '★' : '☆'}
                 </button>
-                <button onClick={fetchRandom} disabled={!canNext || isLoading} className={`text-sm tracking-widest uppercase transition-opacity duration-500 ${canNext ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+                <button 
+                  onClick={fetchRandom} 
+                  disabled={!canNext || isLoading} 
+                  className={`text-sm tracking-widest uppercase transition-all duration-700 ${canNext ? 'opacity-100' : 'opacity-0 pointer-events-none translate-y-2'}`}
+                >
                   {isLoading ? '...' : 'Next →'}
                 </button>
               </div>
@@ -98,17 +107,17 @@ export default function Room135() {
         )}
 
         {mode === 'LIST' && (
-          <div className="h-full overflow-y-auto px-8 py-12">
+          <div className="h-full overflow-y-auto px-8 py-12 bg-white">
             <div className="max-w-md mx-auto">
               <h3 className="text-[10px] tracking-[0.3em] uppercase opacity-30 mb-12 text-center">Collection</h3>
               <ul className="space-y-6">
                 {favorites.length > 0 ? favorites.map((fav, i) => (
                   <li key={i} className="group flex items-baseline gap-4">
-                    <span className="text-[8px] opacity-20">0{i+1}</span>
-                    <span className="text-base font-medium border-b border-transparent group-hover:border-black transition-all cursor-crosshair">{fav}</span>
+                    <span className="text-[8px] opacity-20">{(i+1).toString().padStart(2, '0')}</span>
+                    <span className="text-base font-medium border-b border-transparent group-hover:border-black transition-all cursor-default">{fav}</span>
                   </li>
                 )) : (
-                  <li className="text-center italic opacity-20 text-sm">No records found.</li>
+                  <li className="text-center italic opacity-20 text-sm">Empty room.</li>
                 )}
               </ul>
             </div>
@@ -116,10 +125,13 @@ export default function Room135() {
         )}
       </main>
 
-      <footer className="h-16 border-t border-gray-100 flex items-center px-8 shrink-0 bg-white z-20">
+      <footer className="h-16 border-t border-gray-50 flex items-center px-8 shrink-0 bg-white z-20">
         <button 
-          onClick={() => setMode(mode === 'LIST' ? 'HOME' : 'LIST')}
-          className={`text-xl transition-all ${mode === 'LIST' ? 'scale-110' : 'opacity-20 hover:opacity-100'}`}
+          onClick={() => {
+            setMode(mode === 'LIST' ? 'HOME' : 'LIST');
+            setArticle(null); // リスト表示時は記事をクリアしてスッキリさせる
+          }}
+          className={`text-xl transition-all ${mode === 'LIST' ? 'opacity-100 scale-110' : 'opacity-20'}`}
         >
           ★
         </button>

@@ -11,8 +11,6 @@ export default function Room134() {
   const [nodes, setNodes] = useState<any[]>([]);
   const [viewingNode, setViewingNode] = useState<any | null>(null);
   const [creatorMode, setCreatorMode] = useState<'NONE' | 'MENU' | 'NODE' | 'TRACK' | 'BOX'>('NONE');
-  
-  // 共有状態：パッドとトラックデータ
   const [pads, setPads] = useState<(any | null)[]>(Array(8).fill(null));
   const [trackData, setTrackData] = useState<any[]>([]);
 
@@ -30,17 +28,19 @@ export default function Room134() {
     fetchData();
   };
 
-  const updateBox = async (nodeId: string, newContents: any[]) => {
-    const { error } = await supabase.from('mainline').update({ description: JSON.stringify(newContents) }).eq('id', nodeId);
-    if (!error) {
-      setViewingNode((prev: any) => prev ? { ...prev, description: JSON.stringify(newContents) } : null);
-      fetchData();
-    }
-  };
-
   const assignToPad = (index: number, node: any) => {
     const newPads = [...pads];
     newPads[index] = { id: node.id, image_url: node.image_url };
+    setPads(newPads);
+  };
+
+  // パッドに直接ファイルをアップロードして貼る
+  const uploadToPad = async (index: number, file: File) => {
+    const fileName = `${Date.now()}-${file.name}`;
+    await supabase.storage.from('images').upload(fileName, file);
+    const url = supabase.storage.from('images').getPublicUrl(fileName).data.publicUrl;
+    const newPads = [...pads];
+    newPads[index] = { id: Date.now(), image_url: url };
     setPads(newPads);
   };
 
@@ -64,7 +64,6 @@ export default function Room134() {
             const isBox = node.image_url === 'BOX_TYPE';
             const contents = (isTrack || isBox) ? JSON.parse(node.description || '[]') : [];
             const thumb = (isTrack || isBox) ? contents[0]?.image_url : node.image_url;
-
             return (
               <div key={node.id} onClick={() => setViewingNode(node)} className="mb-2 break-inside-avoid relative group cursor-pointer active:scale-[0.98] transition-transform">
                 <div className="relative z-0 rounded-sm overflow-hidden bg-[#F0EEE4] border border-black/10 shadow-sm">
@@ -82,12 +81,17 @@ export default function Room134() {
             {viewingNode.image_url === 'TRACK_TYPE' ? (
                <TrackPlayer data={JSON.parse(viewingNode.description)} onComplete={() => setViewingNode(null)} />
             ) : viewingNode.image_url === 'BOX_TYPE' ? (
-               <BoxViewer node={viewingNode} onUpdate={(newC: any[]) => updateBox(viewingNode.id, newC)} />
+               <BoxViewer node={viewingNode} onUpdate={(newC: any[]) => {
+                 supabase.from('mainline').update({ description: JSON.stringify(newC) }).eq('id', viewingNode.id).then(() => {
+                   setViewingNode((prev: any) => ({ ...prev, description: JSON.stringify(newC) }));
+                   fetchData();
+                 });
+               }} />
             ) : (
               <div className="max-w-4xl w-full flex flex-col items-center">
                 <img src={viewingNode.image_url} className="max-h-[60vh] object-contain shadow-2xl rounded-sm mb-10" />
                 <div className="flex flex-col items-center gap-6">
-                  <p className="text-[9px] font-black uppercase tracking-[0.3em] opacity-30">Assign to Pad</p>
+                  <p className="text-[9px] font-black uppercase tracking-[0.3em] opacity-30">Assign to Sampler</p>
                   <div className="flex gap-3">
                     {pads.map((_, i) => (
                       <button key={i} onClick={(e) => { e.stopPropagation(); assignToPad(i, viewingNode); }} className={`w-12 h-12 rounded-2xl border-2 text-[11px] font-black transition-all ${pads[i]?.image_url === viewingNode.image_url ? 'bg-black text-white border-black shadow-xl scale-110' : 'border-black/5 bg-white/50'}`}>{i + 1}</button>
@@ -103,22 +107,32 @@ export default function Room134() {
         </div>
       )}
 
-      {/* 🏛 透過サンプラー UI */}
       {creatorMode === 'TRACK' && (
         <div className="fixed inset-0 z-[4500] bg-black/10 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-500">
           <div className="bg-white/90 backdrop-blur-xl w-full max-w-xs p-10 rounded-[3.5rem] shadow-2xl border border-white/20">
             <div className="flex justify-between items-center mb-10">
-              <button onClick={() => setTrackData([])} className="text-[9px] font-black uppercase px-5 py-2.5 bg-black text-white rounded-full shadow-md">Clear</button>
+              <button onClick={() => setTrackData([])} className="text-[9px] font-black uppercase px-5 py-2.5 bg-black text-white rounded-full">Clear</button>
               <div className="text-[10px] font-black opacity-30 tabular-nums">{trackData.length}/32</div>
             </div>
             <div className="grid grid-cols-4 gap-4 mb-12">
               {pads.map((p, i) => (
-                <div key={i} onMouseDown={() => p && setTrackData(prev => [...prev, p])} className={`aspect-square rounded-2xl border transition-all flex items-center justify-center relative overflow-hidden active:scale-90 cursor-pointer ${p ? 'bg-white border-black/10 shadow-md ring-2 ring-black/5' : 'bg-black/5 border-dashed border-black/10'}`}>
-                  {p?.image_url ? <img src={p.image_url} className="w-full h-full object-cover" /> : <span className="text-[20px] opacity-10">＋</span>}
+                <div key={i} className="aspect-square relative">
+                  {/* 直接アップロード用の透明なinput */}
+                  {!p && (
+                    <label className="absolute inset-0 z-10 cursor-pointer">
+                      <input type="file" className="hidden" onChange={e => e.target.files?.[0] && uploadToPad(i, e.target.files[0])} />
+                    </label>
+                  )}
+                  <div 
+                    onMouseDown={() => p && setTrackData(prev => [...prev, p])}
+                    className={`w-full h-full rounded-2xl border transition-all flex items-center justify-center overflow-hidden active:scale-90 cursor-pointer ${p ? 'bg-white border-black/10 shadow-md ring-2 ring-black/5' : 'bg-black/5 border-dashed border-black/10'}`}
+                  >
+                    {p?.image_url ? <img src={p.image_url} className="w-full h-full object-cover" /> : <span className="text-[20px] opacity-10">＋</span>}
+                  </div>
                 </div>
               ))}
             </div>
-            <button onClick={() => handlePost('TRACK_TYPE', {description: JSON.stringify(trackData)})} className="w-full py-5 bg-black text-white text-[10px] font-black uppercase tracking-[0.4em] rounded-2xl mb-3 shadow-xl active:scale-95 transition-all">Release Track</button>
+            <button onClick={() => handlePost('TRACK_TYPE', {description: JSON.stringify(trackData)})} className="w-full py-5 bg-black text-white text-[10px] font-black uppercase tracking-[0.4em] rounded-2xl mb-3 shadow-xl">Release Track</button>
             <button onClick={() => setCreatorMode('NONE')} className="w-full py-3 text-[8px] font-black uppercase opacity-20">Cancel</button>
           </div>
         </div>
@@ -146,7 +160,6 @@ export default function Room134() {
 }
 
 // --- SUB COMPONENTS ---
-
 function TrackPlayer({data, onComplete}: any) {
   const [idx, setIdx] = useState(0);
   useEffect(() => {
@@ -159,10 +172,9 @@ function TrackPlayer({data, onComplete}: any) {
     }, 500);
     return () => clearInterval(timer);
   }, [data, onComplete]);
-  const current = data[idx];
   return (
     <div className="w-full h-full flex items-center justify-center p-4">
-      {current?.image_url && <img key={idx} src={current.image_url} className="max-h-[80vh] max-w-full object-contain animate-in fade-in duration-300" />}
+      {data[idx]?.image_url && <img key={idx} src={data[idx].image_url} className="max-h-[80vh] max-w-full object-contain animate-in fade-in duration-300" />}
     </div>
   );
 }
@@ -185,8 +197,8 @@ function BoxViewer({node, onUpdate}: any) {
            {item.image_url ? <img src={item.image_url} className="w-full h-full object-cover" /> : <div className="p-12 text-sm italic opacity-40">{item.description}</div>}
         </div>
       ))}
-      <div className="flex-shrink-0 h-[65vh] aspect-[3/4] snap-center bg-black/5 border-2 border-dashed border-black/10 rounded-sm flex items-center justify-center relative">
-        {loading ? <span className="text-[10px] animate-pulse font-black uppercase">...</span> : <label className="w-full h-full flex items-center justify-center cursor-pointer text-4xl opacity-20">＋<input type="file" className="hidden" onChange={e => e.target.files?.[0] && handleAdd(e.target.files[0])} /></label>}
+      <div className="flex-shrink-0 h-[65vh] aspect-[3/4] snap-center bg-black/5 border-2 border-dashed border-black/10 rounded-sm flex items-center justify-center relative hover:bg-black/10 transition-all">
+        {loading ? <span className="text-[10px] animate-pulse">...</span> : <label className="w-full h-full flex items-center justify-center cursor-pointer text-4xl opacity-20">＋<input type="file" className="hidden" onChange={e => e.target.files?.[0] && handleAdd(e.target.files[0])} /></label>}
       </div>
     </div>
   );
@@ -240,7 +252,7 @@ function BoxCreator({onRelease, onCancel}: any) {
        </div>
        <div className="mt-12 flex items-center space-x-10">
           <button onClick={onCancel} className="text-[10px] font-black uppercase opacity-20 tracking-widest">Cancel</button>
-          <button onClick={async ()=>{setLoading(true); await onRelease({description: JSON.stringify(boxItems.filter(i=>i!==null))});}} disabled={loading} className="px-10 py-4 bg-black text-white text-[10px] font-black uppercase rounded-full tracking-[0.2em] shadow-xl active:scale-95 transition-all">{loading ? '...' : 'Release Box'}</button>
+          <button onClick={async ()=>{setLoading(true); await onRelease({description: JSON.stringify(boxItems.filter(i=>i!==null))});}} disabled={loading} className="px-10 py-4 bg-black text-white text-[10px] font-black uppercase rounded-full tracking-[0.2em] shadow-xl active:scale-95 transition-all">{loading ? '...' : 'Release'}</button>
        </div>
     </div>
   );

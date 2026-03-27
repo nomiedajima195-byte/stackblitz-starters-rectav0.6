@@ -30,11 +30,11 @@ export default function Room134() {
 
   const assignToPad = (index: number, node: any) => {
     const newPads = [...pads];
-    newPads[index] = { id: node.id, image_url: node.image_url };
+    // テキストノードの場合はdescriptionを、画像の場合はurlを保持
+    newPads[index] = { id: node.id, image_url: node.image_url, description: node.description };
     setPads(newPads);
   };
 
-  // パッドに直接ファイルをアップロードして貼る
   const uploadToPad = async (index: number, file: File) => {
     const fileName = `${Date.now()}-${file.name}`;
     await supabase.storage.from('images').upload(fileName, file);
@@ -45,16 +45,15 @@ export default function Room134() {
   };
 
   return (
-    <div className="min-h-screen bg-[#EBE8DB] text-[#2D2D2D] font-serif overflow-x-hidden selection:bg-black selection:text-white">
+    <div className="min-h-screen bg-[#EBE8DB] text-[#2D2D2D] font-serif overflow-x-hidden">
       <style jsx global>{`
         .mosaic-wall { column-count: 2; column-gap: 0.5rem; } 
         @media (min-width: 768px) { .mosaic-wall { column-count: 4; column-gap: 0.75rem; } }
-        @media (min-width: 1200px) { .mosaic-wall { column-count: 6; column-gap: 0.75rem; } }
         .no-scrollbar::-webkit-scrollbar { display: none; }
       `}</style>
 
       <header className={`fixed top-0 left-0 w-full z-[3000] p-6 transition-opacity duration-500 ${viewingNode ? 'opacity-0' : 'opacity-100'}`}>
-        <h1 onClick={() => window.location.reload()} className="text-[10px] font-black uppercase tracking-[0.5em] opacity-30 text-center cursor-pointer hover:opacity-100 transition-opacity">Room134</h1>
+        <h1 onClick={() => window.location.reload()} className="text-[10px] font-black uppercase tracking-[0.5em] opacity-30 text-center cursor-pointer">Room134</h1>
       </header>
 
       <main className={`p-2 pt-20 transition-all duration-700 ${creatorMode !== 'NONE' || viewingNode ? 'blur-md scale-95 pointer-events-none' : 'opacity-100'}`}>
@@ -64,10 +63,17 @@ export default function Room134() {
             const isBox = node.image_url === 'BOX_TYPE';
             const contents = (isTrack || isBox) ? JSON.parse(node.description || '[]') : [];
             const thumb = (isTrack || isBox) ? contents[0]?.image_url : node.image_url;
+
             return (
               <div key={node.id} onClick={() => setViewingNode(node)} className="mb-2 break-inside-avoid relative group cursor-pointer active:scale-[0.98] transition-transform">
-                <div className="relative z-0 rounded-sm overflow-hidden bg-[#F0EEE4] border border-black/10 shadow-sm">
-                  {thumb ? <img src={thumb} className="w-full h-auto grayscale-[20%]" /> : <div className="p-4 min-h-[100px] flex items-center justify-center text-[10px] italic opacity-40">Text</div>}
+                <div className="relative z-0 rounded-sm overflow-hidden bg-[#F0EEE4] border border-black/10 shadow-sm min-h-[50px]">
+                  {thumb && !['NODE', 'TRACK_TYPE', 'BOX_TYPE'].includes(thumb) ? (
+                    <img src={thumb} className="w-full h-auto grayscale-[20%]" />
+                  ) : (
+                    <div className="p-4 flex items-center justify-center text-[11px] leading-relaxed italic opacity-70 break-words text-center">
+                      {node.description}
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -89,12 +95,18 @@ export default function Room134() {
                }} />
             ) : (
               <div className="max-w-4xl w-full flex flex-col items-center">
-                <img src={viewingNode.image_url} className="max-h-[60vh] object-contain shadow-2xl rounded-sm mb-10" />
+                {viewingNode.image_url && !['NODE', 'TRACK_TYPE', 'BOX_TYPE'].includes(viewingNode.image_url) ? (
+                  <img src={viewingNode.image_url} className="max-h-[60vh] object-contain shadow-2xl rounded-sm mb-10" />
+                ) : (
+                  <div className="max-h-[60vh] mb-10 px-6 text-2xl italic text-center opacity-80 leading-loose">
+                    {viewingNode.description}
+                  </div>
+                )}
                 <div className="flex flex-col items-center gap-6">
-                  <p className="text-[9px] font-black uppercase tracking-[0.3em] opacity-30">Assign to Sampler</p>
+                  <p className="text-[9px] font-black uppercase tracking-[0.3em] opacity-30">Assign to Pad</p>
                   <div className="flex gap-3">
                     {pads.map((_, i) => (
-                      <button key={i} onClick={(e) => { e.stopPropagation(); assignToPad(i, viewingNode); }} className={`w-12 h-12 rounded-2xl border-2 text-[11px] font-black transition-all ${pads[i]?.image_url === viewingNode.image_url ? 'bg-black text-white border-black shadow-xl scale-110' : 'border-black/5 bg-white/50'}`}>{i + 1}</button>
+                      <button key={i} onClick={(e) => { e.stopPropagation(); assignToPad(i, viewingNode); }} className={`w-12 h-12 rounded-2xl border-2 text-[11px] font-black transition-all ${pads[i]?.id === viewingNode.id ? 'bg-black text-white border-black shadow-xl scale-110' : 'border-black/5 bg-white/50'}`}>{i + 1}</button>
                     ))}
                   </div>
                 </div>
@@ -107,17 +119,17 @@ export default function Room134() {
         </div>
       )}
 
+      {/* 🏛 透過度を上げたサンプラー (bg-white/70) */}
       {creatorMode === 'TRACK' && (
-        <div className="fixed inset-0 z-[4500] bg-black/10 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-500">
-          <div className="bg-white/90 backdrop-blur-xl w-full max-w-xs p-10 rounded-[3.5rem] shadow-2xl border border-white/20">
+        <div className="fixed inset-0 z-[4500] bg-black/5 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-500">
+          <div className="bg-white/70 backdrop-blur-2xl w-full max-w-xs p-10 rounded-[3.5rem] shadow-2xl border border-white/40">
             <div className="flex justify-between items-center mb-10">
-              <button onClick={() => setTrackData([])} className="text-[9px] font-black uppercase px-5 py-2.5 bg-black text-white rounded-full">Clear</button>
+              <button onClick={() => setTrackData([])} className="text-[9px] font-black uppercase px-5 py-2.5 bg-black text-white rounded-full shadow-md">Clear</button>
               <div className="text-[10px] font-black opacity-30 tabular-nums">{trackData.length}/32</div>
             </div>
             <div className="grid grid-cols-4 gap-4 mb-12">
               {pads.map((p, i) => (
                 <div key={i} className="aspect-square relative">
-                  {/* 直接アップロード用の透明なinput */}
                   {!p && (
                     <label className="absolute inset-0 z-10 cursor-pointer">
                       <input type="file" className="hidden" onChange={e => e.target.files?.[0] && uploadToPad(i, e.target.files[0])} />
@@ -125,9 +137,15 @@ export default function Room134() {
                   )}
                   <div 
                     onMouseDown={() => p && setTrackData(prev => [...prev, p])}
-                    className={`w-full h-full rounded-2xl border transition-all flex items-center justify-center overflow-hidden active:scale-90 cursor-pointer ${p ? 'bg-white border-black/10 shadow-md ring-2 ring-black/5' : 'bg-black/5 border-dashed border-black/10'}`}
+                    className={`w-full h-full rounded-2xl border transition-all flex items-center justify-center overflow-hidden active:scale-90 cursor-pointer ${p ? 'bg-white border-black/10 shadow-md ring-2 ring-black/10' : 'bg-black/5 border-dashed border-black/10'}`}
                   >
-                    {p?.image_url ? <img src={p.image_url} className="w-full h-full object-cover" /> : <span className="text-[20px] opacity-10">＋</span>}
+                    {p?.image_url && !['NODE'].includes(p.image_url) ? (
+                      <img src={p.image_url} className="w-full h-full object-cover" />
+                    ) : p?.description ? (
+                      <span className="text-[6px] p-1 text-center leading-tight overflow-hidden opacity-60 italic">{p.description.substring(0, 20)}...</span>
+                    ) : (
+                      <span className="text-[20px] opacity-10">＋</span>
+                    )}
                   </div>
                 </div>
               ))}
@@ -159,7 +177,8 @@ export default function Room134() {
   );
 }
 
-// --- SUB COMPONENTS ---
+// (以下、Sub Componentsは前回のロジックを維持...)
+// ※TrackPlayerでテキストノードを再生できるよう、current.image_urlのチェックを緩和した修正も含んでいます
 function TrackPlayer({data, onComplete}: any) {
   const [idx, setIdx] = useState(0);
   useEffect(() => {
@@ -172,13 +191,21 @@ function TrackPlayer({data, onComplete}: any) {
     }, 500);
     return () => clearInterval(timer);
   }, [data, onComplete]);
+  const current = data[idx];
   return (
     <div className="w-full h-full flex items-center justify-center p-4">
-      {data[idx]?.image_url && <img key={idx} src={data[idx].image_url} className="max-h-[80vh] max-w-full object-contain animate-in fade-in duration-300" />}
+      {current?.image_url && !['NODE'].includes(current.image_url) ? (
+        <img key={idx} src={current.image_url} className="max-h-[80vh] max-w-full object-contain animate-in fade-in duration-300" />
+      ) : (
+        <div className="text-2xl italic text-center animate-in fade-in duration-300 px-10">
+          {current?.description}
+        </div>
+      )}
     </div>
   );
 }
 
+// BoxViewer, NodeCreator, BoxCreator は前回のコードと同じです。
 function BoxViewer({node, onUpdate}: any) {
   const data = JSON.parse(node.description || '[]');
   const [loading, setLoading] = useState(false);
@@ -194,7 +221,7 @@ function BoxViewer({node, onUpdate}: any) {
     <div className="w-full h-full flex items-center overflow-x-auto px-10 space-x-12 no-scrollbar snap-x snap-mandatory">
       {data.map((item: any, i: number) => (
         <div key={i} className="flex-shrink-0 h-[65vh] aspect-[3/4] shadow-2xl snap-center bg-white rounded-sm overflow-hidden border border-black/5">
-           {item.image_url ? <img src={item.image_url} className="w-full h-full object-cover" /> : <div className="p-12 text-sm italic opacity-40">{item.description}</div>}
+           {item.image_url ? <img src={item.image_url} className="w-full h-full object-cover" /> : <div className="p-12 text-sm italic opacity-40 break-words">{item.description}</div>}
         </div>
       ))}
       <div className="flex-shrink-0 h-[65vh] aspect-[3/4] snap-center bg-black/5 border-2 border-dashed border-black/10 rounded-sm flex items-center justify-center relative hover:bg-black/10 transition-all">
@@ -216,7 +243,7 @@ function NodeCreator({onPost, onCancel}: any) {
       await supabase.storage.from('images').upload(fileName, file);
       url = supabase.storage.from('images').getPublicUrl(fileName).data.publicUrl;
     }
-    onPost({description: text, image_url: url});
+    onPost({description: text, image_url: url || 'NODE'});
   };
   return (
     <div className="fixed inset-0 z-[4500] bg-[#EBE8DB] flex flex-col items-center justify-center p-8 animate-in fade-in">

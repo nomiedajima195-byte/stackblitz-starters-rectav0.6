@@ -30,7 +30,6 @@ export default function Room134() {
 
   const assignToPad = (index: number, node: any) => {
     const newPads = [...pads];
-    // テキストノードの場合はdescriptionを、画像の場合はurlを保持
     newPads[index] = { id: node.id, image_url: node.image_url, description: node.description };
     setPads(newPads);
   };
@@ -45,7 +44,7 @@ export default function Room134() {
   };
 
   return (
-    <div className="min-h-screen bg-[#EBE8DB] text-[#2D2D2D] font-serif overflow-x-hidden">
+    <div className="min-h-screen bg-[#EBE8DB] text-[#2D2D2D] font-serif overflow-x-hiddenselection:bg-black selection:text-white">
       <style jsx global>{`
         .mosaic-wall { column-count: 2; column-gap: 0.5rem; } 
         @media (min-width: 768px) { .mosaic-wall { column-count: 4; column-gap: 0.75rem; } }
@@ -53,7 +52,7 @@ export default function Room134() {
       `}</style>
 
       <header className={`fixed top-0 left-0 w-full z-[3000] p-6 transition-opacity duration-500 ${viewingNode ? 'opacity-0' : 'opacity-100'}`}>
-        <h1 onClick={() => window.location.reload()} className="text-[10px] font-black uppercase tracking-[0.5em] opacity-30 text-center cursor-pointer">Room134</h1>
+        <h1 onClick={() => window.location.reload()} className="text-[10px] font-black uppercase tracking-[0.5em] opacity-30 text-center cursor-pointer hover:opacity-100 transition-opacity">Room134</h1>
       </header>
 
       <main className={`p-2 pt-20 transition-all duration-700 ${creatorMode !== 'NONE' || viewingNode ? 'blur-md scale-95 pointer-events-none' : 'opacity-100'}`}>
@@ -65,13 +64,30 @@ export default function Room134() {
             const thumb = (isTrack || isBox) ? contents[0]?.image_url : node.image_url;
 
             return (
-              <div key={node.id} onClick={() => setViewingNode(node)} className="mb-2 break-inside-avoid relative group cursor-pointer active:scale-[0.98] transition-transform">
-                <div className="relative z-0 rounded-sm overflow-hidden bg-[#F0EEE4] border border-black/10 shadow-sm min-h-[50px]">
+              <div key={node.id} onClick={() => setViewingNode(node)} className="mb-2 break-inside-avoid relative group cursor-pointer active:scale-[0.98] transition-transform overflow-hidden rounded-sm">
+                
+                {/* トラック限定: 背後の重なりエフェクト (密着に合わせて控えめに調整) */}
+                {isTrack && contents.length > 1 && (
+                  <>
+                    <div className="absolute inset-0 bg-black/10 border border-black/5 rounded-sm translate-x-1 translate-y-1 rotate-[1deg] -z-10 group-hover:translate-x-2 group-hover:translate-y-2 group-hover:rotate-[2deg] transition-transform"></div>
+                    <div className="absolute inset-0 bg-black/5 border border-black/5 rounded-sm translate-x-2 translate-y-2 rotate-[2deg] -z-20 group-hover:translate-x-3 group-hover:translate-y-3 group-hover:rotate-[3deg] transition-transform"></div>
+                  </>
+                )}
+
+                {/* メインカード本体 */}
+                <div className="relative z-0 overflow-hidden bg-[#F0EEE4] border border-black/10 shadow-sm min-h-[50px]">
                   {thumb && !['NODE', 'TRACK_TYPE', 'BOX_TYPE'].includes(thumb) ? (
-                    <img src={thumb} className="w-full h-auto grayscale-[20%]" />
+                    <img src={thumb} className="w-full h-auto grayscale-[20%] group-hover:grayscale-0 transition-all duration-500" />
                   ) : (
-                    <div className="p-4 flex items-center justify-center text-[11px] leading-relaxed italic opacity-70 break-words text-center">
-                      {node.description}
+                    <div className="p-4 flex items-center justify-center text-[11px] leading-relaxed italic opacity-70 break-words text-center min-h-[100px]">
+                      {isTrack ? contents[0]?.description || node.description : node.description}
+                    </div>
+                  )}
+
+                  {/* ▷オーバーレイ (トラックのみ) */}
+                  {isTrack && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/5 text-white/40 text-5xl font-light pointer-events-none group-hover:text-white/70 transition-colors">
+                      ▷
                     </div>
                   )}
                 </div>
@@ -103,7 +119,7 @@ export default function Room134() {
                   </div>
                 )}
                 <div className="flex flex-col items-center gap-6">
-                  <p className="text-[9px] font-black uppercase tracking-[0.3em] opacity-30">Assign to Pad</p>
+                  <p className="text-[9px] font-black uppercase tracking-[0.3em] opacity-30">Assign to Sampler Pad</p>
                   <div className="flex gap-3">
                     {pads.map((_, i) => (
                       <button key={i} onClick={(e) => { e.stopPropagation(); assignToPad(i, viewingNode); }} className={`w-12 h-12 rounded-2xl border-2 text-[11px] font-black transition-all ${pads[i]?.id === viewingNode.id ? 'bg-black text-white border-black shadow-xl scale-110' : 'border-black/5 bg-white/50'}`}>{i + 1}</button>
@@ -114,15 +130,15 @@ export default function Room134() {
             )}
           </div>
           <div className="h-24 flex items-center justify-center">
-            <button onClick={() => setViewingNode(null)} className="w-14 h-14 bg-black text-white rounded-full flex items-center justify-center text-2xl shadow-xl active:scale-90">◎</button>
+            <button onClick={() => setViewingNode(null)} className="w-14 h-14 bg-black text-white rounded-full flex items-center justify-center text-2xl shadow-xl active:scale-90 transition-all border border-white/10">◎</button>
           </div>
         </div>
       )}
 
-      {/* 🏛 透過度を上げたサンプラー (bg-white/70) */}
+      {/* 🏛 透過サンプラー UI */}
       {creatorMode === 'TRACK' && (
-        <div className="fixed inset-0 z-[4500] bg-black/5 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-500">
-          <div className="bg-white/70 backdrop-blur-2xl w-full max-w-xs p-10 rounded-[3.5rem] shadow-2xl border border-white/40">
+        <div className="fixed inset-0 z-[4500] bg-black/10 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-500">
+          <div className="bg-white/90 backdrop-blur-xl w-full max-w-xs p-10 rounded-[3.5rem] shadow-2xl border border-white/20">
             <div className="flex justify-between items-center mb-10">
               <button onClick={() => setTrackData([])} className="text-[9px] font-black uppercase px-5 py-2.5 bg-black text-white rounded-full shadow-md">Clear</button>
               <div className="text-[10px] font-black opacity-30 tabular-nums">{trackData.length}/32</div>
@@ -150,7 +166,7 @@ export default function Room134() {
                 </div>
               ))}
             </div>
-            <button onClick={() => handlePost('TRACK_TYPE', {description: JSON.stringify(trackData)})} className="w-full py-5 bg-black text-white text-[10px] font-black uppercase tracking-[0.4em] rounded-2xl mb-3 shadow-xl">Release Track</button>
+            <button onClick={() => handlePost('TRACK_TYPE', {description: JSON.stringify(trackData)})} className="w-full py-5 bg-black text-white text-[10px] font-black uppercase tracking-[0.4em] rounded-2xl mb-3 shadow-xl active:scale-95 transition-all">Release Track</button>
             <button onClick={() => setCreatorMode('NONE')} className="w-full py-3 text-[8px] font-black uppercase opacity-20">Cancel</button>
           </div>
         </div>
@@ -162,12 +178,12 @@ export default function Room134() {
       {!viewingNode && (
         <nav className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[4000]">
           {creatorMode === 'NONE' ? (
-            <button onClick={() => setCreatorMode('MENU')} className="w-16 h-16 bg-black text-white rounded-full flex items-center justify-center text-3xl shadow-2xl active:scale-90 transition-all">◎</button>
+            <button onClick={() => setCreatorMode('MENU')} className="w-16 h-16 bg-black text-white rounded-full flex items-center justify-center text-3xl shadow-2xl active:scale-90 transition-all border border-white/5">◎</button>
           ) : creatorMode === 'MENU' ? (
             <div className="flex space-x-4 bg-white/90 backdrop-blur-2xl p-3 rounded-full shadow-2xl border border-black/5 animate-in slide-in-from-bottom-10">
-              <button onClick={() => setCreatorMode('NODE')} className="px-6 py-3 bg-black text-white text-[9px] font-black uppercase rounded-full">Node</button>
-              <button onClick={() => setCreatorMode('TRACK')} className="px-6 py-3 bg-black text-white text-[9px] font-black uppercase rounded-full">Track</button>
-              <button onClick={() => setCreatorMode('BOX')} className="px-6 py-3 bg-[#EBE8DB] text-black text-[9px] font-black uppercase rounded-full border border-black/5">Box</button>
+              <button onClick={() => setCreatorMode('NODE')} className="px-6 py-3 bg-black text-white text-[9px] font-black uppercase rounded-full tracking-widest transition-all">Node</button>
+              <button onClick={() => setCreatorMode('TRACK')} className="px-6 py-3 bg-black text-white text-[9px] font-black uppercase rounded-full tracking-widest transition-all">Track</button>
+              <button onClick={() => setCreatorMode('BOX')} className="px-6 py-3 bg-[#EBE8DB] text-black text-[9px] font-black uppercase rounded-full tracking-widest border border-black/5 transition-all">Box</button>
               <button onClick={() => setCreatorMode('NONE')} className="px-4 py-3 text-[9px] font-black uppercase opacity-20">✕</button>
             </div>
           ) : null}
@@ -177,8 +193,7 @@ export default function Room134() {
   );
 }
 
-// (以下、Sub Componentsは前回のロジックを維持...)
-// ※TrackPlayerでテキストノードを再生できるよう、current.image_urlのチェックを緩和した修正も含んでいます
+// --- SUB COMPONENTS ---
 function TrackPlayer({data, onComplete}: any) {
   const [idx, setIdx] = useState(0);
   useEffect(() => {
@@ -197,7 +212,7 @@ function TrackPlayer({data, onComplete}: any) {
       {current?.image_url && !['NODE'].includes(current.image_url) ? (
         <img key={idx} src={current.image_url} className="max-h-[80vh] max-w-full object-contain animate-in fade-in duration-300" />
       ) : (
-        <div className="text-2xl italic text-center animate-in fade-in duration-300 px-10">
+        <div className="text-2xl italic text-center animate-in fade-in duration-300 px-10 break-words leading-relaxed text-black/80">
           {current?.description}
         </div>
       )}
@@ -205,7 +220,6 @@ function TrackPlayer({data, onComplete}: any) {
   );
 }
 
-// BoxViewer, NodeCreator, BoxCreator は前回のコードと同じです。
 function BoxViewer({node, onUpdate}: any) {
   const data = JSON.parse(node.description || '[]');
   const [loading, setLoading] = useState(false);
@@ -218,14 +232,14 @@ function BoxViewer({node, onUpdate}: any) {
     setLoading(false);
   };
   return (
-    <div className="w-full h-full flex items-center overflow-x-auto px-10 space-x-12 no-scrollbar snap-x snap-mandatory">
+    <div className="w-full h-full flex items-center overflow-x-auto px-10 space-x-12 no-scrollbar snap-x snap-mandatory" onClick={e=>e.stopPropagation()}>
       {data.map((item: any, i: number) => (
         <div key={i} className="flex-shrink-0 h-[65vh] aspect-[3/4] shadow-2xl snap-center bg-white rounded-sm overflow-hidden border border-black/5">
-           {item.image_url ? <img src={item.image_url} className="w-full h-full object-cover" /> : <div className="p-12 text-sm italic opacity-40 break-words">{item.description}</div>}
+           {item.image_url ? <img src={item.image_url} className="w-full h-full object-cover" /> : <div className="p-12 text-sm italic opacity-40 break-words text-center flex items-center justify-center h-full w-full">{item.description}</div>}
         </div>
       ))}
       <div className="flex-shrink-0 h-[65vh] aspect-[3/4] snap-center bg-black/5 border-2 border-dashed border-black/10 rounded-sm flex items-center justify-center relative hover:bg-black/10 transition-all">
-        {loading ? <span className="text-[10px] animate-pulse">...</span> : <label className="w-full h-full flex items-center justify-center cursor-pointer text-4xl opacity-20">＋<input type="file" className="hidden" onChange={e => e.target.files?.[0] && handleAdd(e.target.files[0])} /></label>}
+        {loading ? <span className="text-[10px] animate-pulse">...</span> : <label className="w-full h-full flex items-center justify-center cursor-pointer text-4xl opacity-20 hover:opacity-100 transition-opacity">＋<input type="file" className="hidden" onChange={e => e.target.files?.[0] && handleAdd(e.target.files[0])} /></label>}
       </div>
     </div>
   );

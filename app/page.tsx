@@ -11,8 +11,6 @@ export default function Room134() {
   const [nodes, setNodes] = useState<any[]>([]);
   const [viewingNode, setViewingNode] = useState<any | null>(null);
   const [creatorMode, setCreatorMode] = useState<'NONE' | 'MENU' | 'NODE' | 'TRACK' | 'BOX'>('NONE');
-  
-  // パッドとトラックのステート
   const [pads, setPads] = useState<(any | null)[]>(Array(8).fill(null));
   const [trackData, setTrackData] = useState<any[]>([]);
   const [previewTrack, setPreviewTrack] = useState(false);
@@ -31,20 +29,29 @@ export default function Room134() {
     fetchData();
   };
 
-  // 整理1: ↓ PAD ボタン用の時系列自動アサインロジック
   const autoAssignToPad = (node: any) => {
     const newPads = [...pads];
     const emptyIdx = newPads.findIndex(p => p === null);
-
-    if (emptyIdx !== -1) {
-      newPads[emptyIdx] = { id: node.id, image_url: node.image_url, description: node.description };
-    } else {
-      // 全て埋まっている場合は、一番古いもの(左端)を消して右に詰める
-      newPads.shift();
-      newPads.push({ id: node.id, image_url: node.image_url, description: node.description });
-    }
+    const item = { id: node.id, image_url: node.image_url, description: node.description };
+    if (emptyIdx !== -1) { newPads[emptyIdx] = item; } 
+    else { newPads.shift(); newPads.push(item); }
     setPads(newPads);
-    setViewingNode(null); // アサイン後、スムーズに壁面に戻る
+    setViewingNode(null);
+  };
+
+  // 整理：リミックス開始
+  const handleRemix = (node: any) => {
+    const contents = JSON.parse(node.description || '[]');
+    const newPads = Array(8).fill(null);
+    // 重複を除去してユニークな素材だけをパッドに展開
+    const uniqueItems = contents.filter((v:any, i:number, a:any[]) => a.findIndex(t => t.image_url === v.image_url) === i);
+    uniqueItems.slice(0, 8).forEach((item: any, idx: number) => {
+      newPads[idx] = item;
+    });
+    setPads(newPads);
+    setTrackData([]); // 打ち直しのために録音データはクリア
+    setCreatorMode('TRACK');
+    setViewingNode(null);
   };
 
   const uploadToPad = async (index: number, file: File) => {
@@ -65,7 +72,7 @@ export default function Room134() {
       `}</style>
 
       <header className={`fixed top-0 left-0 w-full z-[3000] p-6 transition-opacity duration-500 ${viewingNode ? 'opacity-0' : 'opacity-100'}`}>
-        <h1 onClick={() => window.location.reload()} className="text-[10px] font-black uppercase tracking-[0.5em] opacity-30 text-center cursor-pointer hover:opacity-100 transition-opacity">Room134</h1>
+        <h1 onClick={() => window.location.reload()} className="text-[10px] font-black uppercase tracking-[0.5em] opacity-30 text-center cursor-pointer hover:opacity-100 transition-opacity italic">Rubbish</h1>
       </header>
 
       <main className={`p-2 pt-20 transition-all duration-700 ${creatorMode !== 'NONE' || viewingNode ? 'blur-md scale-95 pointer-events-none' : 'opacity-100'}`}>
@@ -78,13 +85,6 @@ export default function Room134() {
 
             return (
               <div key={node.id} onClick={() => setViewingNode(node)} className="mb-2 break-inside-avoid relative group cursor-pointer active:scale-[0.98] transition-transform overflow-hidden rounded-sm">
-                {isTrack && contents.length > 1 && (
-                  <>
-                    <div className="absolute inset-0 bg-black/10 border border-black/5 rounded-sm translate-x-1 translate-y-1 rotate-[1deg] -z-10 group-hover:translate-x-2 group-hover:translate-y-2 group-hover:rotate-[2deg] transition-transform"></div>
-                    <div className="absolute inset-0 bg-black/5 border border-black/5 rounded-sm translate-x-2 translate-y-2 rotate-[2deg] -z-20 group-hover:translate-x-3 group-hover:translate-y-3 group-hover:rotate-[3deg] transition-transform"></div>
-                  </>
-                )}
-
                 <div className="relative z-0 overflow-hidden bg-[#F0EEE4] border border-black/10 shadow-sm min-h-[50px]">
                   {thumb && !['NODE', 'TRACK_TYPE', 'BOX_TYPE'].includes(thumb) ? (
                     <img src={thumb} className="w-full h-auto grayscale-[20%] group-hover:grayscale-0 transition-all duration-500" />
@@ -93,11 +93,8 @@ export default function Room134() {
                       {isTrack ? contents[0]?.description || node.description : node.description}
                     </div>
                   )}
-
                   {isTrack && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/5 text-white/40 text-5xl font-light pointer-events-none group-hover:text-white/70 transition-colors">
-                      ▷
-                    </div>
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/5 text-white/40 text-5xl font-light pointer-events-none group-hover:text-white/70 transition-colors">▷</div>
                   )}
                 </div>
               </div>
@@ -106,12 +103,22 @@ export default function Room134() {
         </div>
       </main>
 
-      {/* VIEWER OVERLAY */}
       {viewingNode && (
         <div className="fixed inset-0 z-[5000] bg-[#EBE8DB]/90 backdrop-blur-lg flex flex-col animate-in fade-in duration-500">
           <div className="flex-grow flex flex-col items-center justify-center p-6 overflow-hidden">
             {viewingNode.image_url === 'TRACK_TYPE' ? (
-               <TrackPlayer data={JSON.parse(viewingNode.description)} onComplete={() => setViewingNode(null)} />
+              <div className="w-full h-full flex flex-col items-center">
+                <div className="flex-grow w-full flex items-center justify-center">
+                   <TrackPlayer data={JSON.parse(viewingNode.description)} onComplete={() => {}} />
+                </div>
+                {/* 整理：リミックスボタン */}
+                <div className="absolute bottom-32 right-10">
+                  <button onClick={() => handleRemix(viewingNode)} className="group flex flex-col items-center gap-2">
+                    <span className="w-12 h-12 bg-black text-white rounded-full flex items-center justify-center text-xl shadow-xl active:scale-90 transition-all">⇄</span>
+                    <span className="text-[8px] font-black uppercase tracking-[0.2em] opacity-40 group-hover:opacity-100 transition-opacity">Remix</span>
+                  </button>
+                </div>
+              </div>
             ) : viewingNode.image_url === 'BOX_TYPE' ? (
                <BoxViewer node={viewingNode} onUpdate={(newC: any[]) => {
                  supabase.from('mainline').update({ description: JSON.stringify(newC) }).eq('id', viewingNode.id).then(() => {
@@ -124,33 +131,21 @@ export default function Room134() {
                 {viewingNode.image_url && !['NODE'].includes(viewingNode.image_url) ? (
                   <img src={viewingNode.image_url} className="max-h-[60vh] object-contain shadow-2xl rounded-sm mb-10" />
                 ) : (
-                  <div className="max-h-[60vh] mb-10 px-6 text-2xl italic text-center opacity-80 leading-loose">
-                    {viewingNode.description}
-                  </div>
+                  <div className="max-h-[60vh] mb-10 px-6 text-2xl italic text-center opacity-80 leading-loose">{viewingNode.description}</div>
                 )}
-                
-                {/* 整理2: ↓ PAD ボタンによる自動アサイン */}
-                <button 
-                  onClick={(e) => { e.stopPropagation(); autoAssignToPad(viewingNode); }}
-                  className="px-10 py-4 bg-black text-white text-[11px] font-black tracking-[0.3em] uppercase rounded-full shadow-2xl active:scale-90 transition-all flex items-center gap-3"
-                >
-                  ↓ PAD
-                </button>
+                <button onClick={() => autoAssignToPad(viewingNode)} className="px-10 py-4 bg-black text-white text-[11px] font-black tracking-[0.3em] uppercase rounded-full shadow-2xl active:scale-90 transition-all flex items-center gap-3">↓ PAD</button>
               </div>
             )}
           </div>
           <div className="h-24 flex items-center justify-center">
-            <button onClick={() => setViewingNode(null)} className="w-14 h-14 bg-black text-white rounded-full flex items-center justify-center text-2xl shadow-xl active:scale-90 transition-all border border-white/10">◎</button>
+            <button onClick={() => setViewingNode(null)} className="w-14 h-14 bg-black text-white rounded-full flex items-center justify-center text-2xl shadow-xl active:scale-90 border border-white/10">◎</button>
           </div>
         </div>
       )}
 
-      {/* TRACK CREATOR */}
       {creatorMode === 'TRACK' && (
         <div className="fixed inset-0 z-[4500] bg-black/10 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-500">
-          <div className="bg-white/90 backdrop-blur-xl w-full max-w-xs p-10 rounded-[3.5rem] shadow-2xl border border-white/20">
-            
-            {/* 整理3: RECインジケーターとクリア */}
+          <div className="bg-white/70 backdrop-blur-2xl w-full max-w-xs p-10 rounded-[3.5rem] shadow-2xl border border-white/40">
             <div className="flex justify-between items-center mb-10">
               <button onClick={() => setTrackData([])} className="text-[9px] font-black uppercase px-5 py-2.5 bg-black/10 text-black rounded-full shadow-sm hover:bg-black/20 transition-colors">Clear REC</button>
               <div className="text-[10px] font-black opacity-40 tabular-nums flex items-center tracking-widest">
@@ -164,8 +159,7 @@ export default function Room134() {
                 <div key={i} className="aspect-square relative">
                   {!p && (
                     <label className="absolute inset-0 z-10 cursor-pointer flex items-center justify-center text-[20px] opacity-10 hover:opacity-30 transition-opacity">
-                      ＋
-                      <input type="file" className="hidden" onChange={e => e.target.files?.[0] && uploadToPad(i, e.target.files[0])} />
+                      ＋<input type="file" className="hidden" onChange={e => e.target.files?.[0] && uploadToPad(i, e.target.files[0])} />
                     </label>
                   )}
                   <div 
@@ -182,38 +176,19 @@ export default function Room134() {
               ))}
             </div>
 
-            {/* 整理4: PREVIEW と RELEASE ボタンの分離 */}
             <div className="flex gap-2 mb-3">
-              <button 
-                onClick={() => setPreviewTrack(true)} 
-                disabled={trackData.length === 0}
-                className="flex-1 py-4 bg-[#EBE8DB] text-black text-[10px] font-black uppercase tracking-[0.2em] rounded-2xl shadow-sm border border-black/10 active:scale-95 transition-all disabled:opacity-30"
-              >
-                Preview
-              </button>
-              <button 
-                onClick={() => handlePost('TRACK_TYPE', {description: JSON.stringify(trackData)})} 
-                disabled={trackData.length === 0}
-                className="flex-1 py-4 bg-black text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-2xl shadow-xl active:scale-95 transition-all disabled:opacity-30"
-              >
-                Release
-              </button>
+              <button onClick={() => setPreviewTrack(true)} disabled={trackData.length === 0} className="flex-1 py-4 bg-[#EBE8DB] text-black text-[10px] font-black uppercase tracking-[0.2em] rounded-2xl shadow-sm border border-black/10 active:scale-95 transition-all disabled:opacity-30">Preview</button>
+              <button onClick={() => handlePost('TRACK_TYPE', {description: JSON.stringify(trackData)})} disabled={trackData.length === 0} className="flex-1 py-4 bg-black text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-2xl shadow-xl active:scale-95 transition-all disabled:opacity-30">Release</button>
             </div>
             <button onClick={() => setCreatorMode('NONE')} className="w-full py-3 text-[8px] font-black uppercase opacity-20 hover:opacity-100 transition-opacity">Cancel</button>
           </div>
         </div>
       )}
 
-      {/* TRACK PREVIEW OVERLAY */}
       {previewTrack && (
         <div className="fixed inset-0 z-[6000] bg-[#EBE8DB] flex flex-col items-center justify-center animate-in fade-in">
           <TrackPlayer data={trackData} onComplete={() => setPreviewTrack(false)} />
-          <button 
-            onClick={() => setPreviewTrack(false)} 
-            className="absolute bottom-10 px-6 py-3 bg-black/10 text-black text-[10px] font-black uppercase tracking-widest rounded-full hover:bg-black hover:text-white transition-colors"
-          >
-            Stop Preview
-          </button>
+          <button onClick={() => setPreviewTrack(false)} className="absolute bottom-10 px-6 py-3 bg-black/10 text-black text-[10px] font-black uppercase tracking-widest rounded-full hover:bg-black hover:text-white transition-colors">Stop Preview</button>
         </div>
       )}
 
@@ -226,9 +201,9 @@ export default function Room134() {
             <button onClick={() => setCreatorMode('MENU')} className="w-16 h-16 bg-black text-white rounded-full flex items-center justify-center text-3xl shadow-2xl active:scale-90 transition-all border border-white/5">◎</button>
           ) : creatorMode === 'MENU' ? (
             <div className="flex space-x-4 bg-white/90 backdrop-blur-2xl p-3 rounded-full shadow-2xl border border-black/5 animate-in slide-in-from-bottom-10">
-              <button onClick={() => setCreatorMode('NODE')} className="px-6 py-3 bg-black text-white text-[9px] font-black uppercase rounded-full tracking-widest transition-all">Node</button>
-              <button onClick={() => setCreatorMode('TRACK')} className="px-6 py-3 bg-black text-white text-[9px] font-black uppercase rounded-full tracking-widest transition-all">Track</button>
-              <button onClick={() => setCreatorMode('BOX')} className="px-6 py-3 bg-[#EBE8DB] text-black text-[9px] font-black uppercase rounded-full tracking-widest border border-black/5 transition-all">Box</button>
+              <button onClick={() => setCreatorMode('NODE')} className="px-6 py-3 bg-black text-white text-[9px] font-black uppercase rounded-full">Node</button>
+              <button onClick={() => setCreatorMode('TRACK')} className="px-6 py-3 bg-black text-white text-[9px] font-black uppercase rounded-full">Track</button>
+              <button onClick={() => setCreatorMode('BOX')} className="px-6 py-3 bg-[#EBE8DB] text-black text-[9px] font-black uppercase rounded-full border border-black/5">Box</button>
               <button onClick={() => setCreatorMode('NONE')} className="px-4 py-3 text-[9px] font-black uppercase opacity-20">✕</button>
             </div>
           ) : null}
@@ -238,11 +213,11 @@ export default function Room134() {
   );
 }
 
-// --- SUB COMPONENTS ---
+// Sub Components (TrackPlayer, BoxViewer, NodeCreator, BoxCreator) は前回のロジックを維持...
 function TrackPlayer({data, onComplete}: any) {
   const [idx, setIdx] = useState(0);
   useEffect(() => {
-    if(!data || data.length === 0) { onComplete(); return; }
+    if(!data || data.length === 0) { return; }
     const timer = setInterval(() => {
       setIdx(v => {
         if (v >= data.length - 1) { clearInterval(timer); setTimeout(onComplete, 800); return v; }
@@ -257,9 +232,7 @@ function TrackPlayer({data, onComplete}: any) {
       {current?.image_url && !['NODE'].includes(current.image_url) ? (
         <img key={idx} src={current.image_url} className="max-h-[80vh] max-w-full object-contain animate-in fade-in duration-300" />
       ) : (
-        <div className="text-2xl italic text-center animate-in fade-in duration-300 px-10 break-words leading-relaxed text-black/80">
-          {current?.description}
-        </div>
+        <div className="text-2xl italic text-center animate-in fade-in duration-300 px-10 break-words leading-relaxed text-black/80">{current?.description}</div>
       )}
     </div>
   );

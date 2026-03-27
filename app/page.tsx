@@ -11,8 +11,11 @@ export default function Room134() {
   const [nodes, setNodes] = useState<any[]>([]);
   const [viewingNode, setViewingNode] = useState<any | null>(null);
   const [creatorMode, setCreatorMode] = useState<'NONE' | 'MENU' | 'NODE' | 'TRACK' | 'BOX'>('NONE');
+  
+  // パッドとトラックのステート
   const [pads, setPads] = useState<(any | null)[]>(Array(8).fill(null));
   const [trackData, setTrackData] = useState<any[]>([]);
+  const [previewTrack, setPreviewTrack] = useState(false);
 
   const fetchData = useCallback(async () => {
     const { data } = await supabase.from('mainline').select('*');
@@ -28,10 +31,20 @@ export default function Room134() {
     fetchData();
   };
 
-  const assignToPad = (index: number, node: any) => {
+  // 整理1: ↓ PAD ボタン用の時系列自動アサインロジック
+  const autoAssignToPad = (node: any) => {
     const newPads = [...pads];
-    newPads[index] = { id: node.id, image_url: node.image_url, description: node.description };
+    const emptyIdx = newPads.findIndex(p => p === null);
+
+    if (emptyIdx !== -1) {
+      newPads[emptyIdx] = { id: node.id, image_url: node.image_url, description: node.description };
+    } else {
+      // 全て埋まっている場合は、一番古いもの(左端)を消して右に詰める
+      newPads.shift();
+      newPads.push({ id: node.id, image_url: node.image_url, description: node.description });
+    }
     setPads(newPads);
+    setViewingNode(null); // アサイン後、スムーズに壁面に戻る
   };
 
   const uploadToPad = async (index: number, file: File) => {
@@ -44,7 +57,7 @@ export default function Room134() {
   };
 
   return (
-    <div className="min-h-screen bg-[#EBE8DB] text-[#2D2D2D] font-serif overflow-x-hiddenselection:bg-black selection:text-white">
+    <div className="min-h-screen bg-[#EBE8DB] text-[#2D2D2D] font-serif overflow-x-hidden selection:bg-black selection:text-white">
       <style jsx global>{`
         .mosaic-wall { column-count: 2; column-gap: 0.5rem; } 
         @media (min-width: 768px) { .mosaic-wall { column-count: 4; column-gap: 0.75rem; } }
@@ -65,8 +78,6 @@ export default function Room134() {
 
             return (
               <div key={node.id} onClick={() => setViewingNode(node)} className="mb-2 break-inside-avoid relative group cursor-pointer active:scale-[0.98] transition-transform overflow-hidden rounded-sm">
-                
-                {/* トラック限定: 背後の重なりエフェクト (密着に合わせて控えめに調整) */}
                 {isTrack && contents.length > 1 && (
                   <>
                     <div className="absolute inset-0 bg-black/10 border border-black/5 rounded-sm translate-x-1 translate-y-1 rotate-[1deg] -z-10 group-hover:translate-x-2 group-hover:translate-y-2 group-hover:rotate-[2deg] transition-transform"></div>
@@ -74,7 +85,6 @@ export default function Room134() {
                   </>
                 )}
 
-                {/* メインカード本体 */}
                 <div className="relative z-0 overflow-hidden bg-[#F0EEE4] border border-black/10 shadow-sm min-h-[50px]">
                   {thumb && !['NODE', 'TRACK_TYPE', 'BOX_TYPE'].includes(thumb) ? (
                     <img src={thumb} className="w-full h-auto grayscale-[20%] group-hover:grayscale-0 transition-all duration-500" />
@@ -84,7 +94,6 @@ export default function Room134() {
                     </div>
                   )}
 
-                  {/* ▷オーバーレイ (トラックのみ) */}
                   {isTrack && (
                     <div className="absolute inset-0 flex items-center justify-center bg-black/5 text-white/40 text-5xl font-light pointer-events-none group-hover:text-white/70 transition-colors">
                       ▷
@@ -97,6 +106,7 @@ export default function Room134() {
         </div>
       </main>
 
+      {/* VIEWER OVERLAY */}
       {viewingNode && (
         <div className="fixed inset-0 z-[5000] bg-[#EBE8DB]/90 backdrop-blur-lg flex flex-col animate-in fade-in duration-500">
           <div className="flex-grow flex flex-col items-center justify-center p-6 overflow-hidden">
@@ -111,21 +121,21 @@ export default function Room134() {
                }} />
             ) : (
               <div className="max-w-4xl w-full flex flex-col items-center">
-                {viewingNode.image_url && !['NODE', 'TRACK_TYPE', 'BOX_TYPE'].includes(viewingNode.image_url) ? (
+                {viewingNode.image_url && !['NODE'].includes(viewingNode.image_url) ? (
                   <img src={viewingNode.image_url} className="max-h-[60vh] object-contain shadow-2xl rounded-sm mb-10" />
                 ) : (
                   <div className="max-h-[60vh] mb-10 px-6 text-2xl italic text-center opacity-80 leading-loose">
                     {viewingNode.description}
                   </div>
                 )}
-                <div className="flex flex-col items-center gap-6">
-                  <p className="text-[9px] font-black uppercase tracking-[0.3em] opacity-30">Assign to Sampler Pad</p>
-                  <div className="flex gap-3">
-                    {pads.map((_, i) => (
-                      <button key={i} onClick={(e) => { e.stopPropagation(); assignToPad(i, viewingNode); }} className={`w-12 h-12 rounded-2xl border-2 text-[11px] font-black transition-all ${pads[i]?.id === viewingNode.id ? 'bg-black text-white border-black shadow-xl scale-110' : 'border-black/5 bg-white/50'}`}>{i + 1}</button>
-                    ))}
-                  </div>
-                </div>
+                
+                {/* 整理2: ↓ PAD ボタンによる自動アサイン */}
+                <button 
+                  onClick={(e) => { e.stopPropagation(); autoAssignToPad(viewingNode); }}
+                  className="px-10 py-4 bg-black text-white text-[11px] font-black tracking-[0.3em] uppercase rounded-full shadow-2xl active:scale-90 transition-all flex items-center gap-3"
+                >
+                  ↓ PAD
+                </button>
               </div>
             )}
           </div>
@@ -135,40 +145,75 @@ export default function Room134() {
         </div>
       )}
 
-      {/* 🏛 透過サンプラー UI */}
+      {/* TRACK CREATOR */}
       {creatorMode === 'TRACK' && (
         <div className="fixed inset-0 z-[4500] bg-black/10 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-500">
           <div className="bg-white/90 backdrop-blur-xl w-full max-w-xs p-10 rounded-[3.5rem] shadow-2xl border border-white/20">
+            
+            {/* 整理3: RECインジケーターとクリア */}
             <div className="flex justify-between items-center mb-10">
-              <button onClick={() => setTrackData([])} className="text-[9px] font-black uppercase px-5 py-2.5 bg-black text-white rounded-full shadow-md">Clear</button>
-              <div className="text-[10px] font-black opacity-30 tabular-nums">{trackData.length}/32</div>
+              <button onClick={() => setTrackData([])} className="text-[9px] font-black uppercase px-5 py-2.5 bg-black/10 text-black rounded-full shadow-sm hover:bg-black/20 transition-colors">Clear REC</button>
+              <div className="text-[10px] font-black opacity-40 tabular-nums flex items-center tracking-widest">
+                <span className={`text-red-500 mr-2 text-[8px] ${trackData.length > 0 ? 'animate-pulse' : 'opacity-0'}`}>● REC</span>
+                {trackData.length}/32
+              </div>
             </div>
+            
             <div className="grid grid-cols-4 gap-4 mb-12">
               {pads.map((p, i) => (
                 <div key={i} className="aspect-square relative">
                   {!p && (
-                    <label className="absolute inset-0 z-10 cursor-pointer">
+                    <label className="absolute inset-0 z-10 cursor-pointer flex items-center justify-center text-[20px] opacity-10 hover:opacity-30 transition-opacity">
+                      ＋
                       <input type="file" className="hidden" onChange={e => e.target.files?.[0] && uploadToPad(i, e.target.files[0])} />
                     </label>
                   )}
                   <div 
-                    onMouseDown={() => p && setTrackData(prev => [...prev, p])}
+                    onMouseDown={() => p && setTrackData(prev => prev.length < 32 ? [...prev, p] : prev)}
                     className={`w-full h-full rounded-2xl border transition-all flex items-center justify-center overflow-hidden active:scale-90 cursor-pointer ${p ? 'bg-white border-black/10 shadow-md ring-2 ring-black/10' : 'bg-black/5 border-dashed border-black/10'}`}
                   >
                     {p?.image_url && !['NODE'].includes(p.image_url) ? (
                       <img src={p.image_url} className="w-full h-full object-cover" />
                     ) : p?.description ? (
                       <span className="text-[6px] p-1 text-center leading-tight overflow-hidden opacity-60 italic">{p.description.substring(0, 20)}...</span>
-                    ) : (
-                      <span className="text-[20px] opacity-10">＋</span>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               ))}
             </div>
-            <button onClick={() => handlePost('TRACK_TYPE', {description: JSON.stringify(trackData)})} className="w-full py-5 bg-black text-white text-[10px] font-black uppercase tracking-[0.4em] rounded-2xl mb-3 shadow-xl active:scale-95 transition-all">Release Track</button>
-            <button onClick={() => setCreatorMode('NONE')} className="w-full py-3 text-[8px] font-black uppercase opacity-20">Cancel</button>
+
+            {/* 整理4: PREVIEW と RELEASE ボタンの分離 */}
+            <div className="flex gap-2 mb-3">
+              <button 
+                onClick={() => setPreviewTrack(true)} 
+                disabled={trackData.length === 0}
+                className="flex-1 py-4 bg-[#EBE8DB] text-black text-[10px] font-black uppercase tracking-[0.2em] rounded-2xl shadow-sm border border-black/10 active:scale-95 transition-all disabled:opacity-30"
+              >
+                Preview
+              </button>
+              <button 
+                onClick={() => handlePost('TRACK_TYPE', {description: JSON.stringify(trackData)})} 
+                disabled={trackData.length === 0}
+                className="flex-1 py-4 bg-black text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-2xl shadow-xl active:scale-95 transition-all disabled:opacity-30"
+              >
+                Release
+              </button>
+            </div>
+            <button onClick={() => setCreatorMode('NONE')} className="w-full py-3 text-[8px] font-black uppercase opacity-20 hover:opacity-100 transition-opacity">Cancel</button>
           </div>
+        </div>
+      )}
+
+      {/* TRACK PREVIEW OVERLAY */}
+      {previewTrack && (
+        <div className="fixed inset-0 z-[6000] bg-[#EBE8DB] flex flex-col items-center justify-center animate-in fade-in">
+          <TrackPlayer data={trackData} onComplete={() => setPreviewTrack(false)} />
+          <button 
+            onClick={() => setPreviewTrack(false)} 
+            className="absolute bottom-10 px-6 py-3 bg-black/10 text-black text-[10px] font-black uppercase tracking-widest rounded-full hover:bg-black hover:text-white transition-colors"
+          >
+            Stop Preview
+          </button>
         </div>
       )}
 

@@ -61,7 +61,6 @@ export default function Room134() {
     setPads(newPads);
   };
 
-  // 整理: 個別パッドのクリア関数
   const clearPad = (index: number) => {
     const newPads = [...pads];
     newPads[index] = null;
@@ -76,7 +75,6 @@ export default function Room134() {
         .no-scrollbar::-webkit-scrollbar { display: none; }
       `}</style>
 
-      {/* 修正1: ヘッダーをRoom134に */}
       <header className={`fixed top-0 left-0 w-full z-[3000] p-6 transition-opacity duration-500 ${viewingNode ? 'opacity-0' : 'opacity-100'}`}>
         <h1 onClick={() => window.location.reload()} className="text-[10px] font-black uppercase tracking-[0.5em] opacity-30 text-center cursor-pointer hover:opacity-100 transition-opacity italic">Room134</h1>
       </header>
@@ -92,7 +90,6 @@ export default function Room134() {
             return (
               <div key={node.id} onClick={() => setViewingNode(node)} className="mb-2 break-inside-avoid relative group cursor-pointer active:scale-[0.98] transition-transform overflow-hidden rounded-sm">
                 
-                {/* 修正3: Scrapsノードの右端に▢アイコン */}
                 {isBox && (
                   <div className="absolute top-2 right-2 z-10 w-5 h-5 flex items-center justify-center bg-white/60 backdrop-blur-sm rounded-sm text-[12px] text-black/70 shadow-sm pointer-events-none transition-all group-hover:bg-white group-hover:text-black">
                     ▢
@@ -123,7 +120,8 @@ export default function Room134() {
             {viewingNode.image_url === 'TRACK_TYPE' ? (
               <div className="w-full h-full flex flex-col items-center">
                 <div className="flex-grow w-full flex items-center justify-center">
-                   <TrackPlayer data={JSON.parse(viewingNode.description)} onComplete={() => {}} />
+                   {/* 修正箇所: onCompleteで自動的にnull（メイン）に戻す */}
+                   <TrackPlayer data={JSON.parse(viewingNode.description)} onComplete={() => setViewingNode(null)} />
                 </div>
                 <div className="absolute bottom-32 right-10">
                   <button onClick={() => handleRemix(viewingNode)} className="group flex flex-col items-center gap-2">
@@ -167,11 +165,9 @@ export default function Room134() {
               </div>
             </div>
             
-            {/* 修正2: 上下で×ボタンの位置を変えるレイアウト */}
             <div className="grid grid-cols-4 gap-4 mb-12">
               {pads.map((p, i) => (
                 <div key={i} className="flex flex-col items-center gap-2">
-                  {/* 上段（0〜3）は上に×ボタン */}
                   {i < 4 && (
                     <button onClick={() => clearPad(i)} className={`text-[12px] opacity-20 hover:opacity-100 transition-opacity ${!p ? 'invisible' : ''}`}>✕</button>
                   )}
@@ -194,7 +190,6 @@ export default function Room134() {
                     </div>
                   </div>
 
-                  {/* 下段（4〜7）は下に×ボタン */}
                   {i >= 4 && (
                     <button onClick={() => clearPad(i)} className={`text-[12px] opacity-20 hover:opacity-100 transition-opacity ${!p ? 'invisible' : ''}`}>✕</button>
                   )}
@@ -229,7 +224,6 @@ export default function Room134() {
             <div className="flex space-x-4 bg-white/90 backdrop-blur-2xl p-3 rounded-full shadow-2xl border border-black/5 animate-in slide-in-from-bottom-10">
               <button onClick={() => setCreatorMode('NODE')} className="px-6 py-3 bg-black text-white text-[9px] font-black uppercase rounded-full">Node</button>
               <button onClick={() => setCreatorMode('TRACK')} className="px-6 py-3 bg-black text-white text-[9px] font-black uppercase rounded-full">Track</button>
-              {/* 修正3: BOXボタンをScrapsに変更 */}
               <button onClick={() => setCreatorMode('BOX')} className="px-6 py-3 bg-[#EBE8DB] text-black text-[9px] font-black uppercase rounded-full border border-black/5">Scraps</button>
               <button onClick={() => setCreatorMode('NONE')} className="px-4 py-3 text-[9px] font-black uppercase opacity-20">✕</button>
             </div>
@@ -247,7 +241,12 @@ function TrackPlayer({data, onComplete}: any) {
     if(!data || data.length === 0) { return; }
     const timer = setInterval(() => {
       setIdx(v => {
-        if (v >= data.length - 1) { clearInterval(timer); setTimeout(onComplete, 800); return v; }
+        if (v >= data.length - 1) { 
+          clearInterval(timer); 
+          // 最後のコマを表示してから800ms後にonCompleteを発火（画面を閉じる）
+          setTimeout(onComplete, 800); 
+          return v; 
+        }
         return v + 1;
       });
     }, 500);

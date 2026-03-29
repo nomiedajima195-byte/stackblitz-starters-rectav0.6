@@ -39,17 +39,15 @@ export default function Room134() {
     setViewingNode(null);
   };
 
-  // 整理：リミックス開始
   const handleRemix = (node: any) => {
     const contents = JSON.parse(node.description || '[]');
     const newPads = Array(8).fill(null);
-    // 重複を除去してユニークな素材だけをパッドに展開
     const uniqueItems = contents.filter((v:any, i:number, a:any[]) => a.findIndex(t => t.image_url === v.image_url) === i);
     uniqueItems.slice(0, 8).forEach((item: any, idx: number) => {
       newPads[idx] = item;
     });
     setPads(newPads);
-    setTrackData([]); // 打ち直しのために録音データはクリア
+    setTrackData([]); 
     setCreatorMode('TRACK');
     setViewingNode(null);
   };
@@ -63,6 +61,13 @@ export default function Room134() {
     setPads(newPads);
   };
 
+  // 整理: 個別パッドのクリア関数
+  const clearPad = (index: number) => {
+    const newPads = [...pads];
+    newPads[index] = null;
+    setPads(newPads);
+  };
+
   return (
     <div className="min-h-screen bg-[#EBE8DB] text-[#2D2D2D] font-serif overflow-x-hidden selection:bg-black selection:text-white">
       <style jsx global>{`
@@ -71,8 +76,9 @@ export default function Room134() {
         .no-scrollbar::-webkit-scrollbar { display: none; }
       `}</style>
 
+      {/* 修正1: ヘッダーをRoom134に */}
       <header className={`fixed top-0 left-0 w-full z-[3000] p-6 transition-opacity duration-500 ${viewingNode ? 'opacity-0' : 'opacity-100'}`}>
-        <h1 onClick={() => window.location.reload()} className="text-[10px] font-black uppercase tracking-[0.5em] opacity-30 text-center cursor-pointer hover:opacity-100 transition-opacity italic">Rubbish</h1>
+        <h1 onClick={() => window.location.reload()} className="text-[10px] font-black uppercase tracking-[0.5em] opacity-30 text-center cursor-pointer hover:opacity-100 transition-opacity italic">Room134</h1>
       </header>
 
       <main className={`p-2 pt-20 transition-all duration-700 ${creatorMode !== 'NONE' || viewingNode ? 'blur-md scale-95 pointer-events-none' : 'opacity-100'}`}>
@@ -85,12 +91,20 @@ export default function Room134() {
 
             return (
               <div key={node.id} onClick={() => setViewingNode(node)} className="mb-2 break-inside-avoid relative group cursor-pointer active:scale-[0.98] transition-transform overflow-hidden rounded-sm">
+                
+                {/* 修正3: Scrapsノードの右端に▢アイコン */}
+                {isBox && (
+                  <div className="absolute top-2 right-2 z-10 w-5 h-5 flex items-center justify-center bg-white/60 backdrop-blur-sm rounded-sm text-[12px] text-black/70 shadow-sm pointer-events-none transition-all group-hover:bg-white group-hover:text-black">
+                    ▢
+                  </div>
+                )}
+
                 <div className="relative z-0 overflow-hidden bg-[#F0EEE4] border border-black/10 shadow-sm min-h-[50px]">
                   {thumb && !['NODE', 'TRACK_TYPE', 'BOX_TYPE'].includes(thumb) ? (
                     <img src={thumb} className="w-full h-auto grayscale-[20%] group-hover:grayscale-0 transition-all duration-500" />
                   ) : (
                     <div className="p-4 flex items-center justify-center text-[11px] leading-relaxed italic opacity-70 break-words text-center min-h-[100px]">
-                      {isTrack ? contents[0]?.description || node.description : node.description}
+                      {isTrack || isBox ? contents[0]?.description || node.description : node.description}
                     </div>
                   )}
                   {isTrack && (
@@ -111,7 +125,6 @@ export default function Room134() {
                 <div className="flex-grow w-full flex items-center justify-center">
                    <TrackPlayer data={JSON.parse(viewingNode.description)} onComplete={() => {}} />
                 </div>
-                {/* 整理：リミックスボタン */}
                 <div className="absolute bottom-32 right-10">
                   <button onClick={() => handleRemix(viewingNode)} className="group flex flex-col items-center gap-2">
                     <span className="w-12 h-12 bg-black text-white rounded-full flex items-center justify-center text-xl shadow-xl active:scale-90 transition-all">⇄</span>
@@ -146,7 +159,7 @@ export default function Room134() {
       {creatorMode === 'TRACK' && (
         <div className="fixed inset-0 z-[4500] bg-black/10 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-500">
           <div className="bg-white/70 backdrop-blur-2xl w-full max-w-xs p-10 rounded-[3.5rem] shadow-2xl border border-white/40">
-            <div className="flex justify-between items-center mb-10">
+            <div className="flex justify-between items-center mb-6">
               <button onClick={() => setTrackData([])} className="text-[9px] font-black uppercase px-5 py-2.5 bg-black/10 text-black rounded-full shadow-sm hover:bg-black/20 transition-colors">Clear REC</button>
               <div className="text-[10px] font-black opacity-40 tabular-nums flex items-center tracking-widest">
                 <span className={`text-red-500 mr-2 text-[8px] ${trackData.length > 0 ? 'animate-pulse' : 'opacity-0'}`}>● REC</span>
@@ -154,24 +167,37 @@ export default function Room134() {
               </div>
             </div>
             
+            {/* 修正2: 上下で×ボタンの位置を変えるレイアウト */}
             <div className="grid grid-cols-4 gap-4 mb-12">
               {pads.map((p, i) => (
-                <div key={i} className="aspect-square relative">
-                  {!p && (
-                    <label className="absolute inset-0 z-10 cursor-pointer flex items-center justify-center text-[20px] opacity-10 hover:opacity-30 transition-opacity">
-                      ＋<input type="file" className="hidden" onChange={e => e.target.files?.[0] && uploadToPad(i, e.target.files[0])} />
-                    </label>
+                <div key={i} className="flex flex-col items-center gap-2">
+                  {/* 上段（0〜3）は上に×ボタン */}
+                  {i < 4 && (
+                    <button onClick={() => clearPad(i)} className={`text-[12px] opacity-20 hover:opacity-100 transition-opacity ${!p ? 'invisible' : ''}`}>✕</button>
                   )}
-                  <div 
-                    onMouseDown={() => p && setTrackData(prev => prev.length < 32 ? [...prev, p] : prev)}
-                    className={`w-full h-full rounded-2xl border transition-all flex items-center justify-center overflow-hidden active:scale-90 cursor-pointer ${p ? 'bg-white border-black/10 shadow-md ring-2 ring-black/10' : 'bg-black/5 border-dashed border-black/10'}`}
-                  >
-                    {p?.image_url && !['NODE'].includes(p.image_url) ? (
-                      <img src={p.image_url} className="w-full h-full object-cover" />
-                    ) : p?.description ? (
-                      <span className="text-[6px] p-1 text-center leading-tight overflow-hidden opacity-60 italic">{p.description.substring(0, 20)}...</span>
-                    ) : null}
+                  
+                  <div className="aspect-square relative w-full">
+                    {!p && (
+                      <label className="absolute inset-0 z-10 cursor-pointer flex items-center justify-center text-[20px] opacity-10 hover:opacity-30 transition-opacity">
+                        ＋<input type="file" className="hidden" onChange={e => e.target.files?.[0] && uploadToPad(i, e.target.files[0])} />
+                      </label>
+                    )}
+                    <div 
+                      onMouseDown={() => p && setTrackData(prev => prev.length < 32 ? [...prev, p] : prev)}
+                      className={`w-full h-full rounded-2xl border transition-all flex items-center justify-center overflow-hidden active:scale-90 cursor-pointer ${p ? 'bg-white border-black/10 shadow-md ring-2 ring-black/10' : 'bg-black/5 border-dashed border-black/10'}`}
+                    >
+                      {p?.image_url && !['NODE'].includes(p.image_url) ? (
+                        <img src={p.image_url} className="w-full h-full object-cover" />
+                      ) : p?.description ? (
+                        <span className="text-[6px] p-1 text-center leading-tight overflow-hidden opacity-60 italic">{p.description.substring(0, 20)}...</span>
+                      ) : null}
+                    </div>
                   </div>
+
+                  {/* 下段（4〜7）は下に×ボタン */}
+                  {i >= 4 && (
+                    <button onClick={() => clearPad(i)} className={`text-[12px] opacity-20 hover:opacity-100 transition-opacity ${!p ? 'invisible' : ''}`}>✕</button>
+                  )}
                 </div>
               ))}
             </div>
@@ -203,7 +229,8 @@ export default function Room134() {
             <div className="flex space-x-4 bg-white/90 backdrop-blur-2xl p-3 rounded-full shadow-2xl border border-black/5 animate-in slide-in-from-bottom-10">
               <button onClick={() => setCreatorMode('NODE')} className="px-6 py-3 bg-black text-white text-[9px] font-black uppercase rounded-full">Node</button>
               <button onClick={() => setCreatorMode('TRACK')} className="px-6 py-3 bg-black text-white text-[9px] font-black uppercase rounded-full">Track</button>
-              <button onClick={() => setCreatorMode('BOX')} className="px-6 py-3 bg-[#EBE8DB] text-black text-[9px] font-black uppercase rounded-full border border-black/5">Box</button>
+              {/* 修正3: BOXボタンをScrapsに変更 */}
+              <button onClick={() => setCreatorMode('BOX')} className="px-6 py-3 bg-[#EBE8DB] text-black text-[9px] font-black uppercase rounded-full border border-black/5">Scraps</button>
               <button onClick={() => setCreatorMode('NONE')} className="px-4 py-3 text-[9px] font-black uppercase opacity-20">✕</button>
             </div>
           ) : null}
@@ -213,7 +240,7 @@ export default function Room134() {
   );
 }
 
-// Sub Components (TrackPlayer, BoxViewer, NodeCreator, BoxCreator) は前回のロジックを維持...
+// --- 以下、Sub Components ---
 function TrackPlayer({data, onComplete}: any) {
   const [idx, setIdx] = useState(0);
   useEffect(() => {

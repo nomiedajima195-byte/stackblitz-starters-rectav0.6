@@ -38,7 +38,7 @@ const resizeImage = (file: File): Promise<Blob> => {
   });
 };
 
-export default function Room134_PureKoo() {
+export default function Room134_KooBubbleEdition() {
   const [nodes, setNodes] = useState<any[]>([]);
   const [viewingNode, setViewingNode] = useState<any | null>(null);
   const [creatorMode, setCreatorMode] = useState<'NONE' | 'MENU' | 'NODE' | 'TRACK' | 'BOX'>('NONE');
@@ -88,12 +88,6 @@ export default function Room134_PureKoo() {
     setViewingNode(null);
   };
 
-  const clearPad = (index: number) => {
-    const newPads = [...pads];
-    newPads[index] = null;
-    setPads(newPads);
-  };
-
   return (
     <div className="h-[100dvh] w-screen overflow-hidden flex flex-col relative text-black font-mono bg-[#000080]">
       <style jsx global>{`
@@ -105,7 +99,7 @@ export default function Room134_PureKoo() {
           border-right: 2px solid #808080; border-bottom: 2px solid #808080;
           box-shadow: inset 1px 1px 0px #dfdfdf;
           font-family: sans-serif; cursor: pointer;
-          position: relative; /* KooFloat用 */
+          position: relative;
         }
         .win-btn:active {
           border-top: 2px solid #808080; border-left: 2px solid #808080;
@@ -119,30 +113,59 @@ export default function Room134_PureKoo() {
         .mosaic-wall { column-count: 2; column-gap: 0.5rem; } 
         @media (min-width: 768px) { .mosaic-wall { column-count: 4; column-gap: 0.75rem; } }
 
-        /* koo 浮かび上がるアニメーション */
-        @keyframes kooFloat {
-          0% { transform: translateY(0) scale(1); opacity: 1; }
-          100% { transform: translateY(-40px) scale(1.5); opacity: 0; }
+        /* koo 吹き出しアニメーション */
+        @keyframes kooPopUp {
+          0% { transform: translate(-50%, 0) scale(0.5); opacity: 0; }
+          20% { transform: translate(-50%, -20px) scale(1.1); opacity: 1; }
+          80% { transform: translate(-50%, -50px) scale(1); opacity: 1; }
+          100% { transform: translate(-50%, -70px) scale(1); opacity: 0; }
         }
-        .koo-telepathy {
+        .koo-bubble {
           position: absolute;
-          top: 0; left: 50%;
+          bottom: 100%;
+          left: 50%;
           transform: translateX(-50%);
+          background: white;
+          border: 2px solid black;
+          padding: 4px 8px;
+          border-radius: 4px;
           font-family: 'DotGothic16', sans-serif;
           font-weight: bold;
-          color: #FF8C00;
+          color: black;
           pointer-events: none;
-          animation: kooFloat 0.8s ease-out forwards;
+          animation: kooPopUp 1.2s ease-out forwards;
           white-space: nowrap;
+          z-index: 9999;
+          box-shadow: 2px 2px 0px rgba(0,0,0,0.2);
+        }
+        /* 吹き出しのしっぽ */
+        .koo-bubble::after {
+          content: '';
+          position: absolute;
+          top: 100%;
+          left: 50%;
+          transform: translateX(-50%);
+          border-width: 6px;
+          border-style: solid;
+          border-color: black transparent transparent transparent;
+        }
+        .koo-bubble::before {
+          content: '';
+          position: absolute;
+          top: 100%;
+          left: 50%;
+          transform: translateX(-50%);
+          border-width: 4px;
+          border-style: solid;
+          border-color: white transparent transparent transparent;
+          z-index: 1;
         }
       `}</style>
 
-      {/* Header */}
       <header className="h-[60px] md:h-[80px] w-full shrink-0 flex items-center justify-center z-[3000]">
         <h1 onClick={() => window.location.reload()} className="text-3xl md:text-5xl rough-dot-text text-[#FF8C00] cursor-pointer italic">Room134</h1>
       </header>
 
-      {/* Main Grid */}
       <main className="flex-grow frame-scroll overflow-y-auto z-[1000] mx-2 md:mx-4 mb-2 bg-[#000080] p-2"
             style={{ border: '2px solid', borderColor: '#808080 #fff #fff #808080', boxShadow: 'inset 2px 2px 0px #000' }}>
         <div className={`transition-all duration-700 ${creatorMode !== 'NONE' || viewingNode ? 'blur-sm scale-95 pointer-events-none' : 'opacity-100'}`}>
@@ -162,7 +185,6 @@ export default function Room134_PureKoo() {
                       <div className="p-3 flex items-center justify-center text-[10px] leading-tight text-center min-h-[60px]">{node.description}</div>
                     )}
                     {isTrack && <div className="absolute inset-0 flex items-center justify-center bg-black/10 text-white text-3xl opacity-30 italic">koo?</div>}
-                    {/* 修正: 数のカウントは出さず、kooのみ表示 */}
                     {node.koo_count > 0 && (
                       <div className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-yellow-400 text-black text-[9px] font-bold border border-black rough-dot-text text-shadow-none">koo</div>
                     )}
@@ -174,7 +196,6 @@ export default function Room134_PureKoo() {
         </div>
       </main>
 
-      {/* Footer Nav */}
       <nav className="h-[50px] w-full shrink-0 bg-[#c0c0c0] border-t-2 border-white p-1 flex items-center z-[4000]">
         <button onClick={() => setCreatorMode(creatorMode === 'NONE' ? 'MENU' : 'NONE')} className="win-btn px-3 h-[38px] flex items-center gap-1 font-bold text-[11px] italic">◎ upload</button>
         <div className="ml-1 flex gap-1 h-full items-center">
@@ -191,19 +212,16 @@ export default function Room134_PureKoo() {
         </div>
       </nav>
 
-      {/* Viewer Interface */}
       {viewingNode && (
         <div className="fixed inset-0 z-[5000] bg-black/80 flex items-center justify-center p-2">
           <div className="win-btn bg-[#c0c0c0] w-full max-w-5xl h-[90dvh] flex flex-col shadow-2xl">
             <div className="bg-[#000080] text-white p-1 px-2 flex justify-between items-center text-[10px] font-bold shrink-0">
-              {/* 修正: VIEWERのヘッダーからもカウントを撤廃 */}
               <span>VIEWER.EXE</span>
               <button onClick={() => setViewingNode(null)} className="win-btn px-2 text-black">×</button>
             </div>
             <div className="p-2 md:p-4 overflow-auto bg-[#808080] flex-grow flex items-center justify-center relative">
                <div className="bg-white p-1 win-btn max-h-full flex flex-col items-center justify-center overflow-hidden">
                 {viewingNode.image_url === 'TRACK_TYPE' ? (
-                    // 修正: 再生後は自動で閉じる仕様
                     <TrackPlayer data={JSON.parse(viewingNode.description)} onComplete={() => setViewingNode(null)} />
                 ) : viewingNode.image_url === 'BOX_TYPE' ? (
                     <BoxViewer node={viewingNode} onUpdate={fetchData} />
@@ -218,7 +236,6 @@ export default function Room134_PureKoo() {
                 )}
                </div>
                
-               {/* 修正: koo! ボタンのアニメーション実装 */}
                <div className="absolute bottom-4 left-4 flex gap-2">
                  <KooButton onKoo={() => handleKoo(viewingNode)} />
                  <button onClick={() => autoAssignToPad(viewingNode)} className="win-btn px-3 py-3 text-[10px] font-bold">↓ PAD</button>
@@ -231,7 +248,6 @@ export default function Room134_PureKoo() {
         </div>
       )}
 
-      {/* Track Sequencer */}
       {creatorMode === 'TRACK' && (
         <div className="fixed inset-0 z-[4500] bg-black/60 flex items-center justify-center p-4">
           <div className="win-btn p-4 w-full max-w-md bg-[#c0c0c0]">
@@ -239,23 +255,20 @@ export default function Room134_PureKoo() {
               <span>TRACK_SEQUENCER.EXE</span>
               <button onClick={() => setCreatorMode('NONE')} className="win-btn px-2 text-black">×</button>
             </div>
-            
             <div className="flex justify-between items-center mb-2 px-1">
                <button onClick={() => setTrackData([])} className="win-btn px-2 py-1 text-[8px] font-bold">CLEAR REC</button>
                <div className="text-[10px] font-mono font-bold text-red-700 italic">● REC {trackData.length}/32</div>
             </div>
-
             <div className="grid grid-cols-4 gap-2 mb-6 p-2 bg-[#808080] border-inset">
               {pads.map((p, i) => (
                 <div key={i} className="flex flex-col items-center">
                   <div onMouseDown={() => p && setTrackData(prev => prev.length < 32 ? [...prev, p] : prev)} className="aspect-square w-full win-btn bg-white relative overflow-hidden flex items-center justify-center active:bg-yellow-200">
                     {!p ? <label className="cursor-pointer text-xl opacity-20">＋<input type="file" className="hidden" onChange={e => e.target.files?.[0] && uploadToPad(i, e.target.files[0], setPads, pads)} /></label> : <img src={p.image_url} className="w-full h-full object-cover pointer-events-none" />}
                   </div>
-                  <button onClick={() => {const n=[...pads]; n[i]=null; setPads(n);}} className={`text-[8px] mt-1 ${!p && 'invisible'}`}>clr</button>
+                  <button onClick={() => clearPad(i)} className={`text-[8px] mt-1 ${!p && 'invisible'}`}>clr</button>
                 </div>
               ))}
             </div>
-
             <div className="grid grid-cols-2 gap-2">
               <button onClick={() => setPreviewTrack(true)} disabled={trackData.length === 0} className="win-btn py-3 text-[10px] font-bold italic">▶ PREVIEW</button>
               <button onClick={() => handlePost('TRACK_TYPE', {description: JSON.stringify(trackData)})} disabled={trackData.length === 0} className="win-btn py-3 text-[10px] font-bold bg-[#008000] text-white">RELEASE</button>
@@ -264,7 +277,6 @@ export default function Room134_PureKoo() {
         </div>
       )}
 
-      {/* Preview Modal: 再生後は閉じる */}
       {previewTrack && (
         <div className="fixed inset-0 z-[6000] bg-black flex flex-col items-center justify-center">
           <TrackPlayer data={trackData} onComplete={() => setPreviewTrack(false)} />
@@ -278,24 +290,28 @@ export default function Room134_PureKoo() {
   );
 }
 
-/* --- Kooのアニメーションボタン --- */
+/* --- Kooの吹き出しアニメーションボタン --- */
 function KooButton({onKoo}: {onKoo: () => void}) {
-  const [showTelepathy, setShowTelepathy] = useState(false);
+  const [bubbles, setBubbles] = useState<number[]>([]);
   const handlePress = () => {
     onKoo();
-    setShowTelepathy(false); // 一旦リセット
-    setTimeout(() => setShowTelepathy(true), 10); // 再描画でアニメーション発火
-    setTimeout(() => setShowTelepathy(false), 800); // 終わったら消す
+    const id = Date.now();
+    setBubbles(prev => [...prev, id]);
+    setTimeout(() => {
+      setBubbles(prev => prev.filter(b => b !== id));
+    }, 1200);
   };
   return (
     <button onClick={handlePress} className="win-btn px-6 py-3 text-sm font-black text-black bg-yellow-400 active:bg-yellow-600">
       koo!
-      {showTelepathy && <span className="koo-telepathy">koo!</span>}
+      {bubbles.map(id => (
+        <span key={id} className="koo-bubble italic">koo!</span>
+      ))}
     </button>
   );
 }
 
-/* --- サポート機能 (修正済み仕様を維持) --- */
+/* --- サポート機能 --- */
 async function uploadToPad(index: number, file: File, setPads: any, pads: any[]) {
   const resized = await resizeImage(file);
   const fileName = `${Date.now()}-${file.name}`;
@@ -306,7 +322,6 @@ async function uploadToPad(index: number, file: File, setPads: any, pads: any[])
   setPads(newPads);
 }
 
-// 修正: onCompleteを確実に呼ぶ仕様
 function TrackPlayer({data, onComplete}: any) {
   const [idx, setIdx] = useState(0);
   const dataRef = useRef(data);
@@ -321,13 +336,12 @@ function TrackPlayer({data, onComplete}: any) {
       setIdx(v => {
         if (v >= dataRef.current.length - 1) { 
             clearInterval(timer); 
-            // 最後の画像を表示した後、少し余韻を残して閉じる
             setTimeout(() => onCompleteRef.current?.(), 800); 
             return v; 
         }
         return v + 1;
       });
-    }, 450); // 90sっぽいカクカク感
+    }, 450);
     return () => clearInterval(timer);
   }, []);
   return <div className="w-full h-full flex items-center justify-center">{data[idx] && <img src={data[idx].image_url} className="max-h-full object-contain" alt="koo" />}</div>;
@@ -404,7 +418,7 @@ function BoxViewer({node, onUpdate}: any) {
         <img key={i} src={item.image_url} className="h-[50dvh] win-btn p-1 flex-shrink-0" alt="box" />
       ))}
       <div className="h-[50dvh] aspect-[3/4] win-btn bg-[#dfdfdf] flex items-center justify-center flex-shrink-0">
-        <label className="cursor-pointer text-3xl opacity-30 hover:opacity-100">＋<input type="file" className="hidden" onChange={e => e.target.files?.[0] && handleAdd(e.target.files[0])} /></label>
+        <label className="cursor-pointer text-3xl opacity-30">＋<input type="file" className="hidden" onChange={e => e.target.files?.[0] && handleAdd(e.target.files[0])} /></label>
       </div>
     </div>
   );

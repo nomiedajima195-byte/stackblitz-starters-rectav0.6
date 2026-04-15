@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = 'https://pfxwhcgdbavycddapqmz.supabase.co';
@@ -38,7 +38,7 @@ const resizeImage = (file: File): Promise<Blob> => {
   });
 };
 
-export default function Room134_KooEdition() {
+export default function Room134_PureKoo() {
   const [nodes, setNodes] = useState<any[]>([]);
   const [viewingNode, setViewingNode] = useState<any | null>(null);
   const [creatorMode, setCreatorMode] = useState<'NONE' | 'MENU' | 'NODE' | 'TRACK' | 'BOX'>('NONE');
@@ -88,6 +88,12 @@ export default function Room134_KooEdition() {
     setViewingNode(null);
   };
 
+  const clearPad = (index: number) => {
+    const newPads = [...pads];
+    newPads[index] = null;
+    setPads(newPads);
+  };
+
   return (
     <div className="h-[100dvh] w-screen overflow-hidden flex flex-col relative text-black font-mono bg-[#000080]">
       <style jsx global>{`
@@ -99,6 +105,7 @@ export default function Room134_KooEdition() {
           border-right: 2px solid #808080; border-bottom: 2px solid #808080;
           box-shadow: inset 1px 1px 0px #dfdfdf;
           font-family: sans-serif; cursor: pointer;
+          position: relative; /* KooFloat用 */
         }
         .win-btn:active {
           border-top: 2px solid #808080; border-left: 2px solid #808080;
@@ -111,12 +118,31 @@ export default function Room134_KooEdition() {
         .frame-scroll::-webkit-scrollbar-thumb { background: #c0c0c0; border: 1px solid #808080; box-shadow: inset 1px 1px 0px #fff; }
         .mosaic-wall { column-count: 2; column-gap: 0.5rem; } 
         @media (min-width: 768px) { .mosaic-wall { column-count: 4; column-gap: 0.75rem; } }
+
+        /* koo 浮かび上がるアニメーション */
+        @keyframes kooFloat {
+          0% { transform: translateY(0) scale(1); opacity: 1; }
+          100% { transform: translateY(-40px) scale(1.5); opacity: 0; }
+        }
+        .koo-telepathy {
+          position: absolute;
+          top: 0; left: 50%;
+          transform: translateX(-50%);
+          font-family: 'DotGothic16', sans-serif;
+          font-weight: bold;
+          color: #FF8C00;
+          pointer-events: none;
+          animation: kooFloat 0.8s ease-out forwards;
+          white-space: nowrap;
+        }
       `}</style>
 
+      {/* Header */}
       <header className="h-[60px] md:h-[80px] w-full shrink-0 flex items-center justify-center z-[3000]">
         <h1 onClick={() => window.location.reload()} className="text-3xl md:text-5xl rough-dot-text text-[#FF8C00] cursor-pointer italic">Room134</h1>
       </header>
 
+      {/* Main Grid */}
       <main className="flex-grow frame-scroll overflow-y-auto z-[1000] mx-2 md:mx-4 mb-2 bg-[#000080] p-2"
             style={{ border: '2px solid', borderColor: '#808080 #fff #fff #808080', boxShadow: 'inset 2px 2px 0px #000' }}>
         <div className={`transition-all duration-700 ${creatorMode !== 'NONE' || viewingNode ? 'blur-sm scale-95 pointer-events-none' : 'opacity-100'}`}>
@@ -136,8 +162,9 @@ export default function Room134_KooEdition() {
                       <div className="p-3 flex items-center justify-center text-[10px] leading-tight text-center min-h-[60px]">{node.description}</div>
                     )}
                     {isTrack && <div className="absolute inset-0 flex items-center justify-center bg-black/10 text-white text-3xl opacity-30 italic">koo?</div>}
+                    {/* 修正: 数のカウントは出さず、kooのみ表示 */}
                     {node.koo_count > 0 && (
-                      <div className="absolute bottom-1 right-1 px-1 bg-yellow-400 text-black text-[8px] font-bold border border-black">koo:{node.koo_count}</div>
+                      <div className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-yellow-400 text-black text-[9px] font-bold border border-black rough-dot-text text-shadow-none">koo</div>
                     )}
                   </div>
                 </div>
@@ -147,6 +174,7 @@ export default function Room134_KooEdition() {
         </div>
       </main>
 
+      {/* Footer Nav */}
       <nav className="h-[50px] w-full shrink-0 bg-[#c0c0c0] border-t-2 border-white p-1 flex items-center z-[4000]">
         <button onClick={() => setCreatorMode(creatorMode === 'NONE' ? 'MENU' : 'NONE')} className="win-btn px-3 h-[38px] flex items-center gap-1 font-bold text-[11px] italic">◎ upload</button>
         <div className="ml-1 flex gap-1 h-full items-center">
@@ -159,21 +187,24 @@ export default function Room134_KooEdition() {
           )}
         </div>
         <div className="win-btn px-2 h-[38px] flex items-center text-[9px] bg-[#dfdfdf] ml-auto border-inset shrink-0 italic">
-          Koo-Pluke-Planet
+          Planet-Pluke
         </div>
       </nav>
 
+      {/* Viewer Interface */}
       {viewingNode && (
         <div className="fixed inset-0 z-[5000] bg-black/80 flex items-center justify-center p-2">
           <div className="win-btn bg-[#c0c0c0] w-full max-w-5xl h-[90dvh] flex flex-col shadow-2xl">
             <div className="bg-[#000080] text-white p-1 px-2 flex justify-between items-center text-[10px] font-bold shrink-0">
-              <span>VIEWER.EXE - {viewingNode.koo_count || 0} kooed</span>
+              {/* 修正: VIEWERのヘッダーからもカウントを撤廃 */}
+              <span>VIEWER.EXE</span>
               <button onClick={() => setViewingNode(null)} className="win-btn px-2 text-black">×</button>
             </div>
             <div className="p-2 md:p-4 overflow-auto bg-[#808080] flex-grow flex items-center justify-center relative">
                <div className="bg-white p-1 win-btn max-h-full flex flex-col items-center justify-center overflow-hidden">
                 {viewingNode.image_url === 'TRACK_TYPE' ? (
-                    <TrackPlayer data={JSON.parse(viewingNode.description)} />
+                    // 修正: 再生後は自動で閉じる仕様
+                    <TrackPlayer data={JSON.parse(viewingNode.description)} onComplete={() => setViewingNode(null)} />
                 ) : viewingNode.image_url === 'BOX_TYPE' ? (
                     <BoxViewer node={viewingNode} onUpdate={fetchData} />
                 ) : (
@@ -187,9 +218,9 @@ export default function Room134_KooEdition() {
                 )}
                </div>
                
-               {/* koo 敬意ボタン */}
+               {/* 修正: koo! ボタンのアニメーション実装 */}
                <div className="absolute bottom-4 left-4 flex gap-2">
-                 <button onClick={() => handleKoo(viewingNode)} className="win-btn px-6 py-3 text-sm font-black text-black bg-yellow-400 active:bg-yellow-600">koo!</button>
+                 <KooButton onKoo={() => handleKoo(viewingNode)} />
                  <button onClick={() => autoAssignToPad(viewingNode)} className="win-btn px-3 py-3 text-[10px] font-bold">↓ PAD</button>
                </div>
                {viewingNode.image_url === 'TRACK_TYPE' && (
@@ -200,17 +231,20 @@ export default function Room134_KooEdition() {
         </div>
       )}
 
+      {/* Track Sequencer */}
       {creatorMode === 'TRACK' && (
         <div className="fixed inset-0 z-[4500] bg-black/60 flex items-center justify-center p-4">
-          <div className="win-btn p-4 w-full max-w-md">
+          <div className="win-btn p-4 w-full max-w-md bg-[#c0c0c0]">
             <div className="bg-[#000080] text-white p-1 px-2 mb-4 flex justify-between items-center text-[11px] font-bold">
               <span>TRACK_SEQUENCER.EXE</span>
               <button onClick={() => setCreatorMode('NONE')} className="win-btn px-2 text-black">×</button>
             </div>
+            
             <div className="flex justify-between items-center mb-2 px-1">
                <button onClick={() => setTrackData([])} className="win-btn px-2 py-1 text-[8px] font-bold">CLEAR REC</button>
                <div className="text-[10px] font-mono font-bold text-red-700 italic">● REC {trackData.length}/32</div>
             </div>
+
             <div className="grid grid-cols-4 gap-2 mb-6 p-2 bg-[#808080] border-inset">
               {pads.map((p, i) => (
                 <div key={i} className="flex flex-col items-center">
@@ -221,6 +255,7 @@ export default function Room134_KooEdition() {
                 </div>
               ))}
             </div>
+
             <div className="grid grid-cols-2 gap-2">
               <button onClick={() => setPreviewTrack(true)} disabled={trackData.length === 0} className="win-btn py-3 text-[10px] font-bold italic">▶ PREVIEW</button>
               <button onClick={() => handlePost('TRACK_TYPE', {description: JSON.stringify(trackData)})} disabled={trackData.length === 0} className="win-btn py-3 text-[10px] font-bold bg-[#008000] text-white">RELEASE</button>
@@ -229,9 +264,10 @@ export default function Room134_KooEdition() {
         </div>
       )}
 
+      {/* Preview Modal: 再生後は閉じる */}
       {previewTrack && (
         <div className="fixed inset-0 z-[6000] bg-black flex flex-col items-center justify-center">
-          <TrackPlayer data={trackData} />
+          <TrackPlayer data={trackData} onComplete={() => setPreviewTrack(false)} />
           <button onClick={() => setPreviewTrack(false)} className="win-btn mt-8 px-8 py-2 text-sm font-bold">STOP PREVIEW</button>
         </div>
       )}
@@ -242,8 +278,24 @@ export default function Room134_KooEdition() {
   );
 }
 
-/* --- Sub Components --- */
+/* --- Kooのアニメーションボタン --- */
+function KooButton({onKoo}: {onKoo: () => void}) {
+  const [showTelepathy, setShowTelepathy] = useState(false);
+  const handlePress = () => {
+    onKoo();
+    setShowTelepathy(false); // 一旦リセット
+    setTimeout(() => setShowTelepathy(true), 10); // 再描画でアニメーション発火
+    setTimeout(() => setShowTelepathy(false), 800); // 終わったら消す
+  };
+  return (
+    <button onClick={handlePress} className="win-btn px-6 py-3 text-sm font-black text-black bg-yellow-400 active:bg-yellow-600">
+      koo!
+      {showTelepathy && <span className="koo-telepathy">koo!</span>}
+    </button>
+  );
+}
 
+/* --- サポート機能 (修正済み仕様を維持) --- */
 async function uploadToPad(index: number, file: File, setPads: any, pads: any[]) {
   const resized = await resizeImage(file);
   const fileName = `${Date.now()}-${file.name}`;
@@ -254,15 +306,30 @@ async function uploadToPad(index: number, file: File, setPads: any, pads: any[])
   setPads(newPads);
 }
 
-function TrackPlayer({data}: any) {
+// 修正: onCompleteを確実に呼ぶ仕様
+function TrackPlayer({data, onComplete}: any) {
   const [idx, setIdx] = useState(0);
+  const dataRef = useRef(data);
+  const onCompleteRef = useRef(onComplete);
+
   useEffect(() => {
-    if(!data || data.length === 0) return;
+    if(!dataRef.current || dataRef.current.length === 0) { 
+        onCompleteRef.current?.();
+        return; 
+    }
     const timer = setInterval(() => {
-      setIdx(v => (v >= data.length - 1 ? 0 : v + 1));
-    }, 450);
+      setIdx(v => {
+        if (v >= dataRef.current.length - 1) { 
+            clearInterval(timer); 
+            // 最後の画像を表示した後、少し余韻を残して閉じる
+            setTimeout(() => onCompleteRef.current?.(), 800); 
+            return v; 
+        }
+        return v + 1;
+      });
+    }, 450); // 90sっぽいカクカク感
     return () => clearInterval(timer);
-  }, [data]);
+  }, []);
   return <div className="w-full h-full flex items-center justify-center">{data[idx] && <img src={data[idx].image_url} className="max-h-full object-contain" alt="koo" />}</div>;
 }
 
@@ -337,7 +404,7 @@ function BoxViewer({node, onUpdate}: any) {
         <img key={i} src={item.image_url} className="h-[50dvh] win-btn p-1 flex-shrink-0" alt="box" />
       ))}
       <div className="h-[50dvh] aspect-[3/4] win-btn bg-[#dfdfdf] flex items-center justify-center flex-shrink-0">
-        <label className="cursor-pointer text-3xl opacity-30">＋<input type="file" className="hidden" onChange={e => e.target.files?.[0] && handleAdd(e.target.files[0])} /></label>
+        <label className="cursor-pointer text-3xl opacity-30 hover:opacity-100">＋<input type="file" className="hidden" onChange={e => e.target.files?.[0] && handleAdd(e.target.files[0])} /></label>
       </div>
     </div>
   );

@@ -27,12 +27,16 @@ export default function Room134_90s() {
   };
 
   return (
-    <div className="min-h-screen text-[#000] font-mono overflow-x-hidden relative">
+    // h-screen と overflow-hidden で画面全体のスクロールを禁止
+    <div className="h-screen w-screen overflow-hidden flex flex-col relative text-[#000] font-mono bg-[#000080]">
       <style jsx global>{`
-        /* 1. 背景をネイビー一色に固定 */
+        /* 完璧なドットフォントのインポート */
+        @import url('https://fonts.googleapis.com/css2?family=DotGothic16&display=swap');
+
         body {
           background-color: #000080;
-          background-image: none;
+          margin: 0;
+          overflow: hidden;
         }
         
         .win-btn {
@@ -55,50 +59,92 @@ export default function Room134_90s() {
           padding-left: 2px;
         }
 
-        /* 3. 粗々のドットフォント表現（アンチエイリアスを切り、文字間を詰め、影で立体感を出す） */
         .rough-dot-text { 
-          font-family: 'MS PGothic', 'Courier New', monospace; 
-          letter-spacing: -2px; 
-          font-weight: 900; 
-          font-smooth: never;
-          -webkit-font-smoothing: none;
+          font-family: 'DotGothic16', monospace; 
           text-shadow: 2px 2px 0px #000;
-          image-rendering: pixelated;
         }
         
+        /* 90s Win風スクロールバー */
+        .frame-scroll::-webkit-scrollbar { 
+          width: 16px; 
+        }
+        .frame-scroll::-webkit-scrollbar-track { 
+          background: #dfdfdf; 
+          border-left: 1px solid #808080; 
+        }
+        .frame-scroll::-webkit-scrollbar-thumb { 
+          background: #c0c0c0; 
+          border-top: 1px solid #fff; 
+          border-left: 1px solid #fff; 
+          border-right: 1px solid #808080; 
+          border-bottom: 1px solid #808080; 
+        }
+
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .mosaic-wall { column-count: 2; column-gap: 0.5rem; } 
         @media (min-width: 768px) { .mosaic-wall { column-count: 4; column-gap: 0.75rem; } }
       `}</style>
 
-      {/* Header: Room134のみ。粗いドットフォント＆オレンジ */}
-      <header className={`fixed top-0 left-0 w-full z-[3000] p-4 flex items-center justify-center transition-opacity duration-500 ${viewingNode ? 'opacity-0' : 'opacity-100'}`}>
-        <h1 onClick={() => window.location.reload()} className="text-4xl rough-dot-text text-[#FF8C00] cursor-pointer">Room134</h1>
+      {/* 固定ヘッダー */}
+      <header className="h-[70px] w-full shrink-0 flex items-center justify-center z-[3000]">
+        <h1 onClick={() => window.location.reload()} className="text-5xl rough-dot-text text-[#FF8C00] cursor-pointer mt-2">
+          Room134
+        </h1>
       </header>
 
-      <main className={`p-2 pt-20 pb-16 transition-all duration-700 ${creatorMode !== 'NONE' || viewingNode ? 'blur-sm scale-95 pointer-events-none' : 'opacity-100'}`}>
-        <div className="mosaic-wall max-w-[140rem] mx-auto">
-          {nodes.map(node => {
-            const isTrack = node.image_url === 'TRACK_TYPE';
-            const isBox = node.image_url === 'BOX_TYPE';
-            const contents = (isTrack || isBox) ? JSON.parse(node.description || '[]') : [];
-            const thumb = (isTrack || isBox) ? contents[0]?.image_url : node.image_url;
-            return (
-              <div key={node.id} onClick={() => setViewingNode(node)} className="mb-2 break-inside-avoid relative win-btn p-[2px] overflow-hidden bg-white">
-                <div className="bg-white relative">
-                  {isBox && <div className="absolute top-1 right-1 z-10 w-4 h-4 bg-[#c0c0c0] border border-black flex items-center justify-center text-[10px]">▢</div>}
-                  {thumb && !['NODE', 'TRACK_TYPE', 'BOX_TYPE'].includes(thumb) ? (
-                    <img src={thumb} className="w-full h-auto grayscale-[30%] hover:grayscale-0" alt="node" />
-                  ) : (
-                    <div className="p-3 flex items-center justify-center text-[11px] leading-relaxed text-center min-h-[80px]">{node.description}</div>
-                  )}
-                  {isTrack && <div className="absolute inset-0 flex items-center justify-center bg-black/10 text-white text-4xl">▷</div>}
+      {/* 窮屈なスクロール領域 (iframe/frameset風) */}
+      <main className="flex-grow frame-scroll overflow-y-scroll z-[1000] mx-4 mb-2 p-2 bg-[#000080]"
+            style={{
+              borderTop: '3px solid #808080',
+              borderLeft: '3px solid #808080',
+              borderBottom: '3px solid #ffffff',
+              borderRight: '3px solid #ffffff',
+            }}>
+        <div className={`transition-all duration-700 ${creatorMode !== 'NONE' || viewingNode ? 'blur-sm scale-95 pointer-events-none' : 'opacity-100'}`}>
+          <div className="mosaic-wall max-w-[140rem] mx-auto pb-4">
+            {nodes.map(node => {
+              const isTrack = node.image_url === 'TRACK_TYPE';
+              const isBox = node.image_url === 'BOX_TYPE';
+              const contents = (isTrack || isBox) ? JSON.parse(node.description || '[]') : [];
+              const thumb = (isTrack || isBox) ? contents[0]?.image_url : node.image_url;
+              return (
+                <div key={node.id} onClick={() => setViewingNode(node)} className="mb-2 break-inside-avoid relative win-btn p-[2px] overflow-hidden bg-white">
+                  <div className="bg-white relative">
+                    {isBox && <div className="absolute top-1 right-1 z-10 w-4 h-4 bg-[#c0c0c0] border border-black flex items-center justify-center text-[10px]">▢</div>}
+                    {thumb && !['NODE', 'TRACK_TYPE', 'BOX_TYPE'].includes(thumb) ? (
+                      <img src={thumb} className="w-full h-auto grayscale-[30%] hover:grayscale-0" alt="node" />
+                    ) : (
+                      <div className="p-3 flex items-center justify-center text-[11px] leading-relaxed text-center min-h-[80px]">{node.description}</div>
+                    )}
+                    {isTrack && <div className="absolute inset-0 flex items-center justify-center bg-black/10 text-white text-4xl">▷</div>}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       </main>
+
+      {/* 固定フッター */}
+      <nav className="h-[48px] w-full shrink-0 bg-[#c0c0c0] border-t-2 border-white p-1 flex items-center z-[4000] shadow-[0_-2px_5px_rgba(0,0,0,0.2)]">
+        <button onClick={() => setCreatorMode(creatorMode === 'NONE' ? 'MENU' : 'NONE')} className="win-btn px-4 h-full flex items-center gap-2 font-bold text-[12px] text-black italic">
+          ◎ upload
+        </button>
+        
+        <div className="ml-2 flex gap-1 h-full items-center">
+          {creatorMode === 'MENU' && (
+            <>
+              <button onClick={() => setCreatorMode('NODE')} className="win-btn px-4 h-8 text-[10px] font-bold text-black">NODE</button>
+              <button onClick={() => setCreatorMode('TRACK')} className="win-btn px-4 h-8 text-[10px] font-bold text-black">TRACK</button>
+              <button onClick={() => setCreatorMode('BOX')} className="win-btn px-4 h-8 text-[10px] font-bold text-black">Scraps</button>
+            </>
+          )}
+        </div>
+
+        <div className="win-btn px-3 h-full flex items-center text-[10px] font-mono bg-[#dfdfdf] ml-auto border-inset text-black">
+          {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        </div>
+      </nav>
 
       {/* Viewing Interface */}
       {viewingNode && (
@@ -129,29 +175,7 @@ export default function Room134_90s() {
         </div>
       )}
 
-      {/* Footer: 2. 「◎ upload」をフッターの左端に配置（Roomと差し替え） */}
-      {!viewingNode && (
-        <nav className="fixed bottom-0 left-0 w-full bg-[#c0c0c0] border-t-2 border-white p-1 flex items-center z-[4000] h-12 shadow-[0_-2px_5px_rgba(0,0,0,0.2)]">
-          <button onClick={() => setCreatorMode(creatorMode === 'NONE' ? 'MENU' : 'NONE')} className="win-btn px-4 h-full flex items-center gap-2 font-bold text-[12px] text-black italic">
-            ◎ upload
-          </button>
-          
-          <div className="ml-2 flex gap-1 h-full items-center">
-            {creatorMode === 'MENU' && (
-              <>
-                <button onClick={() => setCreatorMode('NODE')} className="win-btn px-4 h-8 text-[10px] font-bold text-black">NODE</button>
-                <button onClick={() => setCreatorMode('TRACK')} className="win-btn px-4 h-8 text-[10px] font-bold text-black">TRACK</button>
-                <button onClick={() => setCreatorMode('BOX')} className="win-btn px-4 h-8 text-[10px] font-bold text-black">Scraps</button>
-              </>
-            )}
-          </div>
-
-          <div className="win-btn px-3 h-full flex items-center text-[10px] font-mono bg-[#dfdfdf] ml-auto border-inset text-black">
-            {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-          </div>
-        </nav>
-      )}
-
+      {/* Creators */}
       {creatorMode === 'NODE' && <NodeCreator onPost={(p:any)=>handlePost('NODE', p)} onCancel={()=>setCreatorMode('NONE')} />}
       {creatorMode === 'TRACK' && <TrackSequencer onPost={(p:any)=>handlePost('TRACK_TYPE', p)} onCancel={()=>setCreatorMode('NONE')} pads={pads} setPads={setPads} />}
       {creatorMode === 'BOX' && <BoxCreator onRelease={(p:any)=>handlePost('BOX_TYPE', p)} onCancel={()=>setCreatorMode('NONE')} />}
@@ -159,7 +183,7 @@ export default function Room134_90s() {
   );
 }
 
-/* --- コンポーネント群 (エラー修正済み仕様を維持) --- */
+/* --- コンポーネント群 --- */
 
 function NodeCreator({onPost, onCancel}: any) {
   const [text, setText] = useState('');

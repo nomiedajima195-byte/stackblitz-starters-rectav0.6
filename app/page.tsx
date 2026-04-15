@@ -7,17 +7,13 @@ const supabaseUrl = 'https://pfxwhcgdbavycddapqmz.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmeHdoY2dkYmF2eWNkZGFwcW16Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxNjQ0NzUsImV4cCI6MjA4Mjc0MDQ3NX0.YNQlbyocg2olS6-1WxTnbr5N2z52XcVIpI1XR-XrDtM';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-const KU_IMAGE_URL = 'https://pfxwhcgdbavycddapqmz.supabase.co/storage/v1/object/public/images/ku.png';
-
-export default function Room134_PureEdition() {
+export default function Room134_DarkPixel() {
   const [nodes, setNodes] = useState<any[]>([]);
   const [viewingNode, setViewingNode] = useState<any | null>(null);
-  // NODEモードを削除
   const [creatorMode, setCreatorMode] = useState<'NONE' | 'MENU' | 'TRACK' | 'BOX'>('NONE');
   const [pads, setPads] = useState<(any | null)[]>(Array(8).fill(null));
   const [trackData, setTrackData] = useState<any[]>([]);
   const [previewTrack, setPreviewTrack] = useState(false);
-  const [animatingIdx, setAnimatingIdx] = useState<number | null>(null);
 
   const fetchData = useCallback(async () => {
     const { data } = await supabase.from('mainline').select('*');
@@ -35,16 +31,6 @@ export default function Room134_PureEdition() {
     fetchData();
   };
 
-  const autoAssignToPad = (node: any) => {
-    const newPads = [...pads];
-    const emptyIdx = newPads.findIndex(p => p === null);
-    const item = { id: node.id, image_url: node.image_url, description: node.description };
-    if (emptyIdx !== -1) { newPads[emptyIdx] = item; } 
-    else { newPads.shift(); newPads.push(item); }
-    setPads(newPads);
-    setViewingNode(null);
-  };
-
   const uploadToPad = async (index: number, file: File) => {
     const fileName = `${Date.now()}-${file.name}`;
     await supabase.storage.from('images').upload(fileName, file);
@@ -55,85 +41,66 @@ export default function Room134_PureEdition() {
   };
 
   return (
-    <div className="min-h-screen text-[#000] font-mono overflow-x-hidden relative selection:bg-[#000080] selection:text-white">
+    <div className="min-h-screen bg-[#1a1b26] text-[#c0caf5] overflow-x-hidden relative selection:bg-orange-500 selection:text-white">
+      {/* Google Fonts からピクセルフォントをロード */}
+      <link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet" />
+      
       <style dangerouslySetInnerHTML={{ __html: `
-        body {
-          background: linear-gradient(135deg, #1A1A4D 0%, #1A1A4D 10%, #fad0c4 20%, #ffd1ff 30%, #a1c4fd 40%, #c2e9fb 50%, #d4fc79 60%, #96e6a1 70%, #fff1eb 80%, #ace0f9 100%);
-          background-attachment: fixed;
-          background-size: cover;
-        }
+        .pixel-font { font-family: 'DotGothic16', sans-serif; }
         .mosaic-wall { column-count: 2; column-gap: 0.5rem; } 
         @media (min-width: 768px) { .mosaic-wall { column-count: 4; column-gap: 0.75rem; } }
         
+        /* Windows-style elements with Dark Navy theme */
         .win-btn {
-          background: #c0c0c0;
-          border-top: 2px solid #fff;
-          border-left: 2px solid #fff;
-          border-right: 2px solid #808080;
-          border-bottom: 2px solid #808080;
-          box-shadow: inset 1px 1px 0px #dfdfdf;
+          background: #24283b;
+          border-top: 2px solid #414868;
+          border-left: 2px solid #414868;
+          border-right: 2px solid #10141e;
+          border-bottom: 2px solid #10141e;
         }
         .win-btn:active {
-          border-top: 2px solid #808080;
-          border-left: 2px solid #808080;
-          border-right: 2px solid #fff;
-          border-bottom: 2px solid #fff;
-          padding-top: 2px;
-          padding-left: 2px;
+          border-top: 2px solid #10141e;
+          border-left: 2px solid #10141e;
+          border-right: 2px solid #414868;
+          border-bottom: 2px solid #414868;
+          padding-top: 1px; padding-left: 1px;
         }
-        .dot-text { font-family: 'Courier New', Courier, monospace; letter-spacing: -1px; font-weight: bold; }
-        
-        @keyframes ku-peek {
-          0% { transform: translateY(100%) scale(0.5); opacity: 0; }
-          30% { transform: translateY(0) scale(1.1); opacity: 1; }
-          70% { transform: translateY(0) scale(1.1); opacity: 1; }
-          100% { transform: translateY(100%) scale(0.5); opacity: 0; }
-        }
-        .ku-animate { animation: ku-peek 0.8s ease-in-out forwards; }
       `}} />
 
-      <header className="fixed top-0 left-0 w-full z-[3000] p-4 pointer-events-none">
-        <div className="max-w-[140rem] mx-auto flex items-center justify-center gap-12 text-center drop-shadow-[2px_2px_0px_rgba(255,255,255,0.8)] pointer-events-auto">
-          <h1 onClick={() => window.location.reload()} className="text-2xl dot-text italic text-orange-400 cursor-pointer">Room134</h1>
-        </div>
+      <header className="fixed top-0 left-0 w-full z-[3000] p-6 text-center">
+        <h1 
+          onClick={() => window.location.reload()} 
+          className="pixel-font text-3xl italic text-[#ff8c00] cursor-pointer drop-shadow-[0_2px_0px_rgba(0,0,0,0.5)] active:scale-95 transition-transform"
+        >
+          Room134
+        </h1>
       </header>
 
-      <main className={`p-2 pt-20 transition-all duration-700 ${creatorMode !== 'NONE' || viewingNode ? 'blur-sm scale-95 pointer-events-none' : 'opacity-100'}`}>
+      <main className={`p-2 pt-24 transition-all duration-500 ${creatorMode !== 'NONE' || viewingNode ? 'blur-md opacity-40 scale-95' : 'opacity-100'}`}>
         <div className="mosaic-wall max-w-[140rem] mx-auto">
-          {nodes.map((node, i) => {
+          {nodes.map((node) => {
             const isTrack = node.image_url === 'TRACK_TYPE';
             const isBox = node.image_url === 'BOX_TYPE';
             const contents = (isTrack || isBox) ? JSON.parse(node.description || '[]') : [];
             const thumb = (isTrack || isBox) ? contents[0]?.image_url : node.image_url;
 
             return (
-              <div key={node.id} className="mb-2 break-inside-avoid relative win-btn p-[2px] overflow-hidden group">
+              <div key={node.id} className="mb-2 break-inside-avoid relative win-btn p-[1px] overflow-hidden group">
                 <div 
-                  onClick={() => setAnimatingIdx(i)} 
-                  className="bg-white relative cursor-pointer min-h-[80px] flex items-center justify-center"
+                  onClick={() => setViewingNode(node)} 
+                  className="bg-[#10141e] relative cursor-pointer min-h-[60px] flex items-center justify-center overflow-hidden"
                 >
-                  {isBox && <div className="absolute top-1 right-1 z-10 w-4 h-4 bg-[#c0c0c0] border border-black flex items-center justify-center text-[10px]">▢</div>}
+                  {isBox && <div className="absolute top-1 right-1 z-10 w-4 h-4 bg-orange-500/20 border border-orange-500 text-orange-500 flex items-center justify-center text-[10px] pixel-font">Box</div>}
                   
                   {thumb && !['NODE', 'TRACK_TYPE', 'BOX_TYPE'].includes(thumb) ? (
-                    <img src={thumb} className="w-full h-auto grayscale-[40%] group-hover:grayscale-0 transition-all" />
+                    <img src={thumb} className="w-full h-auto opacity-80 group-hover:opacity-100 transition-opacity duration-300" />
                   ) : (
-                    <div className="p-3 text-[11px] leading-relaxed break-words text-center italic opacity-60">
+                    <div className="p-4 text-[11px] leading-relaxed text-center italic opacity-50 pixel-font">
                       {node.description}
                     </div>
                   )}
 
-                  {isTrack && <div className="absolute inset-0 flex items-center justify-center bg-black/10 text-white text-4xl">▷</div>}
-                  
-                  <img src={KU_IMAGE_URL} className="absolute bottom-1 right-1 w-4 h-4 border border-black p-[1px] bg-[#c0c0c0] z-20" />
-                  
-                  <img 
-                    src={KU_IMAGE_URL} 
-                    className={`absolute inset-0 m-auto w-3/4 h-3/4 object-contain pointer-events-none z-50 opacity-0 ${animatingIdx === i ? 'ku-animate' : ''}`}
-                    onAnimationEnd={() => {
-                      setAnimatingIdx(null);
-                      setViewingNode(node);
-                    }}
-                  />
+                  {isTrack && <div className="absolute inset-0 flex items-center justify-center bg-orange-500/10 text-orange-500 text-2xl pixel-font">PLAY</div>}
                 </div>
               </div>
             );
@@ -141,86 +108,71 @@ export default function Room134_PureEdition() {
         </div>
       </main>
 
+      {/* Viewer */}
       {viewingNode && (
-        <div className="fixed inset-0 z-[5000] bg-[#808080]/80 flex items-center justify-center p-4">
-          <div className="win-btn bg-[#c0c0c0] w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl relative">
-            <div className="bg-[#000080] text-white p-1 px-2 flex justify-between items-center text-[11px] font-bold">
-              <span>VIEWER.EXE</span>
-              <button onClick={() => setViewingNode(null)} className="win-btn px-2 text-black">×</button>
+        <div className="fixed inset-0 z-[5000] bg-[#1a1b26]/95 flex items-center justify-center p-4">
+          <div className="win-btn bg-[#24283b] w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            <div className="bg-[#414868] text-[#c0caf5] p-2 flex justify-between items-center text-[12px] pixel-font">
+              <span>VIEW_ARTIFACT</span>
+              <button onClick={() => setViewingNode(null)} className="win-btn px-3 text-[#ff8c00]">X</button>
             </div>
-            <div className="p-6 overflow-auto bg-white flex-grow flex flex-col items-center justify-center min-h-[300px]">
+            <div className="p-4 overflow-auto bg-[#10141e] flex-grow flex flex-col items-center justify-center min-h-[300px]">
               {viewingNode.image_url === 'TRACK_TYPE' ? (
                 <TrackPlayer data={JSON.parse(viewingNode.description)} onComplete={() => setViewingNode(null)} />
               ) : viewingNode.image_url === 'BOX_TYPE' ? (
-                <BoxViewer node={viewingNode} onUpdate={(newC: any[]) => {
-                    supabase.from('mainline').update({ description: JSON.stringify(newC) }).eq('id', viewingNode.id).then(() => {
-                        setViewingNode((prev: any) => ({ ...prev, description: JSON.stringify(newC) }));
-                        fetchData();
-                    });
-                }} />
+                <BoxViewer node={viewingNode} />
               ) : (
-                <div className="w-full h-full flex flex-col items-center gap-4">
-                  {viewingNode.image_url !== 'NODE' ? (
-                    <img src={viewingNode.image_url} className="max-h-[70vh] max-w-full win-btn p-1 border-inset" />
-                  ) : (
-                    <div className="p-10 text-xl italic text-center">{viewingNode.description}</div>
-                  )}
-                  <button onClick={() => autoAssignToPad(viewingNode)} className="win-btn px-10 py-2 font-bold text-[10px] text-black italic">↓ PAD</button>
-                </div>
+                <img src={viewingNode.image_url} className="max-h-[75vh] max-w-full border border-[#414868]" />
               )}
             </div>
-            <img src={KU_IMAGE_URL} className="absolute bottom-2 right-2 w-6 h-6 border border-black p-[1px] bg-[#c0c0c0]" />
           </div>
         </div>
       )}
 
+      {/* Footer Nav */}
       {!viewingNode && (
-        <nav className="fixed bottom-0 left-0 w-full bg-[#c0c0c0] border-t-2 border-white p-1 flex items-center z-[4000] h-12">
-          <button onClick={() => setCreatorMode(creatorMode === 'NONE' ? 'MENU' : 'NONE')} className="win-btn px-3 h-full flex items-center font-bold text-[12px] italic text-black">
-            ◎ Room
+        <nav className="fixed bottom-0 left-0 w-full bg-[#10141e] border-t border-[#414868] p-2 flex items-center z-[4000] h-14">
+          <button onClick={() => setCreatorMode(creatorMode === 'NONE' ? 'MENU' : 'NONE')} className="win-btn px-4 h-full flex items-center text-[#ff8c00] pixel-font text-lg">
+            MENU
           </button>
-          <div className="ml-2 flex gap-1">
+          <div className="ml-4 flex gap-2">
             {creatorMode === 'MENU' && (
               <>
-                <button onClick={() => setCreatorMode('TRACK')} className="win-btn px-4 h-8 text-[10px] font-bold text-black uppercase">Track</button>
-                <button onClick={() => setCreatorMode('BOX')} className="win-btn px-4 h-8 text-[10px] font-bold text-black uppercase">Scraps</button>
+                <button onClick={() => setCreatorMode('TRACK')} className="win-btn px-4 h-10 text-[12px] pixel-font text-[#c0caf5]">TRACK_REC</button>
+                <button onClick={() => setCreatorMode('BOX')} className="win-btn px-4 h-10 text-[12px] pixel-font text-[#c0caf5]">BOX_PACK</button>
               </>
             )}
-          </div>
-          <div className="win-btn px-2 h-full flex items-center text-[10px] font-mono bg-[#dfdfdf] ml-auto">
-            {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </div>
         </nav>
       )}
 
+      {/* Track Creator */}
       {creatorMode === 'TRACK' && (
-        <div className="fixed inset-0 z-[4500] bg-black/40 flex items-center justify-center p-4">
-          <div className="win-btn p-4 w-full max-w-sm relative bg-[#c0c0c0]">
-            <div className="bg-[#000080] text-white p-1 px-2 mb-4 flex justify-between items-center text-[11px] font-bold">
-              <span>TRACK_MAKER.EXE</span>
-              <button onClick={() => setCreatorMode('NONE')} className="win-btn px-2 text-black">×</button>
+        <div className="fixed inset-0 z-[4500] bg-black/80 flex items-center justify-center p-4">
+          <div className="win-btn p-4 w-full max-w-md bg-[#24283b]">
+            <div className="bg-[#414868] p-2 mb-4 text-[12px] pixel-font flex justify-between items-center">
+              <span>TRACK_MAKER</span>
+              <button onClick={() => setCreatorMode('NONE')}>[X]</button>
             </div>
-            <div className="grid grid-cols-4 gap-2 mb-6 bg-[#808080] p-2">
+            <div className="grid grid-cols-4 gap-2 mb-6 bg-[#10141e] p-3">
               {pads.map((p, i) => (
-                <div key={i} className="aspect-square relative w-full win-btn bg-white overflow-hidden flex items-center justify-center cursor-pointer">
+                <div key={i} className="aspect-square win-btn bg-[#1a1b26] flex items-center justify-center overflow-hidden cursor-pointer relative">
                   {!p ? (
-                    <label className="w-full h-full flex items-center justify-center opacity-20">＋<input type="file" className="hidden" onChange={e => e.target.files?.[0] && uploadToPad(i, e.target.files[0])} /></label>
+                    <label className="w-full h-full flex items-center justify-center opacity-30 pixel-font">＋<input type="file" className="hidden" onChange={e => e.target.files?.[0] && uploadToPad(i, e.target.files[0])} /></label>
                   ) : (
-                    <div onClick={() => setTrackData(prev => [...prev, p])} className="w-full h-full"><img src={p.image_url} className="w-full h-full object-cover" /></div>
+                    <div onClick={() => setTrackData(prev => [...prev, p])} className="w-full h-full animate-pulse"><img src={p.image_url} className="w-full h-full object-cover" /></div>
                   )}
                 </div>
               ))}
             </div>
             <div className="flex gap-2">
-                <button onClick={() => setPreviewTrack(true)} className="win-btn flex-1 py-2 text-[10px] font-bold">PREVIEW</button>
-                <button onClick={() => handlePost('TRACK_TYPE', {description: JSON.stringify(trackData)})} className="win-btn flex-1 py-2 text-[10px] font-bold">RELEASE</button>
+              <button onClick={() => setPreviewTrack(true)} className="win-btn flex-1 py-3 text-sm pixel-font text-orange-500">PREVIEW</button>
+              <button onClick={() => handlePost('TRACK_TYPE', {description: JSON.stringify(trackData)})} className="win-btn flex-1 py-3 text-sm pixel-font text-orange-500">RELEASE</button>
             </div>
           </div>
         </div>
       )}
 
-      {creatorMode === 'BOX' && <BoxCreator onRelease={(p:any)=>handlePost('BOX_TYPE', p)} onCancel={()=>setCreatorMode('NONE')} />}
-      
       {previewTrack && (
         <div className="fixed inset-0 z-[6000] bg-black flex items-center justify-center">
            <TrackPlayer data={trackData} onComplete={() => setPreviewTrack(false)} />
@@ -239,61 +191,26 @@ function TrackPlayer({data, onComplete}: any) {
         if (v >= data.length - 1) { clearInterval(timer); setTimeout(onComplete, 800); return v; }
         return v + 1;
       });
-    }, 500);
+    }, 400); // 若干早めのテンポ
     return () => clearInterval(timer);
   }, [data, onComplete]);
   const current = data[idx];
   return (
-    <div className="flex flex-col items-center justify-center w-full h-full">
-      {current?.image_url && <img key={idx} src={current.image_url} className="max-h-[80vh] object-contain" />}
+    <div className="flex items-center justify-center w-full h-full">
+      {current?.image_url && <img key={idx} src={current.image_url} className="max-h-[85vh] object-contain shadow-[0_0_50px_rgba(255,140,0,0.2)]" />}
     </div>
   );
 }
 
-function BoxViewer({node, onUpdate}: any) {
+function BoxViewer({node}: any) {
   const data = JSON.parse(node.description || '[]');
-  const handleAdd = async (f: File) => {
-    const fileName = `${Date.now()}-${f.name}`;
-    await supabase.storage.from('images').upload(fileName, f);
-    const url = supabase.storage.from('images').getPublicUrl(fileName).data.publicUrl;
-    onUpdate([...data, { id: Date.now(), image_url: url }]);
-  };
   return (
-    <div className="w-full h-full flex items-center overflow-x-auto p-4 space-x-4">
+    <div className="w-full h-full flex items-center overflow-x-auto p-4 space-x-6 scrollbar-hide">
       {data.map((item: any, i: number) => (
-        <div key={i} className="flex-shrink-0 win-btn p-1 bg-white relative"><img src={item.image_url} className="h-[60vh] object-contain" /></div>
+        <div key={i} className="flex-shrink-0 win-btn p-[2px] bg-[#1a1b26]">
+          <img src={item.image_url} className="h-[60vh] object-contain" />
+        </div>
       ))}
-      <label className="flex-shrink-0 h-[60vh] aspect-[3/4] win-btn bg-[#d0d0d0] flex items-center justify-center text-5xl opacity-30 cursor-pointer">＋<input type="file" className="hidden" onChange={e => e.target.files?.[0] && handleAdd(e.target.files[0])} /></label>
-    </div>
-  );
-}
-
-function BoxCreator({onRelease, onCancel}: any) {
-  const [boxItems, setBoxItems] = useState<(any|null)[]>(Array(12).fill(null));
-  const handleFile = async (i: number, f: File) => {
-    const fileName = `${Date.now()}-${f.name}`;
-    await supabase.storage.from('images').upload(fileName, f);
-    const url = supabase.storage.from('images').getPublicUrl(fileName).data.publicUrl;
-    const next = [...boxItems];
-    next[i] = {id: Date.now()+i, image_url: url};
-    setBoxItems(next);
-  };
-  return (
-    <div className="fixed inset-0 z-[4500] bg-[#808080]/80 flex items-center justify-center p-4">
-      <div className="win-btn p-4 w-full max-w-4xl relative bg-[#c0c0c0]">
-        <div className="bg-[#000080] text-white p-1 px-2 mb-4 flex justify-between items-center text-[11px] font-bold">
-          <span>SCRAP_PACKER.EXE</span>
-          <button onClick={onCancel} className="win-btn px-2 text-black">×</button>
-        </div>
-        <div className="grid grid-cols-6 gap-2 mb-6 h-64 overflow-y-auto p-2 bg-[#808080]">
-          {boxItems.map((item, i) => (
-            <div key={i} className="aspect-[3/4] win-btn bg-white overflow-hidden flex items-center justify-center relative">
-              {item ? <img src={item.image_url} className="w-full h-full object-cover" /> : <label className="w-full h-full flex items-center justify-center opacity-10 cursor-pointer">＋<input type="file" className="hidden" onChange={e => e.target.files?.[0] && handleFile(i, e.target.files[0])} /></label>}
-            </div>
-          ))}
-        </div>
-        <button onClick={()=>onRelease({description: JSON.stringify(boxItems.filter(i=>i!==null))})} className="win-btn w-full py-4 font-bold text-[10px] text-black">RELEASE AS SCRAPS</button>
-      </div>
     </div>
   );
 }

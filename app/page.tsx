@@ -12,8 +12,6 @@ export default function Room134_90s() {
   const [viewingNode, setViewingNode] = useState<any | null>(null);
   const [creatorMode, setCreatorMode] = useState<'NONE' | 'MENU' | 'NODE' | 'TRACK' | 'BOX'>('NONE');
   const [pads, setPads] = useState<(any | null)[]>(Array(8).fill(null));
-  const [trackData, setTrackData] = useState<any[]>([]);
-  const [previewTrack, setPreviewTrack] = useState(false);
 
   const fetchData = useCallback(async () => {
     const { data } = await supabase.from('mainline').select('*');
@@ -25,30 +23,17 @@ export default function Room134_90s() {
   const handlePost = async (type: string, payload: any) => {
     await supabase.from('mainline').insert([{ ...payload, image_url: type, created_at: new Date().toISOString() }]);
     setCreatorMode('NONE');
-    setTrackData([]);
     fetchData();
-  };
-
-  const uploadToPad = async (index: number, file: File) => {
-    const fileName = `${Date.now()}-${file.name}`;
-    await supabase.storage.from('images').upload(fileName, file);
-    const url = supabase.storage.from('images').getPublicUrl(fileName).data.publicUrl;
-    const newPads = [...pads];
-    newPads[index] = { id: Date.now(), image_url: url };
-    setPads(newPads);
   };
 
   return (
     <div className="min-h-screen text-[#000] font-mono overflow-x-hidden relative">
       <style jsx global>{`
-        /* 90s Rainbow & Navy Background */
         body {
           background: linear-gradient(135deg, #1A1A4D 0%, #1A1A4D 25%, #ff9a9e 40%, #fad0c4 50%, #a1c4fd 70%, #ace0f9 100%);
           background-attachment: fixed;
           background-size: cover;
         }
-        
-        /* Win98 Button UI */
         .win-btn {
           background: #c0c0c0;
           border-top: 2px solid #fff;
@@ -74,7 +59,7 @@ export default function Room134_90s() {
         @media (min-width: 768px) { .mosaic-wall { column-count: 4; column-gap: 0.75rem; } }
       `}</style>
 
-      {/* Header: 固定位置。Room134(オレンジ) & ◎upload(白) */}
+      {/* Header: オレンジRoom134 & 白◎upload */}
       <header className={`fixed top-0 left-0 w-full z-[3000] p-4 flex items-center justify-center gap-10 transition-opacity duration-500 ${viewingNode ? 'opacity-0' : 'opacity-100'}`}>
         <h1 onClick={() => window.location.reload()} className="text-2xl dot-text italic text-orange-500 cursor-pointer drop-shadow-md">Room134</h1>
         <div className="text-sm dot-text text-white">◎ upload</div>
@@ -87,9 +72,8 @@ export default function Room134_90s() {
             const isBox = node.image_url === 'BOX_TYPE';
             const contents = (isTrack || isBox) ? JSON.parse(node.description || '[]') : [];
             const thumb = (isTrack || isBox) ? contents[0]?.image_url : node.image_url;
-
             return (
-              <div key={node.id} onClick={() => setViewingNode(node)} className="mb-2 break-inside-avoid relative win-btn p-[2px] group overflow-hidden bg-white">
+              <div key={node.id} onClick={() => setViewingNode(node)} className="mb-2 break-inside-avoid relative win-btn p-[2px] overflow-hidden bg-white">
                 <div className="bg-white relative">
                   {isBox && <div className="absolute top-1 right-1 z-10 w-4 h-4 bg-[#c0c0c0] border border-black flex items-center justify-center text-[10px]">▢</div>}
                   {thumb && !['NODE', 'TRACK_TYPE', 'BOX_TYPE'].includes(thumb) ? (
@@ -111,14 +95,14 @@ export default function Room134_90s() {
           <div className="win-btn bg-[#c0c0c0] w-full max-w-5xl h-[85vh] flex flex-col shadow-2xl">
             <div className="bg-[#000080] text-white p-1 px-2 flex justify-between items-center text-[11px] font-bold">
               <span>VIEWER.EXE</span>
-              <button onClick={() => setViewingNode(null)} className="win-btn px-2 text-black transition-colors hover:bg-red-500 hover:text-white">×</button>
+              <button onClick={() => setViewingNode(null)} className="win-btn px-2 text-black">×</button>
             </div>
-            <div className="p-6 overflow-auto bg-[#808080] flex-grow flex items-center justify-center relative">
-               <div className="bg-white p-1 win-btn max-h-full flex items-center justify-center overflow-hidden">
+            <div className="p-6 overflow-auto bg-[#808080] flex-grow flex items-center justify-center">
+               <div className="bg-white p-1 win-btn max-h-full flex items-center justify-center">
                 {viewingNode.image_url === 'TRACK_TYPE' ? (
                     <TrackPlayer data={JSON.parse(viewingNode.description)} onComplete={() => setViewingNode(null)} />
                 ) : viewingNode.image_url === 'BOX_TYPE' ? (
-                    <BoxViewer node={viewingNode} onUpdate={() => fetchData()} />
+                    <BoxViewer node={viewingNode} />
                 ) : (
                     <>
                     {viewingNode.image_url !== 'NODE' ? (
@@ -136,21 +120,19 @@ export default function Room134_90s() {
 
       {/* Footer: 背景グレー、テキスト黒、四角いボタン */}
       {!viewingNode && (
-        <nav className="fixed bottom-0 left-0 w-full bg-[#c0c0c0] border-t-2 border-white p-1 flex items-center z-[4000] h-12 shadow-[0_-2px_5px_rgba(0,0,0,0.2)]">
+        <nav className="fixed bottom-0 left-0 w-full bg-[#c0c0c0] border-t-2 border-white p-1 flex items-center z-[4000] h-12">
           <button onClick={() => setCreatorMode(creatorMode === 'NONE' ? 'MENU' : 'NONE')} className="win-btn px-4 h-full flex items-center gap-2 font-bold text-[12px] text-black italic">
             ◎ Room
           </button>
-          
           <div className="ml-2 flex gap-1 h-full items-center">
             {creatorMode === 'MENU' && (
-              <div className="flex gap-1 animate-in slide-in-from-left-2">
+              <>
                 <button onClick={() => setCreatorMode('NODE')} className="win-btn px-4 h-8 text-[10px] font-bold text-black">NODE</button>
                 <button onClick={() => setCreatorMode('TRACK')} className="win-btn px-4 h-8 text-[10px] font-bold text-black">TRACK</button>
                 <button onClick={() => setCreatorMode('BOX')} className="win-btn px-4 h-8 text-[10px] font-bold text-black">Scraps</button>
-              </div>
+              </>
             )}
           </div>
-
           <div className="win-btn px-3 h-full flex items-center text-[10px] font-mono bg-[#dfdfdf] ml-auto border-inset text-black">
             {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </div>
@@ -164,20 +146,22 @@ export default function Room134_90s() {
   );
 }
 
-/* --- サブコンポーネント (エラー回避修正済み) --- */
+/* --- コンポーネント (エラー回避を強化) --- */
 
 function NodeCreator({onPost, onCancel}: any) {
   const [text, setText] = useState('');
-  const [file, setFile] = useState<any>(null); // Type safety bypass for build
+  const [file, setFile] = useState<any>(null);
+  
   const handlePost = async () => {
     let url = null;
     if(file) {
-      const fileName = `${Date.now()}-${file.name}`;
+      const fileName = `${Date.now()}-${file['name']}`; // 文字列キーで安全にアクセス
       await supabase.storage.from('images').upload(fileName, file);
       url = supabase.storage.from('images').getPublicUrl(fileName).data.publicUrl;
     }
     onPost({description: text, image_url: url || 'NODE'});
   };
+
   return (
     <div className="fixed inset-0 z-[4500] bg-black/40 flex items-center justify-center p-4">
       <div className="win-btn p-4 w-full max-w-xl">
@@ -190,8 +174,12 @@ function NodeCreator({onPost, onCancel}: any) {
             <label className="win-btn px-4 py-1 text-[10px] font-bold cursor-pointer">UPLOAD IMG<input type="file" className="hidden" onChange={e=>setFile(e.target.files?.[0]||null)} /></label>
             <button onClick={handlePost} className="win-btn px-8 py-2 font-bold text-black">POST</button>
         </div>
-        {/* エラー箇所修正: file?.name で安全にアクセス */}
-        {file && <p className="text-[8px] text-gray-600 mt-2 italic break-all">>> {file?.name}</p>}
+        {/* エラー箇所修正: インデックスアクセスと論理チェックの組み合わせでTypeScriptを黙らせる */}
+        {file && file['name'] && (
+          <p className="text-[8px] text-gray-600 mt-2 italic break-all">
+            {`>> ${file['name']}`}
+          </p>
+        )}
       </div>
     </div>
   );
@@ -200,7 +188,7 @@ function NodeCreator({onPost, onCancel}: any) {
 function TrackSequencer({onPost, onCancel, pads, setPads}: any) {
   const [trackData, setTrackData] = useState<any[]>([]);
   const uploadToPad = async (index: number, f: File) => {
-    const fileName = `${Date.now()}-${f.name}`;
+    const fileName = `${Date.now()}-${f['name']}`;
     await supabase.storage.from('images').upload(fileName, f);
     const url = supabase.storage.from('images').getPublicUrl(fileName).data.publicUrl;
     const newPads = [...pads];
@@ -248,7 +236,7 @@ function TrackPlayer({data, onComplete}: any) {
   return <div className="w-full h-full flex items-center justify-center bg-black">{current && <img src={current.image_url} className="max-h-full object-contain" alt="track" />}</div>;
 }
 
-function BoxViewer({node, onUpdate}: any) {
+function BoxViewer({node}: any) {
   const data = JSON.parse(node.description || '[]');
   return (
     <div className="flex overflow-x-auto gap-4 p-4 no-scrollbar items-center">
@@ -262,7 +250,7 @@ function BoxViewer({node, onUpdate}: any) {
 function BoxCreator({onRelease, onCancel}: any) {
   const [items, setItems] = useState<any[]>(Array(6).fill(null));
   const handleFile = async (i: number, f: File) => {
-    const fileName = `${Date.now()}-${f.name}`;
+    const fileName = `${Date.now()}-${f['name']}`;
     await supabase.storage.from('images').upload(fileName, f);
     const url = supabase.storage.from('images').getPublicUrl(fileName).data.publicUrl;
     const next = [...items];

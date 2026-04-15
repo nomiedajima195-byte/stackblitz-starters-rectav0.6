@@ -38,7 +38,7 @@ const resizeImage = (file: File): Promise<Blob> => {
   });
 };
 
-export default function Room134_KooBubbleEdition() {
+export default function Room134_RoundKooEdition() {
   const [nodes, setNodes] = useState<any[]>([]);
   const [viewingNode, setViewingNode] = useState<any | null>(null);
   const [creatorMode, setCreatorMode] = useState<'NONE' | 'MENU' | 'NODE' | 'TRACK' | 'BOX'>('NONE');
@@ -113,52 +113,60 @@ export default function Room134_KooBubbleEdition() {
         .mosaic-wall { column-count: 2; column-gap: 0.5rem; } 
         @media (min-width: 768px) { .mosaic-wall { column-count: 4; column-gap: 0.75rem; } }
 
-        /* koo 吹き出しアニメーション */
-        @keyframes kooPopUp {
-          0% { transform: translate(-50%, 0) scale(0.5); opacity: 0; }
-          20% { transform: translate(-50%, -20px) scale(1.1); opacity: 1; }
-          80% { transform: translate(-50%, -50px) scale(1); opacity: 1; }
-          100% { transform: translate(-50%, -70px) scale(1); opacity: 0; }
-        }
-        .koo-bubble {
-          position: absolute;
-          bottom: 100%;
-          left: 50%;
-          transform: translateX(-50%);
+        /* 丸形吹き出しベース */
+        .bubble-base {
           background: white;
           border: 2px solid black;
-          padding: 4px 8px;
-          border-radius: 4px;
           font-family: 'DotGothic16', sans-serif;
           font-weight: bold;
           color: black;
-          pointer-events: none;
-          animation: kooPopUp 1.2s ease-out forwards;
           white-space: nowrap;
-          z-index: 9999;
-          box-shadow: 2px 2px 0px rgba(0,0,0,0.2);
+          border-radius: 999px; /* 丸形 */
+          display: flex;
+          align-items: center;
+          justify-content: center;
         }
-        /* 吹き出しのしっぽ */
-        .koo-bubble::after {
+
+        /* サムネイル用吹き出し */
+        .thumb-koo-bubble {
+          position: absolute;
+          bottom: 4px; right: 4px;
+          padding: 2px 8px;
+          font-size: 10px;
+          z-index: 20;
+          box-shadow: 2px 2px 0px rgba(0,0,0,0.1);
+        }
+        .thumb-koo-bubble::after {
           content: '';
           position: absolute;
-          top: 100%;
-          left: 50%;
+          top: 80%; left: 20%;
+          border-width: 4px;
+          border-style: solid;
+          border-color: black transparent transparent transparent;
+        }
+
+        /* アニメーション吹き出し */
+        @keyframes kooFloatUp {
+          0% { transform: translate(-50%, 0) scale(0.5); opacity: 0; }
+          20% { transform: translate(-50%, -20px) scale(1.2); opacity: 1; }
+          100% { transform: translate(-50%, -80px) scale(1); opacity: 0; }
+        }
+        .anim-koo-bubble {
+          position: absolute;
+          bottom: 100%; left: 50%;
+          padding: 6px 12px;
+          font-size: 14px;
+          animation: kooFloatUp 1.2s ease-out forwards;
+          z-index: 9999;
+        }
+        .anim-koo-bubble::after {
+          content: '';
+          position: absolute;
+          top: 98%; left: 50%;
           transform: translateX(-50%);
           border-width: 6px;
           border-style: solid;
           border-color: black transparent transparent transparent;
-        }
-        .koo-bubble::before {
-          content: '';
-          position: absolute;
-          top: 100%;
-          left: 50%;
-          transform: translateX(-50%);
-          border-width: 4px;
-          border-style: solid;
-          border-color: white transparent transparent transparent;
-          z-index: 1;
         }
       `}</style>
 
@@ -185,8 +193,10 @@ export default function Room134_KooBubbleEdition() {
                       <div className="p-3 flex items-center justify-center text-[10px] leading-tight text-center min-h-[60px]">{node.description}</div>
                     )}
                     {isTrack && <div className="absolute inset-0 flex items-center justify-center bg-black/10 text-white text-3xl opacity-30 italic">koo?</div>}
+                    
+                    {/* サムネイルの丸形koo吹き出し */}
                     {node.koo_count > 0 && (
-                      <div className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-yellow-400 text-black text-[9px] font-bold border border-black rough-dot-text text-shadow-none">koo</div>
+                      <div className="bubble-base thumb-koo-bubble italic">koo</div>
                     )}
                   </div>
                 </div>
@@ -265,7 +275,7 @@ export default function Room134_KooBubbleEdition() {
                   <div onMouseDown={() => p && setTrackData(prev => prev.length < 32 ? [...prev, p] : prev)} className="aspect-square w-full win-btn bg-white relative overflow-hidden flex items-center justify-center active:bg-yellow-200">
                     {!p ? <label className="cursor-pointer text-xl opacity-20">＋<input type="file" className="hidden" onChange={e => e.target.files?.[0] && uploadToPad(i, e.target.files[0], setPads, pads)} /></label> : <img src={p.image_url} className="w-full h-full object-cover pointer-events-none" />}
                   </div>
-                  <button onClick={() => clearPad(i)} className={`text-[8px] mt-1 ${!p && 'invisible'}`}>clr</button>
+                  <button onClick={() => {const n=[...pads]; n[i]=null; setPads(n);}} className={`text-[8px] mt-1 ${!p && 'invisible'}`}>clr</button>
                 </div>
               ))}
             </div>
@@ -290,7 +300,7 @@ export default function Room134_KooBubbleEdition() {
   );
 }
 
-/* --- Kooの吹き出しアニメーションボタン --- */
+/* --- Kooの丸形吹き出しボタン --- */
 function KooButton({onKoo}: {onKoo: () => void}) {
   const [bubbles, setBubbles] = useState<number[]>([]);
   const handlePress = () => {
@@ -305,13 +315,13 @@ function KooButton({onKoo}: {onKoo: () => void}) {
     <button onClick={handlePress} className="win-btn px-6 py-3 text-sm font-black text-black bg-yellow-400 active:bg-yellow-600">
       koo!
       {bubbles.map(id => (
-        <span key={id} className="koo-bubble italic">koo!</span>
+        <span key={id} className="bubble-base anim-koo-bubble italic">koo!</span>
       ))}
     </button>
   );
 }
 
-/* --- サポート機能 --- */
+/* --- 以下サポート機能 --- */
 async function uploadToPad(index: number, file: File, setPads: any, pads: any[]) {
   const resized = await resizeImage(file);
   const fileName = `${Date.now()}-${file.name}`;
@@ -326,19 +336,11 @@ function TrackPlayer({data, onComplete}: any) {
   const [idx, setIdx] = useState(0);
   const dataRef = useRef(data);
   const onCompleteRef = useRef(onComplete);
-
   useEffect(() => {
-    if(!dataRef.current || dataRef.current.length === 0) { 
-        onCompleteRef.current?.();
-        return; 
-    }
+    if(!dataRef.current || dataRef.current.length === 0) { onCompleteRef.current?.(); return; }
     const timer = setInterval(() => {
       setIdx(v => {
-        if (v >= dataRef.current.length - 1) { 
-            clearInterval(timer); 
-            setTimeout(() => onCompleteRef.current?.(), 800); 
-            return v; 
-        }
+        if (v >= dataRef.current.length - 1) { clearInterval(timer); setTimeout(() => onCompleteRef.current?.(), 800); return v; }
         return v + 1;
       });
     }, 450);
@@ -362,7 +364,7 @@ function NodeCreator({onPost, onCancel}: any) {
   };
   return (
     <div className="fixed inset-0 z-[4500] bg-black/60 flex items-center justify-center p-4">
-      <div className="win-btn p-4 w-full max-w-xl">
+      <div className="win-btn p-4 w-full max-w-xl bg-[#c0c0c0]">
         <div className="bg-[#000080] text-white p-1 px-2 mb-4 flex justify-between items-center text-[11px] font-bold"><span>NODE_ENTRY.EXE</span><button onClick={onCancel} className="win-btn px-2 text-black">×</button></div>
         <textarea autoFocus value={text} onChange={e=>setText(e.target.value)} className="w-full h-40 win-btn bg-white p-4 outline-none italic mb-4 text-black border-inset text-sm" placeholder="Tell something..." />
         <div className="flex justify-between items-center">
@@ -387,7 +389,7 @@ function BoxCreator({onRelease, onCancel}: any) {
   };
   return (
     <div className="fixed inset-0 z-[4500] bg-black/60 flex items-center justify-center p-4">
-      <div className="win-btn p-4 w-full max-w-xl">
+      <div className="win-btn p-4 w-full max-w-xl bg-[#c0c0c0]">
         <div className="bg-[#000080] text-white p-1 px-2 mb-4 flex justify-between items-center text-[11px] font-bold"><span>SCRAP_PACKER.EXE</span><button onClick={onCancel} className="win-btn px-2 text-black">×</button></div>
         <div className="grid grid-cols-3 gap-1 mb-4">
           {items.map((it, i) => (

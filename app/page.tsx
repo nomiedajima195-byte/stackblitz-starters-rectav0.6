@@ -7,7 +7,7 @@ const supabaseUrl = 'https://pfxwhcgdbavycddapqmz.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmeHdoY2dkYmF2eWNkZGFwcW16Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxNjQ0NzUsImV4cCI6MjA4Mjc0MDQ3NX0.YNQlbyocg2olS6-1WxTnbr5N2z52XcVIpI1XR-XrDtM';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-export default function Room134_VisualOnly() {
+export default function Room134_BrightNavy() {
   const [nodes, setNodes] = useState<any[]>([]);
   const [viewingNode, setViewingNode] = useState<any | null>(null);
   const [creatorMode, setCreatorMode] = useState<'NONE' | 'MENU' | 'TRACK' | 'BOX'>('NONE');
@@ -39,30 +39,6 @@ export default function Room134_VisualOnly() {
     newPads[index] = { id: Date.now(), image_url: url };
     setPads(newPads);
   };
-
-  // --- フィルタリングロジック ---
-  const visualNodes = nodes.filter(node => {
-    const isTrack = node.image_url === 'TRACK_TYPE';
-    const isBox = node.image_url === 'BOX_TYPE';
-
-    // 1. テキスト投稿そのものを除外
-    if (node.image_url === 'NODE') return false;
-
-    // 2. トラックまたはBOXの場合のチェック
-    if (isTrack || isBox) {
-      try {
-        const contents = JSON.parse(node.description || '[]');
-        const firstItem = contents[0];
-        // 1枚目が存在しない、または1枚目が画像URLを持っていない（'NODE'等）なら除外
-        if (!firstItem || !firstItem.image_url || firstItem.image_url === 'NODE') {
-          return false;
-        }
-      } catch (e) {
-        return false;
-      }
-    }
-    return true;
-  });
 
   return (
     <div className="min-h-screen bg-[#23395d] text-[#e0e6ed] overflow-x-hidden relative selection:bg-orange-500">
@@ -98,23 +74,31 @@ export default function Room134_VisualOnly() {
         </h1>
       </header>
 
-      <main className={`p-2 pt-24 transition-all duration-500 ${creatorMode !== 'NONE' || viewingNode ? 'blur-md opacity-20 scale-95 pointer-events-none' : 'opacity-100'}`}>
+      <main className={`p-2 pt-24 transition-all duration-500 ${creatorMode !== 'NONE' || viewingNode ? 'blur-md opacity-30 scale-95' : 'opacity-100'}`}>
         <div className="mosaic-wall max-w-[140rem] mx-auto">
-          {visualNodes.map((node) => {
+          {nodes.map((node) => {
             const isTrack = node.image_url === 'TRACK_TYPE';
             const isBox = node.image_url === 'BOX_TYPE';
-            const contents = JSON.parse(node.description || '[]');
+            const contents = (isTrack || isBox) ? JSON.parse(node.description || '[]') : [];
             const thumb = (isTrack || isBox) ? contents[0]?.image_url : node.image_url;
 
             return (
               <div key={node.id} className="mb-2 break-inside-avoid relative win-btn p-[1px] overflow-hidden group">
                 <div 
                   onClick={() => setViewingNode(node)} 
-                  className="bg-[#1a252f] relative cursor-pointer min-h-[40px] flex items-center justify-center overflow-hidden"
+                  className="bg-[#1a252f] relative cursor-pointer min-h-[60px] flex items-center justify-center overflow-hidden"
                 >
                   {isBox && <div className="absolute top-1 right-1 z-10 px-1 bg-orange-500 text-[#1a252f] text-[9px] pixel-font">BOX</div>}
-                  <img src={thumb} className="w-full h-auto opacity-90 group-hover:opacity-100 transition-opacity duration-300" />
-                  {isTrack && <div className="absolute inset-0 flex items-center justify-center bg-orange-500/10 text-orange-500/80 text-xl pixel-font opacity-0 group-hover:opacity-100 transition-all">▷ PLAY</div>}
+                  
+                  {thumb && !['NODE', 'TRACK_TYPE', 'BOX_TYPE'].includes(thumb) ? (
+                    <img src={thumb} className="w-full h-auto opacity-90 group-hover:opacity-100 transition-opacity" />
+                  ) : (
+                    <div className="p-4 text-[10px] text-center italic opacity-40 pixel-font">
+                      {node.description}
+                    </div>
+                  )}
+
+                  {isTrack && <div className="absolute inset-0 flex items-center justify-center bg-orange-500/5 text-orange-500/60 text-xl pixel-font group-hover:text-orange-500 group-hover:bg-orange-500/20 transition-all">▷ PLAY</div>}
                 </div>
               </div>
             );
@@ -124,10 +108,10 @@ export default function Room134_VisualOnly() {
 
       {/* Viewer */}
       {viewingNode && (
-        <div className="fixed inset-0 z-[5000] bg-[#23395d]/98 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[5000] bg-[#23395d]/95 flex items-center justify-center p-4">
           <div className="win-btn bg-[#2c3e50] w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
             <div className="bg-[#5d6d7e] text-white p-2 px-3 flex justify-between items-center text-[12px] pixel-font">
-              <span>Rubbish</span>
+              <span>VIEW_ARTIFACT</span>
               <button onClick={() => setViewingNode(null)} className="win-btn px-4 text-[#ff8c00]">X</button>
             </div>
             <div className="p-4 overflow-auto bg-[#1a252f] flex-grow flex flex-col items-center justify-center min-h-[300px]">
@@ -160,9 +144,9 @@ export default function Room134_VisualOnly() {
         </nav>
       )}
 
-      {/* Track Maker UI */}
+      {/* Track Creator UI */}
       {creatorMode === 'TRACK' && (
-        <div className="fixed inset-0 z-[4500] bg-black/90 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[4500] bg-black/85 flex items-center justify-center p-4">
           <div className="win-btn p-4 w-full max-w-md bg-[#2c3e50]">
             <div className="bg-[#5d6d7e] p-2 mb-4 text-[12px] pixel-font flex justify-between items-center text-white">
               <span>TRACK_MAKER</span>
@@ -209,27 +193,20 @@ function TrackPlayer({data, onComplete}: any) {
     return () => clearInterval(timer);
   }, [data, onComplete]);
   const current = data[idx];
-  
-  // トラック再生中にテキストが含まれていても表示しない（画像のみを表示）
-  if (!current?.image_url || current.image_url === 'NODE') return null;
-
   return (
     <div className="flex items-center justify-center w-full h-full">
-      <img key={idx} src={current.image_url} className="max-h-[85vh] object-contain shadow-[0_0_60px_rgba(0,0,0,0.5)]" />
+      {current?.image_url && <img key={idx} src={current.image_url} className="max-h-[85vh] object-contain" />}
     </div>
   );
 }
 
 function BoxViewer({node}: any) {
   const data = JSON.parse(node.description || '[]');
-  // Box内でも画像がないものはスキップ
-  const visualItems = data.filter((item:any) => item.image_url && item.image_url !== 'NODE');
-  
   return (
-    <div className="w-full h-full flex items-center overflow-x-auto p-4 space-x-6 scrollbar-hide">
-      {visualItems.map((item: any, i: number) => (
+    <div className="w-full h-full flex items-center overflow-x-auto p-4 space-x-6">
+      {data.map((item: any, i: number) => (
         <div key={i} className="flex-shrink-0 win-btn p-[2px] bg-[#23395d]">
-          <img src={item.image_url} className="h-[65vh] object-contain" />
+          <img src={item.image_url} className="h-[65vh] object-contain shadow-lg" />
         </div>
       ))}
     </div>

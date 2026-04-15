@@ -29,11 +29,12 @@ export default function Room134_90s() {
   return (
     <div className="min-h-screen text-[#000] font-mono overflow-x-hidden relative">
       <style jsx global>{`
+        /* 1. 背景をネイビー一色に固定 */
         body {
-          background: linear-gradient(135deg, #1A1A4D 0%, #1A1A4D 25%, #ff9a9e 40%, #fad0c4 50%, #a1c4fd 70%, #ace0f9 100%);
-          background-attachment: fixed;
-          background-size: cover;
+          background-color: #000080;
+          background-image: none;
         }
+        
         .win-btn {
           background: #c0c0c0;
           border-top: 2px solid #fff;
@@ -53,19 +54,29 @@ export default function Room134_90s() {
           padding-top: 2px;
           padding-left: 2px;
         }
-        .dot-text { font-family: 'Courier New', Courier, monospace; letter-spacing: -1px; font-weight: bold; }
+
+        /* 3. 粗々のドットフォント表現（アンチエイリアスを切り、文字間を詰め、影で立体感を出す） */
+        .rough-dot-text { 
+          font-family: 'MS PGothic', 'Courier New', monospace; 
+          letter-spacing: -2px; 
+          font-weight: 900; 
+          font-smooth: never;
+          -webkit-font-smoothing: none;
+          text-shadow: 2px 2px 0px #000;
+          image-rendering: pixelated;
+        }
+        
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .mosaic-wall { column-count: 2; column-gap: 0.5rem; } 
         @media (min-width: 768px) { .mosaic-wall { column-count: 4; column-gap: 0.75rem; } }
       `}</style>
 
-      {/* Header: オレンジRoom134 & 白◎upload */}
-      <header className={`fixed top-0 left-0 w-full z-[3000] p-4 flex items-center justify-center gap-10 transition-opacity duration-500 ${viewingNode ? 'opacity-0' : 'opacity-100'}`}>
-        <h1 onClick={() => window.location.reload()} className="text-2xl dot-text italic text-orange-500 cursor-pointer drop-shadow-md">Room134</h1>
-        <div className="text-sm dot-text text-white">◎ upload</div>
+      {/* Header: Room134のみ。粗いドットフォント＆オレンジ */}
+      <header className={`fixed top-0 left-0 w-full z-[3000] p-4 flex items-center justify-center transition-opacity duration-500 ${viewingNode ? 'opacity-0' : 'opacity-100'}`}>
+        <h1 onClick={() => window.location.reload()} className="text-4xl rough-dot-text text-[#FF8C00] cursor-pointer">Room134</h1>
       </header>
 
-      <main className={`p-2 pt-20 transition-all duration-700 ${creatorMode !== 'NONE' || viewingNode ? 'blur-sm scale-95 pointer-events-none' : 'opacity-100'}`}>
+      <main className={`p-2 pt-20 pb-16 transition-all duration-700 ${creatorMode !== 'NONE' || viewingNode ? 'blur-sm scale-95 pointer-events-none' : 'opacity-100'}`}>
         <div className="mosaic-wall max-w-[140rem] mx-auto">
           {nodes.map(node => {
             const isTrack = node.image_url === 'TRACK_TYPE';
@@ -77,7 +88,7 @@ export default function Room134_90s() {
                 <div className="bg-white relative">
                   {isBox && <div className="absolute top-1 right-1 z-10 w-4 h-4 bg-[#c0c0c0] border border-black flex items-center justify-center text-[10px]">▢</div>}
                   {thumb && !['NODE', 'TRACK_TYPE', 'BOX_TYPE'].includes(thumb) ? (
-                    <img src={thumb} className="w-full h-auto grayscale-[30%] group-hover:grayscale-0" alt="node" />
+                    <img src={thumb} className="w-full h-auto grayscale-[30%] hover:grayscale-0" alt="node" />
                   ) : (
                     <div className="p-3 flex items-center justify-center text-[11px] leading-relaxed text-center min-h-[80px]">{node.description}</div>
                   )}
@@ -89,7 +100,7 @@ export default function Room134_90s() {
         </div>
       </main>
 
-      {/* Viewing Interface: 大きなグレーの四角いウィンドウ */}
+      {/* Viewing Interface */}
       {viewingNode && (
         <div className="fixed inset-0 z-[5000] bg-black/60 flex items-center justify-center p-4">
           <div className="win-btn bg-[#c0c0c0] w-full max-w-5xl h-[85vh] flex flex-col shadow-2xl">
@@ -118,12 +129,13 @@ export default function Room134_90s() {
         </div>
       )}
 
-      {/* Footer: 背景グレー、テキスト黒、四角いボタン */}
+      {/* Footer: 2. 「◎ upload」をフッターの左端に配置（Roomと差し替え） */}
       {!viewingNode && (
-        <nav className="fixed bottom-0 left-0 w-full bg-[#c0c0c0] border-t-2 border-white p-1 flex items-center z-[4000] h-12">
+        <nav className="fixed bottom-0 left-0 w-full bg-[#c0c0c0] border-t-2 border-white p-1 flex items-center z-[4000] h-12 shadow-[0_-2px_5px_rgba(0,0,0,0.2)]">
           <button onClick={() => setCreatorMode(creatorMode === 'NONE' ? 'MENU' : 'NONE')} className="win-btn px-4 h-full flex items-center gap-2 font-bold text-[12px] text-black italic">
-            ◎ Room
+            ◎ upload
           </button>
+          
           <div className="ml-2 flex gap-1 h-full items-center">
             {creatorMode === 'MENU' && (
               <>
@@ -133,6 +145,7 @@ export default function Room134_90s() {
               </>
             )}
           </div>
+
           <div className="win-btn px-3 h-full flex items-center text-[10px] font-mono bg-[#dfdfdf] ml-auto border-inset text-black">
             {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </div>
@@ -146,7 +159,7 @@ export default function Room134_90s() {
   );
 }
 
-/* --- コンポーネント (エラー回避を強化) --- */
+/* --- コンポーネント群 (エラー修正済み仕様を維持) --- */
 
 function NodeCreator({onPost, onCancel}: any) {
   const [text, setText] = useState('');
@@ -155,7 +168,7 @@ function NodeCreator({onPost, onCancel}: any) {
   const handlePost = async () => {
     let url = null;
     if(file) {
-      const fileName = `${Date.now()}-${file['name']}`; // 文字列キーで安全にアクセス
+      const fileName = `${Date.now()}-${file['name']}`;
       await supabase.storage.from('images').upload(fileName, file);
       url = supabase.storage.from('images').getPublicUrl(fileName).data.publicUrl;
     }
@@ -164,7 +177,7 @@ function NodeCreator({onPost, onCancel}: any) {
 
   return (
     <div className="fixed inset-0 z-[4500] bg-black/40 flex items-center justify-center p-4">
-      <div className="win-btn p-4 w-full max-w-xl">
+      <div className="win-btn p-4 w-full max-w-xl shadow-2xl">
         <div className="bg-[#000080] text-white p-1 px-2 mb-4 flex justify-between items-center text-[11px] font-bold">
           <span>NEW_NODE.EXE</span>
           <button onClick={onCancel} className="win-btn px-2 text-black">×</button>
@@ -174,9 +187,8 @@ function NodeCreator({onPost, onCancel}: any) {
             <label className="win-btn px-4 py-1 text-[10px] font-bold cursor-pointer">UPLOAD IMG<input type="file" className="hidden" onChange={e=>setFile(e.target.files?.[0]||null)} /></label>
             <button onClick={handlePost} className="win-btn px-8 py-2 font-bold text-black">POST</button>
         </div>
-        {/* エラー箇所修正: インデックスアクセスと論理チェックの組み合わせでTypeScriptを黙らせる */}
         {file && file['name'] && (
-          <p className="text-[8px] text-gray-600 mt-2 italic break-all">
+          <p className="text-[8px] text-[#000080] mt-2 font-bold break-all">
             {`>> ${file['name']}`}
           </p>
         )}
@@ -197,7 +209,7 @@ function TrackSequencer({onPost, onCancel, pads, setPads}: any) {
   };
   return (
     <div className="fixed inset-0 z-[4500] bg-black/40 flex items-center justify-center p-4">
-      <div className="win-btn p-4 w-full max-w-sm">
+      <div className="win-btn p-4 w-full max-w-sm shadow-2xl">
         <div className="bg-[#000080] text-white p-1 px-2 mb-4 flex justify-between items-center text-[11px] font-bold">
           <span>TRACK_GEN.EXE</span>
           <button onClick={onCancel} className="win-btn px-2 text-black">×</button>
@@ -259,7 +271,7 @@ function BoxCreator({onRelease, onCancel}: any) {
   };
   return (
     <div className="fixed inset-0 z-[4500] bg-black/40 flex items-center justify-center p-4">
-      <div className="win-btn p-4 w-full max-w-xl">
+      <div className="win-btn p-4 w-full max-w-xl shadow-2xl">
         <div className="bg-[#000080] text-white p-1 px-2 mb-4 flex justify-between items-center text-[11px] font-bold">
           <span>SCRAP_PACK.EXE</span>
           <button onClick={onCancel} className="win-btn px-2 text-black">×</button>
